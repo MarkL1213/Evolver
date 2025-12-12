@@ -48,7 +48,7 @@ public partial class ChartControl : UserControl
     Dictionary<Guid, SubPanel> _subPanels = new Dictionary<Guid, SubPanel>();
     int _subPanelNextNumber = 1;
 
-    internal SubPanel? AddNewChartPanel()
+    internal SubPanel? AddNewSubPanel()
     {
         if (DataContext == null) { return null; }
         ChartControlViewModel? vm = (ChartControlViewModel)DataContext;
