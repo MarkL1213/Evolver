@@ -454,6 +454,13 @@ public partial class ChartPanel : Decorator
             {
                 var bodyRect = new Rect(xCenter - halfBarWidth, bodyTop, halfBarWidth * 2, bodyHeight);
                 context.DrawRectangle(bodyBrush, wickPen, bodyRect);
+                if (bodyHeight > 1)
+                {
+                    // Top/bottom lines for open/close levels
+                    context.DrawLine(wickPen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
+                    if (openY != closeY)  // Avoid double line on doji
+                        context.DrawLine(wickPen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
+                }
             }
         }
     }
