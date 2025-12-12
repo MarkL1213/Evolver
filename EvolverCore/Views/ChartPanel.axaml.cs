@@ -24,7 +24,15 @@ public partial class ChartPanel : Decorator
             GridLinesDashStyleProperty,
             GridLinesBoldColorProperty,
             GridLinesBoldThicknessProperty,
-            GridLinesBoldDashStyleProperty
+            GridLinesBoldDashStyleProperty,
+            CandleDownColorProperty,
+            CandleUpColorProperty,
+            WickColorProperty,
+            WickDashStyleProperty,
+            WickThicknessProperty,
+            CandleOutlineThicknessProperty,
+            CandleOutlineDashStyleProperty,
+            CandleOutlineColorProperty
             );
 
         AvaloniaProperty[] penProperties =
@@ -34,7 +42,13 @@ public partial class ChartPanel : Decorator
             GridLinesDashStyleProperty,
             GridLinesBoldColorProperty,
             GridLinesBoldThicknessProperty,
-            GridLinesBoldDashStyleProperty
+            GridLinesBoldDashStyleProperty,
+            WickThicknessProperty,
+            WickColorProperty,
+            WickDashStyleProperty,
+            CandleOutlineThicknessProperty,
+            CandleOutlineDashStyleProperty,
+            CandleOutlineColorProperty
         };
         
         foreach (AvaloniaProperty p in penProperties)
@@ -49,11 +63,6 @@ public partial class ChartPanel : Decorator
         PointerPressed += OnPointerPressed;
         PointerMoved += OnPointerMoved;
         PointerReleased += OnPointerReleased;
-
-        _candleBullBrush = new SolidColorBrush(Colors.LimeGreen, 0.7);
-        _candleBearBrush = new SolidColorBrush(Colors.Red, 0.7);
-        _candleBullPen = new Pen(Brushes.LimeGreen, 1.5);
-        _candleBearPen = new Pen(Brushes.Red, 1.5);
     }
 
 
@@ -274,10 +283,82 @@ public partial class ChartPanel : Decorator
         return ticks;
     }
 
-    private Pen _candleBullPen;
-    private Pen _candleBearPen;
-    private IBrush _candleBullBrush;
-    private IBrush _candleBearBrush;
+
+    #region CandleOutline pen properties
+    private Pen? _cachedCandleOutlinePen;
+
+    public static readonly StyledProperty<IBrush> CandleOutlineColorProperty =
+    AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CandleOutlineColor), Brushes.DarkGray);
+    public IBrush CandleOutlineColor
+    {
+        get { return GetValue(CandleOutlineColorProperty); }
+        set { SetValue(CandleOutlineColorProperty, value); }
+    }
+
+    public static readonly StyledProperty<double> CandleOutlineThicknessProperty =
+    AvaloniaProperty.Register<ChartPanel, double>(nameof(CandleOutlineThickness), 1);
+    public double CandleOutlineThickness
+    {
+        get { return GetValue(CandleOutlineThicknessProperty); }
+        set { SetValue(CandleOutlineThicknessProperty, value); }
+    }
+
+    public static readonly StyledProperty<IDashStyle?> CandleOutlineDashStyleProperty =
+    AvaloniaProperty.Register<ChartPanel, IDashStyle?>(nameof(CandleOutlineDashStyle), null);
+    public IDashStyle? CandleOutlineDashStyle
+    {
+        get { return GetValue(CandleOutlineDashStyleProperty); }
+        set { SetValue(CandleOutlineDashStyleProperty, value); }
+    }
+    #endregion
+
+    #region Wick pen properties
+    private Pen? _cachedWickPen;
+
+    public static readonly StyledProperty<IBrush> WickColorProperty =
+    AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(WickColor), Brushes.DarkGray);
+    public IBrush WickColor
+    {
+        get { return GetValue(WickColorProperty); }
+        set { SetValue(WickColorProperty, value); }
+    }
+
+    public static readonly StyledProperty<double> WickThicknessProperty =
+    AvaloniaProperty.Register<ChartPanel, double>(nameof(WickThickness), 1);
+    public double WickThickness
+    {
+        get { return GetValue(WickThicknessProperty); }
+        set { SetValue(WickThicknessProperty, value); }
+    }
+
+    public static readonly StyledProperty<IDashStyle?> WickDashStyleProperty =
+    AvaloniaProperty.Register<ChartPanel, IDashStyle?>(nameof(WickDashStyle), null);
+    public IDashStyle? WickDashStyle
+    {
+        get { return GetValue(WickDashStyleProperty); }
+        set { SetValue(WickDashStyleProperty, value); }
+    }
+    #endregion
+
+    #region CandleUpColor property
+    public static readonly StyledProperty<IBrush> CandleUpColorProperty =
+        AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CandleUpColor), Brushes.Green);
+    public IBrush CandleUpColor
+    {
+        get { return GetValue(CandleUpColorProperty); }
+        set { SetValue(CandleUpColorProperty, value); }
+    }
+    #endregion
+
+    #region CandleDownColor property
+    public static readonly StyledProperty<IBrush> CandleDownColorProperty =
+        AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CandleDownColor), Brushes.Red);
+    public IBrush CandleDownColor
+    {
+        get { return GetValue(CandleDownColorProperty); }
+        set { SetValue(CandleDownColorProperty, value); }
+    }
+    #endregion
 
     #region ShowGridLines property
     public static readonly StyledProperty<bool> ShowGridLinesProperty =
@@ -372,6 +453,8 @@ public partial class ChartPanel : Decorator
     {
         _cachedGridLinesPen = null;
         _cachedGridLinesBoldPen = null;
+        _cachedWickPen = null;
+        _cachedCandleOutlinePen = null;
     }
 
     public override void Render(DrawingContext context)
@@ -434,11 +517,12 @@ public partial class ChartPanel : Decorator
             double closeY = Bounds.Height - (bar.Close - yAxis.Min) / yRange * Bounds.Height;
 
             bool isBull = bar.Close >= bar.Open;
-            var bodyBrush = isBull ? _candleBullBrush : _candleBearBrush;
-            var wickPen = isBull ? _candleBullPen : _candleBearPen;
+            var bodyBrush = isBull ? CandleUpColor : CandleDownColor;
+            _cachedWickPen ??= new Pen(WickColor, WickThickness, WickDashStyle);
+            _cachedCandleOutlinePen ??= new Pen(CandleOutlineColor,CandleOutlineThickness,CandleOutlineDashStyle);
 
             // Wick (high-low line)
-            context.DrawLine(wickPen, new Point(xCenter, highY), new Point(xCenter, lowY));
+            context.DrawLine(_cachedWickPen, new Point(xCenter, highY), new Point(xCenter, lowY));
 
             // Body (rectangle)
             double bodyTop = Math.Min(openY, closeY);
@@ -447,19 +531,19 @@ public partial class ChartPanel : Decorator
 
             if (bodyHeight < 1) // Doji or very small body to draw as line
             {
-                context.DrawLine(wickPen, new Point(xCenter - halfBarWidth, bodyTop),
+                context.DrawLine(_cachedWickPen, new Point(xCenter - halfBarWidth, bodyTop),
                                         new Point(xCenter + halfBarWidth, bodyTop));
             }
             else
             {
                 var bodyRect = new Rect(xCenter - halfBarWidth, bodyTop, halfBarWidth * 2, bodyHeight);
-                context.DrawRectangle(bodyBrush, wickPen, bodyRect);
+                context.DrawRectangle(bodyBrush, _cachedCandleOutlinePen, bodyRect);
                 if (bodyHeight > 1)
                 {
                     // Top/bottom lines for open/close levels
-                    context.DrawLine(wickPen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
+                    context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
                     if (openY != closeY)  // Avoid double line on doji
-                        context.DrawLine(wickPen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
+                        context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
                 }
             }
         }
