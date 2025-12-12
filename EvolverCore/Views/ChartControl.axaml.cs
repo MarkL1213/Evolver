@@ -7,6 +7,7 @@ using Avalonia.Skia;
 using System.Collections.Generic;
 using System;
 using EvolverCore.ViewModels;
+using System.Linq;
 
 namespace EvolverCore;
 
@@ -45,7 +46,7 @@ public partial class ChartControl : UserControl
         internal ChartPanelViewModel? ViewModel { get; set; }
     }
 
-    Dictionary<Guid, SubPanel> _subPanels = new Dictionary<Guid, SubPanel>();
+    
     int _subPanelNextNumber = 1;
 
     internal SubPanel? AddNewSubPanel()
@@ -57,8 +58,13 @@ public partial class ChartControl : UserControl
         int subPanelCount = vm.SubPanelViewModels.Count;
 
         ChartPanelViewModel subVM = new ChartPanelViewModel { XAxis = vm.SharedXAxis };
-        vm.SubPanelViewModels.Add(subVM);
 
+        SubPanel subPanel = new SubPanel();
+        subPanel.ID = Guid.NewGuid();
+        subPanel.Number = _subPanelNextNumber++;
+        subPanel.ViewModel = subVM;
+
+        vm.SubPanelViewModels.Add(subPanel);
 
         int n = ChartPanelGrid.RowDefinitions.Count - 2;
 
@@ -68,11 +74,6 @@ public partial class ChartControl : UserControl
 
         Grid.SetRow(PrimaryXAxisSplitter, Grid.GetRow(PrimaryXAxisSplitter) + 2);
         Grid.SetRow(PrimaryXAxis, Grid.GetRow(PrimaryXAxis) + 2);
-
-        SubPanel subPanel = new SubPanel();
-        subPanel.ID = Guid.NewGuid();
-        subPanel.Number = _subPanelNextNumber;
-        subPanel.ViewModel = subVM;
 
         GridSplitter gs = new GridSplitter();
         Grid.SetRow(gs, (subPanelCount*2) + 1);
@@ -98,9 +99,6 @@ public partial class ChartControl : UserControl
         cs.SetConnectedChartPanel(cp);
         cp.SetConnectedChartYAxis(cs);
         
-        _subPanels.Add(subPanel.ID,subPanel);
-        _subPanelNextNumber++;
-
         return subPanel;
     }
     internal void RemoveSubPanel(Guid id)
@@ -109,8 +107,8 @@ public partial class ChartControl : UserControl
         ChartControlViewModel? vm = (ChartControlViewModel)DataContext;
         if (vm == null) { return; }
 
-        if (!_subPanels.ContainsKey(id)) { return; }
-        SubPanel subPanel = _subPanels[id];
+        SubPanel? subPanel = vm.SubPanelViewModels.FirstOrDefault(sp => sp.ID == id);
+        if (subPanel == null) { return; }
 
         if (subPanel.Splitter != null)
         {
@@ -130,19 +128,20 @@ public partial class ChartControl : UserControl
 
         if (subPanel.Axis != null) ChartPanelGrid.Children.Remove(subPanel.Axis);
 
-        if (subPanel.ViewModel != null) vm.SubPanelViewModels.Remove(subPanel.ViewModel);
+        vm.SubPanelViewModels.Remove(subPanel);
 
         int oldPanelNumber = subPanel.Number;
-        _subPanels.Remove(id);
-        foreach (Guid remainingPanelID in _subPanels.Keys)
+
+        foreach (SubPanel rPanel in vm.SubPanelViewModels)
         {
-            SubPanel rPanel = _subPanels[remainingPanelID];
+            if (rPanel.Number > oldPanelNumber)
+            {
+                rPanel.Number--;
 
-            if(rPanel.Number > oldPanelNumber) rPanel.Number--;
-
-            if (rPanel.Panel != null) Grid.SetRow(rPanel.Panel, Grid.GetRow(rPanel.Panel) - 2);
-            if (rPanel.Axis != null) Grid.SetRow(rPanel.Axis, Grid.GetRow(rPanel.Axis) - 2);
-            if (rPanel.Splitter != null) Grid.SetRow(rPanel.Splitter, Grid.GetRow(rPanel.Splitter) - 2);
+                if (rPanel.Panel != null) Grid.SetRow(rPanel.Panel, Grid.GetRow(rPanel.Panel) - 2);
+                if (rPanel.Axis != null) Grid.SetRow(rPanel.Axis, Grid.GetRow(rPanel.Axis) - 2);
+                if (rPanel.Splitter != null) Grid.SetRow(rPanel.Splitter, Grid.GetRow(rPanel.Splitter) - 2);
+            }
         }
         _subPanelNextNumber--;
 
