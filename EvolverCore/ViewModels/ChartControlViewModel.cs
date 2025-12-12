@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using EvolverCore.Data;
@@ -20,8 +21,8 @@ namespace EvolverCore.ViewModels
 
         public ChartPanelViewModel PrimaryChartPanelViewModel { get; } = new ChartPanelViewModel();
 
-        public int MainBorderThickness { get; } = 3;
-        public IBrush MainBorderColor { get; } = Brushes.Blue;
+        [ObservableProperty] Thickness _mainBorderThickness = new Thickness(3);
+        [ObservableProperty] IBrush _mainBorderColor = Brushes.Blue;
 
         public ObservableCollection<ChartPanelViewModel> SubPanelViewModels { get; } = new ObservableCollection<ChartPanelViewModel>();
 

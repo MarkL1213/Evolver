@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using EvolverCore.ViewModels;
 
 namespace EvolverCore.Views
 {
@@ -7,6 +8,7 @@ namespace EvolverCore.Views
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = new MainWindowViewModel();
         }
     }
 }

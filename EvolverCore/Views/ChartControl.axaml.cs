@@ -17,10 +17,9 @@ public partial class ChartControl : UserControl
     {
         ChartControlViewModel vm =  new ChartControlViewModel();
         
-        
         InitializeComponent();
         DataContext = vm;
-        
+
         PrimaryChartPanel.ClearValue(DataContextProperty);
         PrimaryChartPanel.DataContext = vm.PrimaryChartPanelViewModel;
         
@@ -77,6 +76,9 @@ public partial class ChartControl : UserControl
         
         return subPanelCount;
     }
+
+    //FIXME: give panels an ID that is independant of their container index
+    //FIXME: account for the new XAxis and splitter when removing rows!
 
     public void RemoveSubPanel(int index)
     {

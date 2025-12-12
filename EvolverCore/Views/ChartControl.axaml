@@ -6,12 +6,14 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:DataType="vm:ChartControlViewModel"
-             x:Class="EvolverCore.ChartControl">
+             x:Class="EvolverCore.ChartControl"
+             >
 <Design.DataContext>
     <vm:ChartControlViewModel/>
 </Design.DataContext>
 
-<Border BorderBrush="{Binding MainBorderColor}" BorderThickness="{Binding MainBorderThickness}">
+<Border BorderBrush="{Binding MainBorderColor}"
+        BorderThickness="{Binding MainBorderThickness}">
     <Grid Name="ChartGrid">
         <Grid.RowDefinitions>
 		    <RowDefinition Height="90*" />
