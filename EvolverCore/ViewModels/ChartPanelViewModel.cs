@@ -35,7 +35,7 @@ namespace EvolverCore.ViewModels
 
         internal ChartXAxisViewModel? XAxis { set; get; }
         internal ChartYAxisViewModel YAxis { get; } = new ChartYAxisViewModel();
-        internal IDataSeries<IDataPoint> Data { get; set; }
+        internal IDataSeries<IDataPoint>? Data { get; set; }
 
 
         [ObservableProperty] bool _showGridLines = true;

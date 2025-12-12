@@ -565,4 +565,54 @@ public partial class ChartPanel : Decorator
         var geometry = new PolylineGeometry(visiblePoints, false);
         context.DrawGeometry(null, new Pen(Brushes.Cyan, 1.5), geometry);
     }
+
+    //private Pen? _volumeBullPen;
+    //private Pen? _volumeBearPen;
+    //private IBrush? _volumeBullBrush;
+    //private IBrush? _volumeBearBrush;
+
+    //private void DrawVolumeHistogram(DrawingContext context)
+    //{
+    //    if (_vm?.Data is not BarDataSeries bars || bars.Count == 0) return;
+    //    if (_vm.XAxis is not { Min: not null, Max: not null } xAxis) return;
+
+    //    TimeSpan xSpan = xAxis.Max.Value - xAxis.Min.Value;
+    //    if (xSpan <= TimeSpan.Zero) return;
+
+    //    // Find max volume in visible range for proper scaling
+    //    long maxVolume = 0;
+    //    foreach (var bar in bars)
+    //    {
+    //        if (bar.Time >= xAxis.Min.Value && bar.Time <= xAxis.Max.Value)
+    //            maxVolume = Math.Max(maxVolume, bar.Volume);
+    //    }
+
+    //    if (maxVolume == 0) return;
+
+    //    double pixelsPerTick = Bounds.Width / xSpan.TotalMilliseconds;
+    //    double barWidth = pixelsPerTick * bars.IntervalTicks();  // Reuse your existing logic
+    //    double maxBarHeight = Bounds.Height * 0.2; // Volume takes ~20% of panel height (adjustable)
+
+    //    foreach (var bar in bars)
+    //    {
+    //        if (bar.Time < xAxis.Min.Value || bar.Time > xAxis.Max.Value) continue;
+
+    //        double xCenter = (bar.Time - xAxis.Min.Value).TotalMilliseconds * pixelsPerTick;
+    //        double volumeRatio = (double)bar.Volume / maxVolume;
+    //        double barHeight = volumeRatio * maxBarHeight;
+
+    //        bool isBull = bar.Close >= bar.Open;
+    //        var brush = isBull ? _volumeBullBrush : _volumeBearBrush;
+    //        var pen = isBull ? _volumeBullPen : _volumeBearPen;
+
+    //        var rect = new Rect(
+    //            xCenter - barWidth * 0.4,
+    //            Bounds.Height - barHeight,
+    //            barWidth * 0.8,
+    //            barHeight);
+
+    //        context.DrawRectangle(brush, pen, rect);
+    //    }
+    //}
+
 }

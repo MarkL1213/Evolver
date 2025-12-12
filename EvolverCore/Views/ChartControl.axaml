@@ -37,7 +37,7 @@
             <GridSplitter Grid.Row="0" Grid.Column="1"/>
             <local:ChartYAxis Name="PrimaryYAxis" Grid.Row="0" Grid.Column="2"/>
         </Grid>
-        <GridSplitter Grid.Row="1" Grid.Column="0"/>
+        <GridSplitter Name="PrimaryXAxisSplitter" Grid.Row="1" Grid.Column="0"/>
         <local:ChartXAxis Name="PrimaryXAxis" Grid.Row="2" Grid.Column="0"/>
     </Grid>
 </Border>
