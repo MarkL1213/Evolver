@@ -1,0 +1,6 @@
+.vs/
+EvolverCore/obj/
+EvolverCore/bin/
+Samples/
+*.tmp
+*.user

@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="using:EvolverCore"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="EvolverCore.ChartControl">
+<Border BorderBrush="Blue" BorderThickness="3">
+    <Grid Name="ChartGrid">
+        <Grid.RowDefinitions>
+		    <RowDefinition Height="90*" />
+            <RowDefinition Height="3" />
+            <RowDefinition Height="10*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+		    <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+	    <Grid Name="ChartPanelGrid" Grid.Row="0" Grid.Column="0">
+            <Grid.RowDefinitions>
+			    <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+			    <ColumnDefinition Width="90*" />
+                <ColumnDefinition Width="3" />
+                <ColumnDefinition Width="10*" />
+            </Grid.ColumnDefinitions>
+		    <local:ChartPanel Name="PrimaryChartPanel" Grid.Row="0" Grid.Column="0"> </local:ChartPanel>
+            <GridSplitter Grid.Row="0" Grid.Column="1"/>
+            <local:ChartYAxis Name="PrimaryYAxis" Grid.Row="0" Grid.Column="2"/>
+        </Grid>
+        <GridSplitter Grid.Row="1" Grid.Column="0"/>
+        <local:ChartXAxis Name="PrimaryXAxis" Grid.Row="2" Grid.Column="0"/>
+    </Grid>
+</Border>
+</UserControl>
