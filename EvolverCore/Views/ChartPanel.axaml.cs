@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using EvolverCore.ViewModels;
+using EvolverCore.Views.Components;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -455,6 +456,8 @@ public partial class ChartPanel : Decorator
         _cachedCandleOutlinePen = null;
     }
 
+    List<IChartComponentRenderer> _attachedComponents = new List<IChartComponentRenderer>();
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -463,9 +466,9 @@ public partial class ChartPanel : Decorator
         DrawCandlesticks(context);
 
         if (_vm == null) return;
-        foreach (ChartComponentBase cc in _vm.ChartComponents)
+        foreach (IChartComponentRenderer component in _attachedComponents)
         {
-            cc.Render(context, this);
+            component.Render(context, this);
         }
     }
 

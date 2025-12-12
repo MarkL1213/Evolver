@@ -143,9 +143,9 @@ public partial class ChartControl : UserControl
                     rPanel.Panel.PanelNumber = rPanel.Number;
                     if (rPanel.ViewModel != null)
                     {
-                        foreach (ChartComponentBase cc in rPanel.ViewModel.ChartComponents)
+                        foreach (ChartComponentViewModel ccvm in rPanel.ViewModel.ChartComponents)
                         {
-                            cc.ChartPanelNumber = rPanel.Number;
+                            ccvm.ChartPanelNumber = rPanel.Number;
                         }
                     }
                     Grid.SetRow(rPanel.Panel, Grid.GetRow(rPanel.Panel) - 2);

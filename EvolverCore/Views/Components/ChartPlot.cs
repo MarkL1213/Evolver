@@ -1,6 +1,5 @@
 ﻿using Avalonia;
 using Avalonia.Media;
-using CommunityToolkit.Mvvm.ComponentModel;
 using EvolverCore.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -8,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EvolverCore
+namespace EvolverCore.Views
 {
     public enum PlotStyle
     {
@@ -16,20 +15,11 @@ namespace EvolverCore
         Bar
     }
 
-
-    internal partial class ChartPlotProperties : ObservableObject
-    {
-        [ObservableProperty] internal IBrush? _plotFillBrush = Brushes.Cyan;
-        [ObservableProperty] internal IBrush? _plotLineBrush = Brushes.Turquoise;
-        [ObservableProperty] internal double _plotLineThickness = 1.5;
-        [ObservableProperty] internal IDashStyle? _plotLineStyle = null;
-    }
-
     internal class ChartPlot : AvaloniaObject
     {
         internal ChartPlot()
         {
-            AvaloniaProperty[] penProperties = 
+            AvaloniaProperty[] penProperties =
             {
                 PlotLineColorProperty,
                 PlotLineStyleProperty,
@@ -42,7 +32,6 @@ namespace EvolverCore
 
         internal PlotStyle Style { get; set; } = PlotStyle.Line;
         internal TimeDataSeries Data { get; } = new TimeDataSeries();
-        ChartPlotProperties Properties { get; } = new ChartPlotProperties();
 
         #region PlotFillColor property
         public static readonly StyledProperty<IBrush> PlotFillColorProperty =
