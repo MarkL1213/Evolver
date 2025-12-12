@@ -1,5 +1,4 @@
-﻿using EvolverAPI.Instrument;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -12,7 +11,7 @@ using System.Threading.Tasks;
 using System.Xml.Serialization;
 using MessagePack;
 
-namespace EvolverCore.Data
+namespace EvolverCore
 {
     public enum Interval
     {
@@ -93,6 +92,10 @@ namespace EvolverCore.Data
         public IEnumerable<T> Select(Func<T, int, T> selector);
 
         public int Count { get; }
+    }
+
+    public class DataSeries
+    {
     }
 
     public class DataSeries<T> : IDataSeries<T> where T : IDataPoint
@@ -190,6 +193,12 @@ namespace EvolverCore.Data
 
             return series;
         }
+
+        internal static long IntervalTicks(DataSeries<T> series)
+        {
+            if (series.Count < 2) return TimeSpan.FromMinutes(1).Ticks;
+            return (series[1].X - series[0].X).Ticks;
+        }
     }
 
     public class TimeDataSeries : DataSeries<TimeDataPoint>
@@ -212,11 +221,6 @@ namespace EvolverCore.Data
         public BarDataSeries()
         {
             TimeZoneInfo = TimeZoneInfo.Local;
-        }
-        internal static long IntervalTicks(BarDataSeries series)
-        {
-            if (series.Count < 2) return TimeSpan.FromMinutes(1).Ticks;
-            return (series[1].Time - series[0].Time).Ticks;
         }
     }
 

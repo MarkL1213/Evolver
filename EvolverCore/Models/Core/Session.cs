@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
-namespace EvolverCore.Session
+namespace EvolverCore
 {
     public class SessionHoursCollection : IDictionary<string, SessionHours>
     {

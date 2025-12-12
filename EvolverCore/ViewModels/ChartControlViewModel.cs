@@ -7,8 +7,6 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
-using EvolverCore.Data;
-using EvolverCore;
 
 namespace EvolverCore.ViewModels
 {

@@ -1,12 +1,9 @@
 ﻿using System.Xml.Serialization;
 using System.Collections.Generic;
-using EvolverCore.Session;
 using System.Diagnostics.CodeAnalysis;
 using System.Collections;
 
-
-
-namespace EvolverAPI.Instrument
+namespace EvolverCore
 {
     public enum InstrumentType
     {

@@ -1,12 +1,13 @@
 ﻿using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using CommunityToolkit.Mvvm.ComponentModel;
+using EvolverCore;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using EvolverCore.Data;
 
 namespace EvolverCore.ViewModels
 {
@@ -35,7 +36,9 @@ namespace EvolverCore.ViewModels
 
         internal ChartXAxisViewModel? XAxis { set; get; }
         internal ChartYAxisViewModel YAxis { get; } = new ChartYAxisViewModel();
-        internal IDataSeries<IDataPoint>? Data { get; set; }
+        
+        internal ObservableCollection<BarDataSeries> Data { get; } = new ObservableCollection<BarDataSeries>();
+        internal ObservableCollection<ChartComponentBase> ChartComponents { get; } = new ObservableCollection<ChartComponentBase>();
 
 
         [ObservableProperty] bool _showGridLines = true;

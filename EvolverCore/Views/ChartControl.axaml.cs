@@ -138,7 +138,18 @@ public partial class ChartControl : UserControl
             {
                 rPanel.Number--;
 
-                if (rPanel.Panel != null) Grid.SetRow(rPanel.Panel, Grid.GetRow(rPanel.Panel) - 2);
+                if (rPanel.Panel != null)
+                {
+                    rPanel.Panel.PanelNumber = rPanel.Number;
+                    if (rPanel.ViewModel != null)
+                    {
+                        foreach (ChartComponentBase cc in rPanel.ViewModel.ChartComponents)
+                        {
+                            cc.ChartPanelNumber = rPanel.Number;
+                        }
+                    }
+                    Grid.SetRow(rPanel.Panel, Grid.GetRow(rPanel.Panel) - 2);
+                }
                 if (rPanel.Axis != null) Grid.SetRow(rPanel.Axis, Grid.GetRow(rPanel.Axis) - 2);
                 if (rPanel.Splitter != null) Grid.SetRow(rPanel.Splitter, Grid.GetRow(rPanel.Splitter) - 2);
             }

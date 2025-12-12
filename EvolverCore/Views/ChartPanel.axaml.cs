@@ -3,8 +3,6 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
-
-using EvolverCore.Data;
 using EvolverCore.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -65,7 +63,7 @@ public partial class ChartPanel : Decorator
         PointerReleased += OnPointerReleased;
     }
 
-
+    internal int PanelNumber { set; get; } = 0;
     private Point _dragStart;
     private DateTime _dragStartXMin;
     private DateTime _dragStartXMax;
@@ -463,6 +461,8 @@ public partial class ChartPanel : Decorator
         DrawBackground(context);
         if(ShowGridLines) DrawGridLines(context);
         DrawCandlesticks(context);
+        DrawCurve(context);
+        DrawHistogram(context);
     }
 
     private void DrawBackground(DrawingContext context)
@@ -495,124 +495,155 @@ public partial class ChartPanel : Decorator
 
     private void DrawCandlesticks(DrawingContext context)
     {
-        if (_vm?.Data is not BarDataSeries bars || bars.Count == 0) return;
+        if (_vm == null) return;
+        if (_vm.Data.Count == 0) return;
         if (_vm.XAxis is not { } xAxis || _vm.YAxis is not { } yAxis) return;
 
         TimeSpan xSpan = xAxis.Max - xAxis.Min;
         double yRange = yAxis.Max - yAxis.Min;
         if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
-
         double pixelsPerTick = Bounds.Width / xSpan.Ticks;
-        double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(bars) / 2)); // auto-scale width
 
-        foreach (var bar in bars)
+        foreach (BarDataSeries bars in _vm.Data)
         {
-            if (bar.Time < xAxis.Min || bar.Time > xAxis.Max) continue;
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(bars) / 2)); // auto-scale width
 
-            double xCenter = (bar.Time - xAxis.Min).Ticks * pixelsPerTick;
-
-            double highY = Bounds.Height - (bar.High - yAxis.Min) / yRange * Bounds.Height;
-            double lowY = Bounds.Height - (bar.Low - yAxis.Min) / yRange * Bounds.Height;
-            double openY = Bounds.Height - (bar.Open - yAxis.Min) / yRange * Bounds.Height;
-            double closeY = Bounds.Height - (bar.Close - yAxis.Min) / yRange * Bounds.Height;
-
-            bool isBull = bar.Close >= bar.Open;
-            var bodyBrush = isBull ? CandleUpColor : CandleDownColor;
-            _cachedWickPen ??= new Pen(WickColor, WickThickness, WickDashStyle);
-            _cachedCandleOutlinePen ??= new Pen(CandleOutlineColor,CandleOutlineThickness,CandleOutlineDashStyle);
-
-            // Wick (high-low line)
-            context.DrawLine(_cachedWickPen, new Point(xCenter, highY), new Point(xCenter, lowY));
-
-            // Body (rectangle)
-            double bodyTop = Math.Min(openY, closeY);
-            double bodyBottom = Math.Max(openY, closeY);
-            double bodyHeight = bodyBottom - bodyTop;
-
-            if (bodyHeight < 1) // Doji or very small body to draw as line
+            foreach (var bar in bars)
             {
-                context.DrawLine(_cachedWickPen, new Point(xCenter - halfBarWidth, bodyTop),
-                                        new Point(xCenter + halfBarWidth, bodyTop));
-            }
-            else
-            {
-                var bodyRect = new Rect(xCenter - halfBarWidth, bodyTop, halfBarWidth * 2, bodyHeight);
-                context.DrawRectangle(bodyBrush, _cachedCandleOutlinePen, bodyRect);
-                if (bodyHeight > 1)
+                if (bar.Time < xAxis.Min || bar.Time > xAxis.Max) continue;
+
+                double xCenter = (bar.Time - xAxis.Min).Ticks * pixelsPerTick;
+
+                double highY = Bounds.Height - (bar.High - yAxis.Min) / yRange * Bounds.Height;
+                double lowY = Bounds.Height - (bar.Low - yAxis.Min) / yRange * Bounds.Height;
+                double openY = Bounds.Height - (bar.Open - yAxis.Min) / yRange * Bounds.Height;
+                double closeY = Bounds.Height - (bar.Close - yAxis.Min) / yRange * Bounds.Height;
+
+                bool isBull = bar.Close >= bar.Open;
+                var bodyBrush = isBull ? CandleUpColor : CandleDownColor;
+                _cachedWickPen ??= new Pen(WickColor, WickThickness, WickDashStyle);
+                _cachedCandleOutlinePen ??= new Pen(CandleOutlineColor, CandleOutlineThickness, CandleOutlineDashStyle);
+
+                // Wick (high-low line)
+                context.DrawLine(_cachedWickPen, new Point(xCenter, highY), new Point(xCenter, lowY));
+
+                // Body (rectangle)
+                double bodyTop = Math.Min(openY, closeY);
+                double bodyBottom = Math.Max(openY, closeY);
+                double bodyHeight = bodyBottom - bodyTop;
+
+                if (bodyHeight < 1) // Doji or very small body to draw as line
                 {
-                    // Top/bottom lines for open/close levels
-                    context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
-                    if (openY != closeY)  // Avoid double line on doji
-                        context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
+                    context.DrawLine(_cachedWickPen, new Point(xCenter - halfBarWidth, bodyTop),
+                                            new Point(xCenter + halfBarWidth, bodyTop));
+                }
+                else
+                {
+                    var bodyRect = new Rect(xCenter - halfBarWidth, bodyTop, halfBarWidth * 2, bodyHeight);
+                    context.DrawRectangle(bodyBrush, _cachedCandleOutlinePen, bodyRect);
+                    if (bodyHeight > 1)
+                    {
+                        // Top/bottom lines for open/close levels
+                        context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
+                        if (openY != closeY)  // Avoid double line on doji
+                            context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
+                    }
                 }
             }
         }
     }
 
+
+    ////////////////
+    //FIXME : these need to be associated with each plot individually
+    private IBrush? _plotFillBrush = Brushes.Cyan;
+    private IBrush? _plotLineBrush = Brushes.Turquoise;
+    private double _plotLineThickness = 1.5;
+    private IDashStyle? _plotLineStyle = null;
+    private Pen? _plotPen;
+    ////////////////
+
     private void DrawCurve(DrawingContext context)
     {
-        if (_vm == null || _vm.XAxis == null || _vm.Data == null || _vm.Data.Count <=0) return;
+        if (_vm == null || _vm.XAxis == null || _vm.ChartComponents.Count == 0) return;
 
-        // Filter visible points only (huge perf win with large datasets)
-        List<Point> visiblePoints = _vm.Data
-            .Where(p => p.X >= _vm.XAxis.Min && p.X <= _vm.XAxis.Max)
-            .Select<IDataPoint, Point>(p => new Point(MapXToScreen(_vm.XAxis,p.X,Bounds), MapYToScreen(_vm.YAxis,p.Y,Bounds))).
-            ToList();
-            
+        _plotPen ??= new Pen(_plotLineBrush, _plotLineThickness, _plotLineStyle);
 
-        if (visiblePoints.Count < 2) return;
+        foreach (ChartComponentBase cc in _vm.ChartComponents)
+        {
+            Indicator? indicator = cc as Indicator;
 
-        var geometry = new PolylineGeometry(visiblePoints, false);
-        context.DrawGeometry(null, new Pen(Brushes.Cyan, 1.5), geometry);
+            if(indicator == null) { continue; }
+
+            foreach (ChartPlot plot in indicator.ChartPlots)
+            {
+                if(plot.Style != PlotStyle.Line) continue;
+
+                // Filter visible points only (huge perf win with large datasets)
+                List<Point> visiblePoints = plot.Data
+                    .Where(p => p.X >= _vm.XAxis.Min && p.X <= _vm.XAxis.Max)
+                    .Select<IDataPoint, Point>(p => new Point(MapXToScreen(_vm.XAxis, p.X, Bounds), MapYToScreen(_vm.YAxis, p.Y, Bounds))).
+                    ToList();
+
+                if (visiblePoints.Count < 2) return;
+
+                var geometry = new PolylineGeometry(visiblePoints, false);
+                context.DrawGeometry(null, _plotPen, geometry);
+            }
+        }
     }
 
-    //private Pen? _volumeBullPen;
-    //private Pen? _volumeBearPen;
-    //private IBrush? _volumeBullBrush;
-    //private IBrush? _volumeBearBrush;
+    private void DrawHistogram(DrawingContext context)
+    {
+        if (_vm == null || _vm.XAxis == null || _vm.ChartComponents.Count == 0) return;
 
-    //private void DrawVolumeHistogram(DrawingContext context)
-    //{
-    //    if (_vm?.Data is not BarDataSeries bars || bars.Count == 0) return;
-    //    if (_vm.XAxis is not { Min: not null, Max: not null } xAxis) return;
+        _plotPen ??= new Pen(_plotLineBrush, _plotLineThickness);
 
-    //    TimeSpan xSpan = xAxis.Max.Value - xAxis.Min.Value;
-    //    if (xSpan <= TimeSpan.Zero) return;
+        TimeSpan xSpan = _vm.XAxis.Max - _vm.XAxis.Min;
+        if (xSpan <= TimeSpan.Zero) return;
 
-    //    // Find max volume in visible range for proper scaling
-    //    long maxVolume = 0;
-    //    foreach (var bar in bars)
-    //    {
-    //        if (bar.Time >= xAxis.Min.Value && bar.Time <= xAxis.Max.Value)
-    //            maxVolume = Math.Max(maxVolume, bar.Volume);
-    //    }
+        foreach (ChartComponentBase cc in _vm.ChartComponents)
+        {
+            Indicator? indicator = cc as Indicator;
 
-    //    if (maxVolume == 0) return;
+            if (indicator == null) { continue; }
 
-    //    double pixelsPerTick = Bounds.Width / xSpan.TotalMilliseconds;
-    //    double barWidth = pixelsPerTick * bars.IntervalTicks();  // Reuse your existing logic
-    //    double maxBarHeight = Bounds.Height * 0.2; // Volume takes ~20% of panel height (adjustable)
+            foreach (ChartPlot plot in indicator.ChartPlots)
+            {
+                if (plot.Style != PlotStyle.Bar) continue;
 
-    //    foreach (var bar in bars)
-    //    {
-    //        if (bar.Time < xAxis.Min.Value || bar.Time > xAxis.Max.Value) continue;
+                List<TimeDataPoint> visiblePoints = plot.Data
+                    .Where(p => p.X >= _vm.XAxis.Min && p.X <= _vm.XAxis.Max)
+                    .ToList();
 
-    //        double xCenter = (bar.Time - xAxis.Min.Value).TotalMilliseconds * pixelsPerTick;
-    //        double volumeRatio = (double)bar.Volume / maxVolume;
-    //        double barHeight = volumeRatio * maxBarHeight;
+                // Find max value in visible range for proper scaling
+                double maxValue = 0;
+                foreach (IDataPoint dataPoint in visiblePoints) { maxValue = Math.Max(maxValue, dataPoint.Y); }
 
-    //        bool isBull = bar.Close >= bar.Open;
-    //        var brush = isBull ? _volumeBullBrush : _volumeBearBrush;
-    //        var pen = isBull ? _volumeBullPen : _volumeBearPen;
+                if (maxValue == 0) continue;
 
-    //        var rect = new Rect(
-    //            xCenter - barWidth * 0.4,
-    //            Bounds.Height - barHeight,
-    //            barWidth * 0.8,
-    //            barHeight);
+                double pixelsPerTick = Bounds.Width / xSpan.TotalMilliseconds;
+                double barWidth = pixelsPerTick * DataSeries<TimeDataPoint>.IntervalTicks(plot.Data);
+                double maxBarHeight = Bounds.Height * 0.9; // Tallest bar takes ~90% of panel height (adjustable)
 
-    //        context.DrawRectangle(brush, pen, rect);
-    //    }
-    //}
+                foreach (IDataPoint dataPoint in visiblePoints)
+                {
+                    if (dataPoint.X < _vm.XAxis.Min || dataPoint.X > _vm.XAxis.Max) continue;
+
+                    double xCenter = (dataPoint.X - _vm.XAxis.Min).TotalMilliseconds * pixelsPerTick;
+                    double valueRatio = dataPoint.Y / maxValue;
+                    double barHeight = valueRatio * maxBarHeight;
+
+                    var rect = new Rect(
+                        xCenter - barWidth * 0.4,
+                        Bounds.Height - barHeight,
+                        barWidth * 0.8,
+                        barHeight);
+
+                    context.DrawRectangle(_plotFillBrush, _plotPen, rect);
+                }
+            }
+        }
+    }
 
 }
