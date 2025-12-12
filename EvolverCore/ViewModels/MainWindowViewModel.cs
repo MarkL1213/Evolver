@@ -1,7 +1,10 @@
-﻿namespace EvolverCore.ViewModels
+﻿using Avalonia.Controls;
+
+namespace EvolverCore.ViewModels
 {
     public partial class MainWindowViewModel : ViewModelBase
     {
-        public string Greeting { get; } = "Welcome to Avalonia!";
+        public string WindowTitle { get; } = "Evolver";
+        public WindowIcon? WindowIcon { get; } = new WindowIcon("D:/Evolver/EvolverCore/Assets/avalonia-logo.ico");
     }
 }

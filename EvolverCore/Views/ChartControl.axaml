@@ -2,10 +2,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="using:EvolverCore"
+             xmlns:vm="using:EvolverCore.ViewModels"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:DataType="vm:ChartControlViewModel"
              x:Class="EvolverCore.ChartControl">
-<Border BorderBrush="Blue" BorderThickness="3">
+<Design.DataContext>
+    <vm:ChartControlViewModel/>
+</Design.DataContext>
+
+<Border BorderBrush="{Binding MainBorderColor}" BorderThickness="{Binding MainBorderThickness}">
     <Grid Name="ChartGrid">
         <Grid.RowDefinitions>
 		    <RowDefinition Height="90*" />
