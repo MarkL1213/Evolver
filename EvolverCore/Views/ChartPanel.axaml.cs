@@ -461,8 +461,12 @@ public partial class ChartPanel : Decorator
         DrawBackground(context);
         if(ShowGridLines) DrawGridLines(context);
         DrawCandlesticks(context);
-        DrawCurve(context);
-        DrawHistogram(context);
+
+        if (_vm == null) return;
+        foreach (ChartComponentBase cc in _vm.ChartComponents)
+        {
+            cc.Render(context, this);
+        }
     }
 
     private void DrawBackground(DrawingContext context)
@@ -552,98 +556,4 @@ public partial class ChartPanel : Decorator
             }
         }
     }
-
-
-    ////////////////
-    //FIXME : these need to be associated with each plot individually
-    private IBrush? _plotFillBrush = Brushes.Cyan;
-    private IBrush? _plotLineBrush = Brushes.Turquoise;
-    private double _plotLineThickness = 1.5;
-    private IDashStyle? _plotLineStyle = null;
-    private Pen? _plotPen;
-    ////////////////
-
-    private void DrawCurve(DrawingContext context)
-    {
-        if (_vm == null || _vm.XAxis == null || _vm.ChartComponents.Count == 0) return;
-
-        _plotPen ??= new Pen(_plotLineBrush, _plotLineThickness, _plotLineStyle);
-
-        foreach (ChartComponentBase cc in _vm.ChartComponents)
-        {
-            Indicator? indicator = cc as Indicator;
-
-            if(indicator == null) { continue; }
-
-            foreach (ChartPlot plot in indicator.ChartPlots)
-            {
-                if(plot.Style != PlotStyle.Line) continue;
-
-                // Filter visible points only (huge perf win with large datasets)
-                List<Point> visiblePoints = plot.Data
-                    .Where(p => p.X >= _vm.XAxis.Min && p.X <= _vm.XAxis.Max)
-                    .Select<IDataPoint, Point>(p => new Point(MapXToScreen(_vm.XAxis, p.X, Bounds), MapYToScreen(_vm.YAxis, p.Y, Bounds))).
-                    ToList();
-
-                if (visiblePoints.Count < 2) return;
-
-                var geometry = new PolylineGeometry(visiblePoints, false);
-                context.DrawGeometry(null, _plotPen, geometry);
-            }
-        }
-    }
-
-    private void DrawHistogram(DrawingContext context)
-    {
-        if (_vm == null || _vm.XAxis == null || _vm.ChartComponents.Count == 0) return;
-
-        _plotPen ??= new Pen(_plotLineBrush, _plotLineThickness);
-
-        TimeSpan xSpan = _vm.XAxis.Max - _vm.XAxis.Min;
-        if (xSpan <= TimeSpan.Zero) return;
-
-        foreach (ChartComponentBase cc in _vm.ChartComponents)
-        {
-            Indicator? indicator = cc as Indicator;
-
-            if (indicator == null) { continue; }
-
-            foreach (ChartPlot plot in indicator.ChartPlots)
-            {
-                if (plot.Style != PlotStyle.Bar) continue;
-
-                List<TimeDataPoint> visiblePoints = plot.Data
-                    .Where(p => p.X >= _vm.XAxis.Min && p.X <= _vm.XAxis.Max)
-                    .ToList();
-
-                // Find max value in visible range for proper scaling
-                double maxValue = 0;
-                foreach (IDataPoint dataPoint in visiblePoints) { maxValue = Math.Max(maxValue, dataPoint.Y); }
-
-                if (maxValue == 0) continue;
-
-                double pixelsPerTick = Bounds.Width / xSpan.TotalMilliseconds;
-                double barWidth = pixelsPerTick * DataSeries<TimeDataPoint>.IntervalTicks(plot.Data);
-                double maxBarHeight = Bounds.Height * 0.9; // Tallest bar takes ~90% of panel height (adjustable)
-
-                foreach (IDataPoint dataPoint in visiblePoints)
-                {
-                    if (dataPoint.X < _vm.XAxis.Min || dataPoint.X > _vm.XAxis.Max) continue;
-
-                    double xCenter = (dataPoint.X - _vm.XAxis.Min).TotalMilliseconds * pixelsPerTick;
-                    double valueRatio = dataPoint.Y / maxValue;
-                    double barHeight = valueRatio * maxBarHeight;
-
-                    var rect = new Rect(
-                        xCenter - barWidth * 0.4,
-                        Bounds.Height - barHeight,
-                        barWidth * 0.8,
-                        barHeight);
-
-                    context.DrawRectangle(_plotFillBrush, _plotPen, rect);
-                }
-            }
-        }
-    }
-
 }

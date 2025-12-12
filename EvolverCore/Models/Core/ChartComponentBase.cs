@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Avalonia;
+using Avalonia.Media;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,5 +13,7 @@ namespace EvolverCore
         public string Name { set; get; } = string.Empty;
         public string Description { set; get; } = string.Empty;
         public int ChartPanelNumber { get; set; } = 0;
+
+        public virtual void Render(DrawingContext context, ChartPanel chartPanel) { }
     }
 }

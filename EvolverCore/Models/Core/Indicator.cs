@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Avalonia.Media;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,5 +12,9 @@ namespace EvolverCore
         internal List<ChartPlot> ChartPlots { get; } = new List<ChartPlot>();
 
 
+        public override void Render(DrawingContext context, ChartPanel chartPanel)
+        {
+            foreach (ChartPlot plot in ChartPlots) { plot.Render(context, chartPanel); }
+        }
     }
 }
