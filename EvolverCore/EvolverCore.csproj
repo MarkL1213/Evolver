@@ -4,7 +4,16 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    
+    <!-- Enable GPU rendering everywhere (critical for Linux) -->
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    
+    <!-- Linux: force GTK3 (more stable than GTK4 right now) -->
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+  
+    <!-- Self-contained for Linux/macOS to avoid native lib hell -->
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed> <!-- Keep until .NET 9 trimming is perfect -->
   </PropertyGroup>
 
   <ItemGroup>

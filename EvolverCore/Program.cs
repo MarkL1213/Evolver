@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Avalonia;
 
 namespace EvolverCore
@@ -16,6 +17,10 @@ namespace EvolverCore
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
+                .With(new X11PlatformOptions { RenderingMode = new[] { X11RenderingMode.Glx } })
+                .With(new AvaloniaNativePlatformOptions { RenderingMode = new[] { AvaloniaNativeRenderingMode.OpenGl } })
+                .With(new Win32PlatformOptions { RenderingMode= new[] { Win32RenderingMode.Wgl } })
+                .With(new MacOSPlatformOptions {  ShowInDock = true })
                 .WithInterFont()
                 .LogToTrace();
     }
