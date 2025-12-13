@@ -9,6 +9,8 @@ namespace EvolverCore.Views.Components
 {
     internal interface IChartComponentRenderer
     {
+        public int RenderOrder { get; set; }
+
         public void Render(DrawingContext context, ChartPanel chartPanel);
     }
 }

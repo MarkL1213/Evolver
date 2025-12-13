@@ -466,7 +466,10 @@ public partial class ChartPanel : Decorator
         DrawCandlesticks(context);
 
         if (_vm == null) return;
-        foreach (IChartComponentRenderer component in _attachedComponents)
+
+        IOrderedEnumerable<IChartComponentRenderer> orderedComponents = _attachedComponents.OrderBy(r => r.RenderOrder);
+
+        foreach (IChartComponentRenderer component in orderedComponents)
         {
             component.Render(context, this);
         }

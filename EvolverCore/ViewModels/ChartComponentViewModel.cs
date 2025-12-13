@@ -11,5 +11,7 @@ namespace EvolverCore.ViewModels
         public string Name { set; get; } = string.Empty;
         public string Description { set; get; } = string.Empty;
         public int ChartPanelNumber { get; set; } = 0;
+
+        public int RenderOrder { get; set; } = 0;
     }
 }

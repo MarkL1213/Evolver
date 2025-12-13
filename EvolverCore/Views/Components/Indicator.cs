@@ -16,6 +16,8 @@ namespace EvolverCore.Views
 
         ChartComponentViewModel Properties { get; } = new ChartComponentViewModel();
 
+        public int RenderOrder { get { return Properties.RenderOrder; } set { Properties.RenderOrder = value; } }
+
         public void Render(DrawingContext context, ChartPanel chartPanel)
         {
             foreach (ChartPlot plot in ChartPlots) { plot.Render(context, chartPanel); }
