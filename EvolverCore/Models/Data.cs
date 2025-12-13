@@ -32,6 +32,7 @@ namespace EvolverCore
         Bid,
         Ask,
         OC,
+        HL,
         HLC,
         OHLC
     }
@@ -81,6 +82,11 @@ namespace EvolverCore
                 return new TimeDataBar(DateTime.MinValue, 0, 0, 0, 0, 0, 0, 0);
             }
         }
+
+        public override string ToString()
+        {
+            return $"BDP [T:{Time} O:{Open} H:{High} L:{Low} C:{Close} B:{Bid} A:{Ask} V:{Volume}]";
+        }
     }
 
     public interface IDataPoint
@@ -103,6 +109,11 @@ namespace EvolverCore
             {
                 return new TimeDataPoint() { Time = DateTime.MinValue, Value = 0 };
             }
+        }
+
+        public override string ToString()
+        {
+            return $"TDP [X:{X} Y:{Y}]";
         }
     }
 
@@ -236,7 +247,7 @@ namespace EvolverCore
 
     }
 
-    public class BarPricePoint : IDataPoint
+    public record BarPricePoint : IDataPoint
     {
         private readonly TimeDataBar _bar;  // Shared reference — no copy
         private readonly BarPointValue _field;
@@ -258,11 +269,17 @@ namespace EvolverCore
             BarPointValue.Bid => _bar.Bid,
             BarPointValue.Ask => _bar.Ask,
             BarPointValue.Volume => _bar.Volume,
+            BarPointValue.HL => (_bar.High + _bar.Low) / 2,
             BarPointValue.OC => (_bar.Open + _bar.Close) / 2,
             BarPointValue.HLC => (_bar.High + _bar.Low + _bar.Close) / 3,
             BarPointValue.OHLC => (_bar.Open + _bar.High + _bar.Low + _bar.Close) / 4,
             _ => throw new NotSupportedException($"Unsupported PriceField: {_field}")
         };
+
+        public override string ToString()
+        {
+            return $"BPP {_field} [X:{X} Y:{Y}]";
+        }
     }
 
     public class BarDataSeries : DataSeries<TimeDataBar>
