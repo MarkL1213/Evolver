@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using CommunityToolkit.Mvvm.Input;
 using EvolverCore.ViewModels;
 
 namespace EvolverCore.Views
@@ -9,6 +11,14 @@ namespace EvolverCore.Views
         {
             InitializeComponent();
             DataContext = new MainWindowViewModel();
+
+            ExitMenuItem.Command = new RelayCommand(ExitMenuItemCommand);
+        }
+
+        private void ExitMenuItemCommand()
+        {
+            ClassicDesktopStyleApplicationLifetime app = new ClassicDesktopStyleApplicationLifetime();
+            app.Shutdown();
         }
     }
 }

@@ -11,6 +11,8 @@ namespace EvolverCore.ViewModels
 {
     internal partial class ChartPlotViewModel : ViewModelBase
     {
+        [ObservableProperty] private BarPointValue _priceField = BarPointValue.Close;
+
         [ObservableProperty] IBrush? _plotFillBrush = Brushes.Cyan;
         [ObservableProperty] IBrush? _plotLineBrush = Brushes.Turquoise;
         [ObservableProperty] double _plotLineThickness = 1.5;

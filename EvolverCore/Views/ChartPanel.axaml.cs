@@ -5,9 +5,11 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using EvolverCore.ViewModels;
 using EvolverCore.Views.Components;
+using EvolverCore.Views.ContextMenus;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+
 
 namespace EvolverCore;
 
@@ -62,7 +64,11 @@ public partial class ChartPanel : Decorator
         PointerPressed += OnPointerPressed;
         PointerMoved += OnPointerMoved;
         PointerReleased += OnPointerReleased;
+
+
+        ContextMenu = ChartPanelContextMenu.CreateDefault();
     }
+
 
     internal int PanelNumber { set; get; } = 0;
     private Point _dragStart;

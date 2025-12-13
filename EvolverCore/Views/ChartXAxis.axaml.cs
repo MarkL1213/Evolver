@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
+using EvolverCore.Views.ContextMenus;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -23,6 +24,7 @@ public partial class ChartXAxis : Decorator
     public ChartXAxis()
     {
         InitializeComponent();
+        ContextMenu = ChartXAxisContextMenu.CreateDefault();
     }
 
     private ChartControlViewModel? _vm;

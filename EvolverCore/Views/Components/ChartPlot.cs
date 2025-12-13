@@ -1,4 +1,5 @@
 ﻿using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
 using EvolverCore.Views.Components;
@@ -84,7 +85,7 @@ namespace EvolverCore.Views
         }
         #endregion
 
-        internal TimeDataSeries Data { get; set; } = new TimeDataSeries();
+        internal DataSeries<IDataPoint>? Data { get; set; } = null;
 
         internal void InvalidatePenCache() { _cachedPlotLinePen = null; }
 
@@ -97,16 +98,29 @@ namespace EvolverCore.Views
         private void DrawCurve(DrawingContext context)
         {
             ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
-            if (vm == null || vm.XAxis == null) { return; }
+            if (vm == null || vm.XAxis == null || Data == null) { return; }
             Rect bounds = Parent.Parent.Bounds;
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
 
-            // Filter visible points only (huge perf win with large datasets)
-            List<Point> visiblePoints = Data
-                .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
-                .Select<IDataPoint, Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds))).
-                ToList();
+            List<Point> visiblePoints;
+            if (Data[0] is TimeDataBar)
+            {
+                List<BarPricePoint> visibleDataPoints = Data
+                        .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
+                        .Select(p => new BarPricePoint(p as TimeDataBar,Properties.PriceField))
+                        .ToList();
+                visiblePoints = visibleDataPoints
+                        .Select(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds)))
+                        .ToList();
+            }
+            else
+            {
+                visiblePoints = Data
+                    .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
+                    .Select<IDataPoint, Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds))).
+                    ToList();
+            }
 
             if (visiblePoints.Count < 2) return;
 
@@ -117,7 +131,7 @@ namespace EvolverCore.Views
         private void DrawHistogram(DrawingContext context)
         {
             ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
-            if (vm == null || vm.XAxis == null) return;
+            if (vm == null || vm.XAxis == null || Data == null) return;
             Rect bounds = Parent.Parent.Bounds;
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
@@ -125,7 +139,7 @@ namespace EvolverCore.Views
             TimeSpan xSpan = vm.XAxis.Max - vm.XAxis.Min;
             if (xSpan <= TimeSpan.Zero) return;
 
-            List<TimeDataPoint> visiblePoints = Data
+            List<IDataPoint> visiblePoints = Data
                 .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
                 .ToList();
 
@@ -144,7 +158,9 @@ namespace EvolverCore.Views
                 if (dataPoint.X < vm.XAxis.Min || dataPoint.X > vm.XAxis.Max) continue;
 
                 double xCenter = (dataPoint.X - vm.XAxis.Min).TotalMilliseconds * pixelsPerTick;
-                double valueRatio = dataPoint.Y / maxValue;
+                TimeDataBar? tdb = dataPoint as TimeDataBar;
+                double Y = tdb != null ? new BarPricePoint(tdb, Properties.PriceField).Y : dataPoint.Y;
+                double valueRatio = Y / maxValue;
                 double barHeight = valueRatio * maxBarHeight;
 
                 var rect = new Rect(

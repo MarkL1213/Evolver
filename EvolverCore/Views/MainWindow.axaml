@@ -12,5 +12,24 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
-    <evolvercore:ChartControl/>
+    
+
+    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32" />
+			<RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        
+        <Menu Grid.Row="0" Grid.Column="0">
+            <MenuItem Header="_File">
+                <MenuItem Name="ExitMenuItem" Header="E_xit" />
+            </MenuItem>
+        </Menu>
+
+        <evolvercore:ChartControl Grid.Row="1" Grid.Column="0"/>
+    </Grid>
+    
 </Window>

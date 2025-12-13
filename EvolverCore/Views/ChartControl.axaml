@@ -14,7 +14,22 @@
 
 <Border BorderBrush="{Binding MainBorderColor}"
         BorderThickness="{Binding MainBorderThickness}">
-    <Grid Name="ChartGrid">
+    <Grid Name="OuterGrid">
+            <Grid.RowDefinitions>
+		    <RowDefinition Height="32" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+		    <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Menu Grid.Row="0" Grid.Column="0" >
+            <MenuItem Header="Indicators">
+                <MenuItem Name="SMAIndicatorMenuItem" Header="SMA"/>
+            </MenuItem>
+            <MenuItem Header="Drawing Tools">
+            </MenuItem>
+        </Menu>
+    <Grid Name="ChartGrid" Grid.Row="1" Grid.Column="0">
         <Grid.RowDefinitions>
 		    <RowDefinition Height="90*" />
             <RowDefinition Height="3" />
@@ -39,6 +54,7 @@
         </Grid>
         <GridSplitter Name="PrimaryXAxisSplitter" Grid.Row="1" Grid.Column="0"/>
         <local:ChartXAxis Name="PrimaryXAxis" Grid.Row="2" Grid.Column="0"/>
+    </Grid>
     </Grid>
 </Border>
 </UserControl>

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
+using EvolverCore.Views.ContextMenus;
 using System;
 using System.Globalization;
 
@@ -31,9 +32,11 @@ public partial class ChartYAxis : Decorator
         foreach (AvaloniaProperty p in penProperties)
             p.Changed.AddClassHandler<ChartYAxis>((c, _) => c.InvalidatePenCache());
     }
+
     public ChartYAxis()
     {
         InitializeComponent();
+        ContextMenu = ChartYAxisContextMenu.CreateDefault();
     }
 
     private void InvalidatePenCache()

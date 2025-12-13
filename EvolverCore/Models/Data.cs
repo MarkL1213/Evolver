@@ -22,6 +22,20 @@ namespace EvolverCore
         Week
     }
 
+    public enum BarPointValue
+    {
+        Open,
+        High,
+        Low,
+        Close,
+        Volume,
+        Bid,
+        Ask,
+        OC,
+        HLC,
+        OHLC
+    }
+
     public struct DataInterval
     {
         public Interval Type;
@@ -44,7 +58,13 @@ namespace EvolverCore
 
         public DateTime Time;
         public DateTime X { get { return Time; } }
-        public double Y { get { return Close; } }
+        public double Y
+        {
+            get
+            {
+                return Close;
+            }
+        }
 
         public double Open;
         public double High;
@@ -92,6 +112,8 @@ namespace EvolverCore
         public IEnumerable<T> Select(Func<T, int, T> selector);
 
         public int Count { get; }
+
+        public T GetValue(int barsAgo);
     }
 
     public class DataSeries
@@ -129,6 +151,7 @@ namespace EvolverCore
             return !(index < 0 || index >= _values.Count);
         }
 
+        public T GetValue(int barsAgo) { return this[barsAgo]; }
         public T this[int barsAgo]
         {
             get
@@ -143,7 +166,7 @@ namespace EvolverCore
             internal set { }
         }
 
-        public void Add(T value) { _values.Add(value); }
+        public virtual void Add(T value) { _values.Add(value); }
 
         internal void Save(string fileName)
         {
@@ -194,7 +217,7 @@ namespace EvolverCore
             return series;
         }
 
-        internal static long IntervalTicks(DataSeries<T> series)
+        internal static long IntervalTicks(DataSeries<IDataPoint> series)
         {
             if (series.Count < 2) return TimeSpan.FromMinutes(1).Ticks;
             return (series[1].X - series[0].X).Ticks;
@@ -213,6 +236,35 @@ namespace EvolverCore
 
     }
 
+    public class BarPricePoint : IDataPoint
+    {
+        private readonly TimeDataBar _bar;  // Shared reference — no copy
+        private readonly BarPointValue _field;
+
+        public BarPricePoint(TimeDataBar? bar, BarPointValue field)
+        {
+            _bar = bar ?? throw new ArgumentNullException(nameof(bar));
+            _field = field;
+        }
+
+        public DateTime X => _bar.Time;
+
+        public double Y => _field switch
+        {
+            BarPointValue.Open => _bar.Open,
+            BarPointValue.High => _bar.High,
+            BarPointValue.Low => _bar.Low,
+            BarPointValue.Close => _bar.Close,
+            BarPointValue.Bid => _bar.Bid,
+            BarPointValue.Ask => _bar.Ask,
+            BarPointValue.Volume => _bar.Volume,
+            BarPointValue.OC => (_bar.Open + _bar.Close) / 2,
+            BarPointValue.HLC => (_bar.High + _bar.Low + _bar.Close) / 3,
+            BarPointValue.OHLC => (_bar.Open + _bar.High + _bar.Low + _bar.Close) / 4,
+            _ => throw new NotSupportedException($"Unsupported PriceField: {_field}")
+        };
+    }
+
     public class BarDataSeries : DataSeries<TimeDataBar>
     {
         TimeZoneInfo TimeZoneInfo { get; set; }
@@ -222,12 +274,19 @@ namespace EvolverCore
         {
             TimeZoneInfo = TimeZoneInfo.Local;
         }
+
+        internal BarPointValue ValueType { set; get; } = BarPointValue.Close;
+
+        internal static long IntervalTicks(BarDataSeries series)
+        {
+            if (series.Count < 2) return TimeSpan.FromMinutes(1).Ticks;
+            return (series[1].X - series[0].X).Ticks;
+        }
     }
 
     public class InstrumentBarDataSeries : BarDataSeries
     {
         public Instrument? Instrument { get; internal set; }
-
 
     }
 }
