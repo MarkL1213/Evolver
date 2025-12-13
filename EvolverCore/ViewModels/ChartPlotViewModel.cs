@@ -1,5 +1,6 @@
 ﻿using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using EvolverCore.Views;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,9 +11,10 @@ namespace EvolverCore.ViewModels
 {
     internal partial class ChartPlotViewModel : ViewModelBase
     {
-        [ObservableProperty] internal IBrush? _plotFillBrush = Brushes.Cyan;
-        [ObservableProperty] internal IBrush? _plotLineBrush = Brushes.Turquoise;
-        [ObservableProperty] internal double _plotLineThickness = 1.5;
-        [ObservableProperty] internal IDashStyle? _plotLineStyle = null;
+        [ObservableProperty] IBrush? _plotFillBrush = Brushes.Cyan;
+        [ObservableProperty] IBrush? _plotLineBrush = Brushes.Turquoise;
+        [ObservableProperty] double _plotLineThickness = 1.5;
+        [ObservableProperty] IDashStyle? _plotLineStyle = null;
+        [ObservableProperty] PlotStyle _style = PlotStyle.Line;
     }
 }

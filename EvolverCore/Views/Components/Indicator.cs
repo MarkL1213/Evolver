@@ -10,17 +10,22 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Views
 {
-    internal class Indicator : AvaloniaObject, IChartComponentRenderer
+    internal class Indicator : ChartComponentBase
     {
+        internal Indicator(ChartPanel parent):base(parent) { }
         internal List<ChartPlot> ChartPlots { get; } = new List<ChartPlot>();
 
-        ChartComponentViewModel Properties { get; } = new ChartComponentViewModel();
-
-        public int RenderOrder { get { return Properties.RenderOrder; } set { Properties.RenderOrder = value; } }
-
-        public void Render(DrawingContext context, ChartPanel chartPanel)
+        internal void AddPlot(ChartPlot plot)
         {
-            foreach (ChartPlot plot in ChartPlots) { plot.Render(context, chartPanel); }
+            IndicatorViewModel? vm = Properties as IndicatorViewModel;
+            if (vm == null) return;
+            ChartPlots.Add(plot);
+            vm.ChartPlots.Add(plot.Properties);
+        }
+
+        public override void Render(DrawingContext context)
+        {
+            foreach (ChartPlot plot in ChartPlots) { plot.Render(context); }
         }
     }
 }

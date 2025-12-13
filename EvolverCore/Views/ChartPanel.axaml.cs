@@ -456,7 +456,15 @@ public partial class ChartPanel : Decorator
         _cachedCandleOutlinePen = null;
     }
 
-    List<IChartComponentRenderer> _attachedComponents = new List<IChartComponentRenderer>();
+    List<ChartComponentBase> _attachedComponents = new List<ChartComponentBase>();
+
+    internal void AttachChartComponent(ChartComponentBase component)
+    {
+        if (_vm == null) return;
+        _attachedComponents.Add(component);
+        _vm.ChartComponents.Add(component.Properties);
+        InvalidateVisual();
+    }
 
     public override void Render(DrawingContext context)
     {
@@ -467,11 +475,11 @@ public partial class ChartPanel : Decorator
 
         if (_vm == null) return;
 
-        IOrderedEnumerable<IChartComponentRenderer> orderedComponents = _attachedComponents.OrderBy(r => r.RenderOrder);
+        IOrderedEnumerable<ChartComponentBase> orderedComponents = _attachedComponents.OrderBy(r => r.RenderOrder);
 
-        foreach (IChartComponentRenderer component in orderedComponents)
+        foreach (ChartComponentBase component in orderedComponents)
         {
-            component.Render(context, this);
+            component.Render(context);
         }
     }
 

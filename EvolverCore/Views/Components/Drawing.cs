@@ -10,12 +10,13 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Views
 {
-    internal class Drawing : AvaloniaObject, IChartComponentRenderer
+    internal class Drawing : ChartComponentBase
     {
-        ChartComponentViewModel Properties { get; } = new ChartComponentViewModel();
+        public Drawing(ChartPanel parent) : base(parent)
+        {
+        }
 
-        public int RenderOrder { get { return Properties.RenderOrder; } set { Properties.RenderOrder = value; } }
-        public void Render(DrawingContext context, ChartPanel panel)
+        public override void Render(DrawingContext context)
         {
         }
     }

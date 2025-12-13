@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
+using EvolverCore.Views.Components;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,8 +18,10 @@ namespace EvolverCore.Views
 
     internal class ChartPlot : AvaloniaObject
     {
-        internal ChartPlot()
+        internal ChartPlot(ChartComponentBase parent)
         {
+            Parent = parent;
+
             AvaloniaProperty[] penProperties =
             {
                 PlotLineColorProperty,
@@ -30,9 +33,20 @@ namespace EvolverCore.Views
                 p.Changed.AddClassHandler<ChartPlot>((c, _) => c.InvalidatePenCache());
         }
 
-        internal PlotStyle Style { get; set; } = PlotStyle.Line;
-        internal TimeDataSeries Data { get; } = new TimeDataSeries();
+        internal ChartPlotViewModel Properties { get; set; } = new ChartPlotViewModel();
 
+        internal ChartComponentBase Parent { get; private set; }
+
+        #region Style property
+        public static readonly StyledProperty<PlotStyle> StyleProperty =
+            AvaloniaProperty.Register<ChartPlot, PlotStyle>(nameof(Style), PlotStyle.Line);
+        public PlotStyle Style
+        {
+            get { return GetValue(StyleProperty); }
+            set { SetValue(StyleProperty, value); }
+        }
+        #endregion
+        
         #region PlotFillColor property
         public static readonly StyledProperty<IBrush> PlotFillColorProperty =
             AvaloniaProperty.Register<ChartPlot, IBrush>(nameof(PlotFillColor), Brushes.Cyan);
@@ -70,20 +84,21 @@ namespace EvolverCore.Views
         }
         #endregion
 
+        internal TimeDataSeries Data { get; set; } = new TimeDataSeries();
 
         internal void InvalidatePenCache() { _cachedPlotLinePen = null; }
 
-        public void Render(DrawingContext context, ChartPanel chartPanel)
+        public void Render(DrawingContext context)
         {
-            if (Style == PlotStyle.Bar) { DrawHistogram(context, chartPanel); }
-            else if (Style == PlotStyle.Line) { DrawCurve(context, chartPanel); }
+            if (Style == PlotStyle.Bar) { DrawHistogram(context); }
+            else if (Style == PlotStyle.Line) { DrawCurve(context); }
         }
 
-        private void DrawCurve(DrawingContext context, ChartPanel chartPanel)
+        private void DrawCurve(DrawingContext context)
         {
-            ChartPanelViewModel? vm = chartPanel.DataContext as ChartPanelViewModel;
+            ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
             if (vm == null || vm.XAxis == null) { return; }
-            Rect bounds = chartPanel.Bounds;
+            Rect bounds = Parent.Parent.Bounds;
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
 
@@ -99,11 +114,11 @@ namespace EvolverCore.Views
             context.DrawGeometry(null, _cachedPlotLinePen, geometry);
         }
 
-        private void DrawHistogram(DrawingContext context, ChartPanel chartPanel)
+        private void DrawHistogram(DrawingContext context)
         {
-            ChartPanelViewModel? vm = chartPanel.DataContext as ChartPanelViewModel;
+            ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
             if (vm == null || vm.XAxis == null) return;
-            Rect bounds = chartPanel.Bounds;
+            Rect bounds = Parent.Parent.Bounds;
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
 

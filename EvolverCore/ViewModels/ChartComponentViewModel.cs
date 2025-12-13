@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,12 +7,11 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.ViewModels
 {
-    internal class ChartComponentViewModel : ViewModelBase
+    internal partial class ChartComponentViewModel : ViewModelBase
     {
-        public string Name { set; get; } = string.Empty;
-        public string Description { set; get; } = string.Empty;
-        public int ChartPanelNumber { get; set; } = 0;
-
-        public int RenderOrder { get; set; } = 0;
+        [ObservableProperty] string _name = string.Empty;
+        [ObservableProperty] string _description = string.Empty;
+        [ObservableProperty] int _chartPanelNumber = 0;
+        [ObservableProperty] int _renderOrder = 0;
     }
 }
