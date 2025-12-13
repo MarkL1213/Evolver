@@ -85,8 +85,6 @@ namespace EvolverCore.Views
         }
         #endregion
 
-        internal DataSeries<IDataPoint>? Data { get; set; } = null;
-
         internal void InvalidatePenCache() { _cachedPlotLinePen = null; }
 
         public void Render(DrawingContext context)
@@ -98,15 +96,16 @@ namespace EvolverCore.Views
         private void DrawCurve(DrawingContext context)
         {
             ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
-            if (vm == null || vm.XAxis == null || Data == null) { return; }
+            ChartComponentViewModel cm = Parent.Properties;
+            if (vm == null || vm.XAxis == null || cm.Data == null) { return; }
             Rect bounds = Parent.Parent.Bounds;
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
 
             List<Point> visiblePoints;
-            if (Data[0] is TimeDataBar)
+            if (cm.Data[0] is TimeDataBar)
             {
-                List<BarPricePoint> visibleDataPoints = Data
+                List<BarPricePoint> visibleDataPoints = cm.Data
                         .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
                         .Select(p => new BarPricePoint(p as TimeDataBar,Properties.PriceField))
                         .ToList();
@@ -116,7 +115,7 @@ namespace EvolverCore.Views
             }
             else
             {
-                visiblePoints = Data
+                visiblePoints = cm.Data
                     .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
                     .Select<IDataPoint, Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds))).
                     ToList();
@@ -131,7 +130,8 @@ namespace EvolverCore.Views
         private void DrawHistogram(DrawingContext context)
         {
             ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
-            if (vm == null || vm.XAxis == null || Data == null) return;
+            ChartComponentViewModel cm = Parent.Properties;
+            if (vm == null || vm.XAxis == null || cm.Data == null) return;
             Rect bounds = Parent.Parent.Bounds;
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
@@ -139,7 +139,7 @@ namespace EvolverCore.Views
             TimeSpan xSpan = vm.XAxis.Max - vm.XAxis.Min;
             if (xSpan <= TimeSpan.Zero) return;
 
-            List<IDataPoint> visiblePoints = Data
+            List<IDataPoint> visiblePoints = cm.Data
                 .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
                 .ToList();
 
@@ -150,7 +150,7 @@ namespace EvolverCore.Views
             if (maxValue == 0) return;
 
             double pixelsPerTick = bounds.Width / xSpan.TotalMilliseconds;
-            double barWidth = pixelsPerTick * DataSeries<TimeDataPoint>.IntervalTicks(Data);
+            double barWidth = pixelsPerTick * DataSeries<TimeDataPoint>.IntervalTicks(cm.Data);
             double maxBarHeight = bounds.Height * 0.9; // Tallest bar takes ~90% of panel height (adjustable)
 
             foreach (IDataPoint dataPoint in visiblePoints)
