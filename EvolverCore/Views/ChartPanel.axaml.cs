@@ -230,15 +230,6 @@ public partial class ChartPanel : Decorator
 
                 long ticksToShift = (long)(msToShift * TimeSpan.TicksPerMillisecond);
 
-                //double totalMs = currentSpan.TotalMilliseconds;
-                //double pixelsPerMs = Bounds.Width / totalMs;
-                //double msToShift = -delta.X * pixelsPerMs * _panSensitivity;
-                //long ticksToShift = (long)(msToShift * TimeSpan.TicksPerMillisecond);
-
-                // Convert pixel drag distance to world time offset
-                //double pixelsPerTick = Bounds.Width / (double)currentSpan.Ticks;
-                //long ticksToShift = (long)(-delta.X * pixelsPerTick * _panSensitivity); // negative = drag right to pan left
-
                 _vm.XAxis.Min = _dragStartXMin.AddTicks(ticksToShift);
                 _vm.XAxis.Max = _dragStartXMax.AddTicks(ticksToShift);
             }
@@ -358,14 +349,6 @@ public partial class ChartPanel : Decorator
 
         DateTime start = min.Date + interval * ((min.TimeOfDay.Ticks + interval.Ticks - 1) / interval.Ticks);
         if (start < min) start += interval;
-
-        //long remainder = min.Ticks % interval.Ticks;
-        //DateTime start = min;
-        //if(remainder!=0)
-        //    start = min.AddTicks(remainder * interval.Ticks);
-
-        //var start = min.AddTicks((min.Ticks / interval.Ticks) * interval.Ticks + interval.Ticks);
-        //if (start < min) start += interval;
 
         for (var t = start; t <= max; t += interval)
             ticks.Add(t);
