@@ -63,7 +63,6 @@ namespace EvolverCore.ViewModels
         [ObservableProperty] IBrush _gridLinesBoldColor = DefaultGridLinesBoldColor;
         [ObservableProperty] double _gridLinesBoldThickness = DefaultGridLinesBoldThickness;
         [ObservableProperty] IDashStyle? _gridLinesBoldDashStyle = DefaultGridLinesBoldDashStyle;
-
-        //[ObservableProperty] ChartYAxis? _connectedChartYAxis = null;
     }
+
 }

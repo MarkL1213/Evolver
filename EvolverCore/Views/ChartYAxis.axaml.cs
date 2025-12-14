@@ -111,8 +111,25 @@ public partial class ChartYAxis : Decorator
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
+
+        if (_vm != null)
+        {
+            _vm.YAxis.PropertyChanged -= AxisPropertyChanged;
+        }
+
         _vm = DataContext as ChartPanelViewModel;
+
+        if (_vm != null)
+        {
+            _vm.YAxis.PropertyChanged += AxisPropertyChanged;
+        }
     }
+
+    private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        InvalidateVisual();
+    }
+
     public void SetConnectedChartPanel(ChartPanel connectedChartPanel)
     {
         _connectedChartPanel = connectedChartPanel;

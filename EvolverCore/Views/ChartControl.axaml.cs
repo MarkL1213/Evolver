@@ -47,9 +47,7 @@ public partial class ChartControl : UserControl
         int lastClose = -1;
         for (int i = 0; i < 200; i++)
         {
-            startTime.AddHours(1);
-
-            int open = lastClose==-1?r.Next(10, 100):lastClose;
+            int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
             int close = r.Next(10, 100);
             int volume = r.Next(100, 1000);
             int high = open > close ? open + r.Next(0,15) : close + r.Next(0,15);
@@ -58,6 +56,7 @@ public partial class ChartControl : UserControl
             TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
             barDataSeries.Add(bar);
             lastClose = close;
+            startTime = startTime.AddHours(1);
         }
 
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;

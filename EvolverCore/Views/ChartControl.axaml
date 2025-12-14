@@ -15,7 +15,7 @@
 <Border BorderBrush="{Binding MainBorderColor}"
         BorderThickness="{Binding MainBorderThickness}">
     <Grid Name="OuterGrid">
-            <Grid.RowDefinitions>
+        <Grid.RowDefinitions>
 		    <RowDefinition Height="32" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -29,19 +29,12 @@
             <MenuItem Header="Drawing Tools">
             </MenuItem>
         </Menu>
-    <Grid Name="ChartGrid" Grid.Row="1" Grid.Column="0">
-        <Grid.RowDefinitions>
-		    <RowDefinition Height="90*" />
-            <RowDefinition Height="3" />
-            <RowDefinition Height="10*" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-		    <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
 
-	    <Grid Name="ChartPanelGrid" Grid.Row="0" Grid.Column="0">
+	    <Grid Name="ChartPanelGrid" Grid.Row="1" Grid.Column="0">
             <Grid.RowDefinitions>
-			    <RowDefinition Height="*" />
+			    <RowDefinition Height="90*" />
+                <RowDefinition Height="3" />
+                <RowDefinition Height="10*" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
 			    <ColumnDefinition Width="90*" />
@@ -51,10 +44,9 @@
 		    <local:ChartPanel Name="PrimaryChartPanel" Grid.Row="0" Grid.Column="0"> </local:ChartPanel>
             <GridSplitter Grid.Row="0" Grid.Column="1"/>
             <local:ChartYAxis Name="PrimaryYAxis" Grid.Row="0" Grid.Column="2"/>
+            <GridSplitter Name="PrimaryXAxisSplitter" Grid.Row="1" Grid.Column="0"/>
+            <local:ChartXAxis Name="PrimaryXAxis" Grid.Row="2" Grid.Column="0"/>
         </Grid>
-        <GridSplitter Name="PrimaryXAxisSplitter" Grid.Row="1" Grid.Column="0"/>
-        <local:ChartXAxis Name="PrimaryXAxis" Grid.Row="2" Grid.Column="0"/>
-    </Grid>
     </Grid>
 </Border>
 </UserControl>

@@ -151,6 +151,24 @@ namespace EvolverCore
             return _values.Select(selector);
         }
 
+        public DateTime Min(Func<T, DateTime> selector)
+        {
+            return _values.Min(selector);
+        }
+        public double Min(Func<T, double> selector)
+        {
+            return _values.Min(selector);
+        }
+
+        public DateTime Max(Func<T, DateTime> selector)
+        {
+            return _values.Max(selector);
+        }
+        public double Max(Func<T, double> selector)
+        {
+            return _values.Max(selector);
+        }
+
         public bool IsDataValid(int barsAgo)
         {
             int c = _values.Count - 1;

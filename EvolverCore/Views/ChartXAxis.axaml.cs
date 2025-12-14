@@ -63,7 +63,23 @@ public partial class ChartXAxis : Decorator
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
+
+        if (_vm != null && _vm.SharedXAxis != null)
+        {
+            _vm.SharedXAxis.PropertyChanged -= AxisPropertyChanged;
+        }
+
         _vm = DataContext as ChartControlViewModel;
+
+        if (_vm != null && _vm.SharedXAxis != null)
+        {
+            _vm.SharedXAxis.PropertyChanged += AxisPropertyChanged;
+        }
+    }
+
+    private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        InvalidateVisual();
     }
 
     public override void Render(DrawingContext context)
@@ -83,14 +99,15 @@ public partial class ChartXAxis : Decorator
     {
         if (_vm == null || _vm.SharedXAxis == null) return;
 
-        List<DateTime> ticks = ChartPanel.ComputeDateTimeTicks(_vm.SharedXAxis.Min,_vm.SharedXAxis.Max); // expose as method or property
+        List<DateTime> ticks = ChartPanel.ComputeDateTimeTicks(_vm.SharedXAxis.Min, _vm.SharedXAxis.Max);
 
         foreach (DateTime tick in ticks)
         {
-            double x = ChartPanel.MapXToScreen(_vm.SharedXAxis,tick,Bounds); // expose as public method
-            string label = tick.Hour == 0 && tick.Minute == 0
-                ? tick.ToString("HH:mm")
-                : tick.ToString("HH:mm:ss");
+            double x = ChartPanel.MapXToScreen(_vm.SharedXAxis, tick, Bounds);
+            //string label = tick.Hour == 0 && tick.Minute == 0
+            //    ? tick.ToString("HH:mm")
+            //    : tick.ToString("HH:mm:ss");
+            string label = tick.ToString("d") + '\n' + tick.ToString("t");
 
             var ft = new FormattedText(label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, _typeface , FontSize, LabelColor)
             {
