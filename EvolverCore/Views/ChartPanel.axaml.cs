@@ -203,6 +203,8 @@ public partial class ChartPanel : Decorator
         }
     }
 
+
+
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
         if (!_isDragging || _vm == null || _vm.XAxis == null)
@@ -215,14 +217,27 @@ public partial class ChartPanel : Decorator
         var currentPos = e.GetPosition(this);
         var delta = currentPos - _dragStart; // delta.X and delta.Y in pixels
 
+
+
         if (Math.Abs(delta.X) > 0.5) // avoid jitter
         {
             TimeSpan currentSpan = _dragStartXMax - _dragStartXMin;
-            if (currentSpan != TimeSpan.Zero)
+            if (currentSpan > TimeSpan.Zero)
             {
+                double totalMs = currentSpan.TotalMilliseconds;
+                double fractionShift = delta.X / Bounds.Width;  // -1.0 to 1.0 for full drag left/right
+                double msToShift = fractionShift * totalMs * PanSensitivity * -1;  // Negative for natural direction (drag right to pan left)
+
+                long ticksToShift = (long)(msToShift * TimeSpan.TicksPerMillisecond);
+
+                //double totalMs = currentSpan.TotalMilliseconds;
+                //double pixelsPerMs = Bounds.Width / totalMs;
+                //double msToShift = -delta.X * pixelsPerMs * _panSensitivity;
+                //long ticksToShift = (long)(msToShift * TimeSpan.TicksPerMillisecond);
+
                 // Convert pixel drag distance to world time offset
-                double pixelsPerTick = Bounds.Width / (double)currentSpan.Ticks;
-                long ticksToShift = (long)(-delta.X * pixelsPerTick); // negative = drag right to pan left
+                //double pixelsPerTick = Bounds.Width / (double)currentSpan.Ticks;
+                //long ticksToShift = (long)(-delta.X * pixelsPerTick * _panSensitivity); // negative = drag right to pan left
 
                 _vm.XAxis.Min = _dragStartXMin.AddTicks(ticksToShift);
                 _vm.XAxis.Max = _dragStartXMax.AddTicks(ticksToShift);
@@ -235,7 +250,7 @@ public partial class ChartPanel : Decorator
             if (currentRange > 0)
             {
                 double pixelsPerUnit = Bounds.Height / currentRange;
-                double unitsToShift = delta.Y * pixelsPerUnit; // positive delta.Y = drag down to view moves down
+                double unitsToShift = delta.Y * pixelsPerUnit * ScrollSensitivity; // positive delta.Y = drag down to view moves down
 
                 _vm.YAxis.Min = _dragStartYMin + unitsToShift;
                 _vm.YAxis.Max = _dragStartYMax + unitsToShift;
@@ -452,6 +467,35 @@ public partial class ChartPanel : Decorator
     }
     #endregion
 
+    #region ScrollSensitivity property
+    public static readonly StyledProperty<double> ScrollSensitivityProperty =
+        AvaloniaProperty.Register<ChartPanel, double>(nameof(ScrollSensitivity), .25);
+    public double ScrollSensitivity
+    {
+        get { return GetValue(ScrollSensitivityProperty); }
+        set
+        {
+            double v = Math.Clamp(value, 0.1, 5.0);
+            SetValue(ScrollSensitivityProperty, v);
+        }
+    }
+    #endregion
+
+
+    #region PanSensitivity property
+    public static readonly StyledProperty<double> PanSensitivityProperty =
+        AvaloniaProperty.Register<ChartPanel, double>(nameof(PanSensitivity), 1);
+    public double PanSensitivity
+    {
+        get { return GetValue(PanSensitivityProperty); }
+        set
+        {
+            double v = Math.Clamp(value, 0.1, 5.0);
+            SetValue(PanSensitivityProperty, v);
+        }
+    }
+    #endregion
+
     #region ShowGridLines property
     public static readonly StyledProperty<bool> ShowGridLinesProperty =
         AvaloniaProperty.Register<ChartPanel, bool>(nameof(ShowGridLines), true);
@@ -562,17 +606,21 @@ public partial class ChartPanel : Decorator
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        DrawBackground(context);
-        if(ShowGridLines) DrawGridLines(context);
-        DrawCandlesticks(context);
 
-        if (_vm == null) return;
-
-        IOrderedEnumerable<ChartComponentBase> orderedComponents = _attachedComponents.OrderBy(r => r.RenderOrder);
-
-        foreach (ChartComponentBase component in orderedComponents)
+        using (DrawingContext.PushedState clipState = context.PushClip(new Rect(Bounds.Size)))
         {
-            component.Render(context);
+            DrawBackground(context);
+            if (ShowGridLines) DrawGridLines(context);
+            DrawCandlesticks(context);
+
+            if (_vm == null) return;
+
+            IOrderedEnumerable<ChartComponentBase> orderedComponents = _attachedComponents.OrderBy(r => r.RenderOrder);
+
+            foreach (ChartComponentBase component in orderedComponents)
+            {
+                component.Render(context);
+            }
         }
     }
 

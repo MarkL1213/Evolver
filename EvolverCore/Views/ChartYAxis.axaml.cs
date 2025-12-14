@@ -140,8 +140,11 @@ public partial class ChartYAxis : Decorator
     {
         base.Render(context);
 
-        DrawBackground(context);
-        DrawTickLinesAndLabels(context);
+        using (DrawingContext.PushedState clipState = context.PushClip(new Rect(Bounds.Size)))
+        {
+            DrawBackground(context);
+            DrawTickLinesAndLabels(context);
+        }
     }
 
     private void DrawTickLinesAndLabels(DrawingContext context)

@@ -14,6 +14,11 @@ namespace EvolverCore.ViewModels
 {
     internal partial class ChartPanelViewModel : ViewModelBase
     {
+        public static double DefaultScrollSensitivity = .25;
+        public static double DefaultPanSensitivity = 1;
+        public static bool DefaultShowGridLines = true;
+
+
         public static IBrush DefaultGridLinesColor = Brushes.DarkGray;
         public static double DefaultGridLinesThickness = 1;
         public static IDashStyle DefaultGridLinesDashStyle = new ImmutableDashStyle(new double[] { 1, 1 }, 0);
@@ -41,8 +46,10 @@ namespace EvolverCore.ViewModels
         internal ObservableCollection<BarDataSeries> Data { get; } = new ObservableCollection<BarDataSeries>();
         internal ObservableCollection<ChartComponentViewModel> ChartComponents { get; } = new ObservableCollection<ChartComponentViewModel>();
 
+        [ObservableProperty] double _scrollSensitivity = DefaultScrollSensitivity;
+        [ObservableProperty] double _panSensitivity = DefaultPanSensitivity;
+        [ObservableProperty] bool _showGridLines = DefaultShowGridLines;
 
-        [ObservableProperty] bool _showGridLines = true;
         [ObservableProperty] IBrush _backgroundColor = DefaultBackgroundColor;
 
         [ObservableProperty] IBrush _candleUpColor = DefaultCandleUpColor;

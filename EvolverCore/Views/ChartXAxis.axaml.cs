@@ -86,8 +86,11 @@ public partial class ChartXAxis : Decorator
     {
         base.Render(context);
 
-        DrawBackground(context);
-        DrawXAxisLabels(context);
+        using (DrawingContext.PushedState clipState = context.PushClip(new Rect(Bounds.Size)))
+        {
+            DrawBackground(context);
+            DrawXAxisLabels(context);
+        }
     }
 
     private void DrawBackground(DrawingContext context)
