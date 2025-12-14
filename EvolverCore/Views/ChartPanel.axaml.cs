@@ -65,7 +65,6 @@ public partial class ChartPanel : Decorator
         PointerMoved += OnPointerMoved;
         PointerReleased += OnPointerReleased;
 
-
         ContextMenu = ChartPanelContextMenu.CreateDefault();
     }
 
@@ -85,6 +84,7 @@ public partial class ChartPanel : Decorator
 
         if (_vm != null)
         {
+            _vm.Data.CollectionChanged -= Data_CollectionChanged;
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged -= AxisPropertyChanged;
             _vm.YAxis.PropertyChanged -= AxisPropertyChanged;
         }
@@ -93,9 +93,15 @@ public partial class ChartPanel : Decorator
 
         if (_vm != null)
         {
+            _vm.Data.CollectionChanged += Data_CollectionChanged;
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged += AxisPropertyChanged;
             _vm.YAxis.PropertyChanged += AxisPropertyChanged;
         }
+    }
+
+    private void Data_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        InvalidateVisual();
     }
 
     private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

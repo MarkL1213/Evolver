@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System;
 using EvolverCore.ViewModels;
 using System.Linq;
+using CommunityToolkit.Mvvm.Input;
 
 namespace EvolverCore;
 
@@ -29,7 +30,43 @@ public partial class ChartControl : UserControl
 
         PrimaryYAxis.SetConnectedChartPanel(PrimaryChartPanel);
         PrimaryChartPanel.SetConnectedChartYAxis(PrimaryYAxis);
+
+        MenuItem testMenu= new MenuItem();
+        testMenu.Header = "Test - Add Random BarData";
+        testMenu.Command = new RelayCommand(Test_AddRandomBarData);
+        ChartMenu.Items.Add(testMenu);
     }
+
+    private void Test_AddRandomBarData()
+    {
+        ///Load some random primary data
+        BarDataSeries barDataSeries = new BarDataSeries();
+        DateTime startTime = new DateTime(2020,1,1,8,0,0);
+        Random r = new Random(DateTime.Now.Second);
+
+        int lastClose = -1;
+        for (int i = 0; i < 200; i++)
+        {
+            startTime.AddHours(1);
+
+            int open = lastClose==-1?r.Next(10, 100):lastClose;
+            int close = r.Next(10, 100);
+            int volume = r.Next(100, 1000);
+            int high = open > close ? open + r.Next(0,15) : close + r.Next(0,15);
+            int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
+
+            TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
+            barDataSeries.Add(bar);
+            lastClose = close;
+        }
+
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null) { return; }
+
+        vm.PrimaryChartPanelViewModel.Data.Clear();
+        vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+    }
+
 
     public override void Render(DrawingContext context)
     {

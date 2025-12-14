@@ -22,7 +22,7 @@
         <Grid.ColumnDefinitions>
 		    <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <Menu Grid.Row="0" Grid.Column="0" >
+        <Menu Name="ChartMenu" Grid.Row="0" Grid.Column="0" >
             <MenuItem Header="Indicators">
                 <MenuItem Name="SMAIndicatorMenuItem" Header="SMA"/>
             </MenuItem>
