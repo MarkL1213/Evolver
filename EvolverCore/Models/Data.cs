@@ -272,8 +272,6 @@ namespace EvolverCore
     public class TimeDataSeries : DataSeries<TimeDataPoint>
     {
         TimeZoneInfo TimeZoneInfo { get; set; }
-        DataInterval Interval { get; set; }
-
         public TimeDataSeries()
         {
             TimeZoneInfo = TimeZoneInfo.Local;
@@ -319,7 +317,6 @@ namespace EvolverCore
     public class BarDataSeries : DataSeries<TimeDataBar>
     {
         TimeZoneInfo TimeZoneInfo { get; set; }
-        DataInterval Interval { get; set; }
 
         public BarDataSeries()
         {

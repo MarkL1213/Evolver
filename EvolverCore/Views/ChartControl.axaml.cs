@@ -7,6 +7,7 @@ using Avalonia.Skia;
 using System.Collections.Generic;
 using System;
 using EvolverCore.ViewModels;
+using EvolverCore.Views.Components;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 
@@ -94,9 +95,38 @@ public partial class ChartControl : UserControl
         testDataMonthlyLarge.CommandParameter = 2000;
         testMenu.Items.Add(testDataMonthlyLarge);
 
+        testMenu.Items.Add(new Separator());
+
+        MenuItem testAddVolume = new MenuItem();
+        testAddVolume.Header = "Add Volume Indicator";
+        testAddVolume.Command = new RelayCommand(Test_AddVolumeIndicator);
+        testMenu.Items.Add(testAddVolume);
+
         ChartMenu.Items.Add(testMenu);
     }
-    
+
+    private void Test_AddVolumeIndicator()
+    {
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null|| vm.PrimaryChartPanelViewModel.Data.Count ==0) return;
+
+        VolumeIndicatorViewModel vivm = new VolumeIndicatorViewModel(vm.PrimaryChartPanelViewModel.Data[0]);
+
+        SubPanel? panel = AddNewSubPanel();
+        if (panel == null) return;
+        if (panel.Panel == null) { RemoveSubPanel(panel.ID); return; }
+
+        VolumeIndicator vi = new VolumeIndicator(panel.Panel);
+        vi.SetDataContext(vivm);
+        panel.Panel.AttachChartComponent(vi);
+        //panel.Panel.InvalidateVisual();
+    }
+
+    private void Test_RemoveVolumeIndicator()
+    {
+
+    }
+
     private void Test_ClearData()
     {
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;
@@ -252,7 +282,12 @@ public partial class ChartControl : UserControl
 
         int subPanelCount = vm.SubPanelViewModels.Count;
 
-        ChartPanelViewModel subVM = new ChartPanelViewModel { XAxis = vm.SharedXAxis };
+        ChartPanelViewModel subVM = new ChartPanelViewModel { XAxis = vm.SharedXAxis};
+        foreach (BarDataSeries bds in vm.PrimaryChartPanelViewModel.Data)
+        {
+            subVM.Data.Add(bds);
+        }
+
 
         SubPanel subPanel = new SubPanel();
         subPanel.ID = Guid.NewGuid();
@@ -281,6 +316,7 @@ public partial class ChartControl : UserControl
         Grid.SetRow(cp, (subPanelCount * 2) + 2);
         Grid.SetColumn(cp, 0);
         cp.DataContext = subVM;
+        cp.IsSubPanel = true;
         subPanel.Panel = cp;
         ChartPanelGrid.Children.Add(cp);
 

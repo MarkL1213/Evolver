@@ -139,7 +139,7 @@ namespace EvolverCore.Views
             TimeSpan xSpan = vm.XAxis.Max - vm.XAxis.Min;
             if (xSpan <= TimeSpan.Zero) return;
 
-            List<IDataPoint> visiblePoints = cm.Data
+            List<TimeDataBar> visiblePoints = cm.Data
                 .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
                 .ToList();
 
@@ -150,7 +150,7 @@ namespace EvolverCore.Views
             if (maxValue == 0) return;
 
             double pixelsPerTick = bounds.Width / xSpan.TotalMilliseconds;
-            double barWidth = pixelsPerTick * DataSeries<TimeDataPoint>.IntervalTicks(cm.Data);
+            double barWidth = pixelsPerTick * BarDataSeries.IntervalTicks(cm.Data);
             double maxBarHeight = bounds.Height * 0.9; // Tallest bar takes ~90% of panel height (adjustable)
 
             foreach (IDataPoint dataPoint in visiblePoints)

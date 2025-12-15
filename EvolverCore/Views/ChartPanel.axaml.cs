@@ -236,7 +236,7 @@ public partial class ChartPanel : Decorator
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
-        if ( _vm == null || _vm.XAxis == null)
+        if (_vm == null || _vm.XAxis == null)
         {
             e.Handled = true;
             return;
@@ -288,7 +288,7 @@ public partial class ChartPanel : Decorator
 
             if (_vm.YAxis != null)
             {
-                if (CrosshairSnapMode == CrosshairSnapMode.Free || _vm.Data.Count == 0)
+                if (CrosshairSnapMode == CrosshairSnapMode.Free || _vm.Data.Count == 0 || IsSubPanel)
                 {
                     double xFraction = currentPos.X / Bounds.Width;
                     TimeSpan span = _vm.XAxis.Max - _vm.XAxis.Min;
@@ -312,10 +312,21 @@ public partial class ChartPanel : Decorator
                     List<IDataPoint> nearestPoints = new List<IDataPoint>();
                     foreach (List<IDataPoint> visibleData in _visibleBarDataPoints)
                     {
+                        if (visibleData.Count == 0) continue;
+
                         var nearestPoint = visibleData
                             .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
                             .First();
                         nearestPoints.Add(nearestPoint);
+                    }
+
+                    if (nearestPoints.Count == 0)
+                    {
+                        _vm.CrosshairTime = null;
+                        _vm.CrosshairPrice = null;
+                        InvalidateVisual();
+                        e.Handled = true;
+                        return;
                     }
 
                     TimeDataBar? nearestBar = nearestPoints
@@ -329,7 +340,7 @@ public partial class ChartPanel : Decorator
                         //..get y coords for each price..then order by and pick first
                         List<PriceCoordPair> yPairs = new List<PriceCoordPair>();
 
-                        yPairs.Add(new PriceCoordPair(nearestBar.Open, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Open, Bounds),"O:"));
+                        yPairs.Add(new PriceCoordPair(nearestBar.Open, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Open, Bounds), "O:"));
                         yPairs.Add(new PriceCoordPair(nearestBar.High, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.High, Bounds), "H:"));
                         yPairs.Add(new PriceCoordPair(nearestBar.Low, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Low, Bounds), "L:"));
                         yPairs.Add(new PriceCoordPair(nearestBar.Close, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Close, Bounds), "C:"));
@@ -358,8 +369,8 @@ public partial class ChartPanel : Decorator
 
         //if ((DateTime.Now - _lastPointerMovedInvalidateVisual).TotalMilliseconds > _pointerMoveDebounceMs)
         //{
-            InvalidateVisual();  // Immediate redraw
-         //   _lastPointerMovedInvalidateVisual = DateTime.Now;
+        InvalidateVisual();  // Immediate redraw
+        //   _lastPointerMovedInvalidateVisual = DateTime.Now;
         //}
         e.Handled = true;
     }
@@ -816,6 +827,7 @@ public partial class ChartPanel : Decorator
     List<ChartComponentBase> _attachedComponents = new List<ChartComponentBase>();
     List<List<IDataPoint>> _visibleBarDataPoints = new List<List<IDataPoint>>();
 
+    internal bool IsSubPanel { get; set; } = false;
 
     internal void AttachChartComponent(ChartComponentBase component)
     {
@@ -833,7 +845,7 @@ public partial class ChartPanel : Decorator
         {
             DrawBackground(context);
             if (ShowGridLines) DrawGridLines(context);
-            DrawCandlesticks(context);
+            if (!IsSubPanel) DrawCandlesticks(context);
 
             if (_vm == null) return;
 

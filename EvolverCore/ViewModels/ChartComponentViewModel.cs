@@ -10,7 +10,7 @@ namespace EvolverCore.ViewModels
 {
     internal partial class ChartComponentViewModel : ViewModelBase
     {
-        [ObservableProperty] DataSeries<IDataPoint>? _data = null;
+        [ObservableProperty] BarDataSeries? _data = null;
 
         [ObservableProperty] string _name = string.Empty;
         [ObservableProperty] string _description = string.Empty;

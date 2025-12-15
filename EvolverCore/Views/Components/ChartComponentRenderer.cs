@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Views.Components
 {
-    internal interface IChartComponentRenderer
+    public interface IChartComponentRenderer
     {
         public int RenderOrder { get; set; }
 
@@ -18,7 +18,7 @@ namespace EvolverCore.Views.Components
         public void Render(DrawingContext context);
     }
 
-    internal class ChartComponentBase : AvaloniaObject, IChartComponentRenderer
+    public class ChartComponentBase : AvaloniaObject, IChartComponentRenderer
     {
         public ChartComponentBase(ChartPanel parent)
         {
