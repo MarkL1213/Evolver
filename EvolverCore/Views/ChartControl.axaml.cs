@@ -17,51 +17,95 @@ public partial class ChartControl : UserControl
 {
     public ChartControl()
     {
-        ChartControlViewModel vm =  new ChartControlViewModel();
-        
+        ChartControlViewModel vm = new ChartControlViewModel();
+
         InitializeComponent();
         DataContext = vm;
 
         PrimaryChartPanel.ClearValue(DataContextProperty);
         PrimaryChartPanel.DataContext = vm.PrimaryChartPanelViewModel;
-        
+
         PrimaryYAxis.ClearValue(DataContextProperty);
         PrimaryYAxis.DataContext = vm.PrimaryChartPanelViewModel;
 
         PrimaryYAxis.SetConnectedChartPanel(PrimaryChartPanel);
         PrimaryChartPanel.SetConnectedChartYAxis(PrimaryYAxis);
 
+        AddTestMenu();
+    }
+
+    #region test cases
+    private void AddTestMenu()
+    { 
         MenuItem testMenu = new MenuItem();
         testMenu.Header = "Test";
 
+        MenuItem testDataClear = new MenuItem();
+        testDataClear.Header = "Clear Data";
+        testDataClear.Command = new RelayCommand(Test_ClearData);
+        testDataClear.CommandParameter = 200;
+        testMenu.Items.Add(testDataClear);
 
         MenuItem testDataHourlyMedium = new MenuItem();
         testDataHourlyMedium.Header = "Add Data - Hourly/Medium";
-        testDataHourlyMedium.Command = new RelayCommand(Test_AddDataHourlyMedium);
+        testDataHourlyMedium.Command = new RelayCommand<int>(new Action<int>(Test_AddDataHourly));
+        testDataHourlyMedium.CommandParameter = 200;
         testMenu.Items.Add(testDataHourlyMedium);
 
         MenuItem testDataSecondsMedium = new MenuItem();
         testDataSecondsMedium.Header = "Add Data - Seconds/Medium";
-        testDataSecondsMedium.Command = new RelayCommand(Test_AddDataSecondsMedium);
+        testDataSecondsMedium.Command = new RelayCommand<int>(new Action<int>(Test_AddDataSeconds));
+        testDataSecondsMedium.CommandParameter = 200;
         testMenu.Items.Add(testDataSecondsMedium);
 
         MenuItem testDataDailyMedium = new MenuItem();
         testDataDailyMedium.Header = "Add Data - Daily/Medium";
-        testDataDailyMedium.Command = new RelayCommand(Test_AddDataDailyMedium);
+        testDataDailyMedium.Command = new RelayCommand<int>(new Action<int>(Test_AddDataDaily));
+        testDataDailyMedium.CommandParameter = 200;
         testMenu.Items.Add(testDataDailyMedium);
 
         MenuItem testDataMonthlyMedium = new MenuItem();
         testDataMonthlyMedium.Header = "Add Data - Monthly/Medium";
-        testDataMonthlyMedium.Command = new RelayCommand(Test_AddDataMonthlyMedium);
+        testDataMonthlyMedium.Command = new RelayCommand<int>(new Action<int>(Test_AddDataMonthly));
+        testDataMonthlyMedium.CommandParameter = 200;
         testMenu.Items.Add(testDataMonthlyMedium);
 
+        MenuItem testDataHourlyLarge = new MenuItem();
+        testDataHourlyLarge.Header = "Add Data - Hourly/Large";
+        testDataHourlyLarge.Command = new RelayCommand<int>(new Action<int>(Test_AddDataHourly));
+        testDataHourlyLarge.CommandParameter = 2000;
+        testMenu.Items.Add(testDataHourlyLarge);
 
+        MenuItem testDataSecondsLarge = new MenuItem();
+        testDataSecondsLarge.Header = "Add Data - Seconds/Large";
+        testDataSecondsLarge.Command = new RelayCommand<int>(new Action<int>(Test_AddDataSeconds));
+        testDataSecondsLarge.CommandParameter = 2000;
+        testMenu.Items.Add(testDataSecondsLarge);
+
+        MenuItem testDataDailyLarge = new MenuItem();
+        testDataDailyLarge.Header = "Add Data - Daily/Large";
+        testDataDailyLarge.Command = new RelayCommand<int>(new Action<int>(Test_AddDataDaily));
+        testDataDailyLarge.CommandParameter = 2000;
+        testMenu.Items.Add(testDataDailyLarge);
+
+        MenuItem testDataMonthlyLarge = new MenuItem();
+        testDataMonthlyLarge.Header = "Add Data - Monthly/Large";
+        testDataMonthlyLarge.Command = new RelayCommand<int>(new Action<int>(Test_AddDataMonthly));
+        testDataMonthlyLarge.CommandParameter = 2000;
+        testMenu.Items.Add(testDataMonthlyLarge);
 
         ChartMenu.Items.Add(testMenu);
     }
+    
+    private void Test_ClearData()
+    {
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null) { return; }
 
-    #region test cases
-    private void Test_AddDataHourlyMedium()
+        vm.PrimaryChartPanelViewModel.Data.Clear();
+    }
+
+    private void Test_AddDataHourly(int size)
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
@@ -69,7 +113,7 @@ public partial class ChartControl : UserControl
         Random r = new Random(DateTime.Now.Second);
 
         int lastClose = -1;
-        for (int i = 0; i < 200; i++)
+        for (int i = 0; i < size; i++)
         {
             int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
             int close = r.Next(10, 100);
@@ -90,7 +134,7 @@ public partial class ChartControl : UserControl
         vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
     }
 
-    private void Test_AddDataSecondsMedium()
+    private void Test_AddDataSeconds(int size)
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
@@ -98,7 +142,7 @@ public partial class ChartControl : UserControl
         Random r = new Random(DateTime.Now.Second);
 
         int lastClose = -1;
-        for (int i = 0; i < 200; i++)
+        for (int i = 0; i < size; i++)
         {
             int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
             int close = r.Next(10, 100);
@@ -119,7 +163,7 @@ public partial class ChartControl : UserControl
         vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
     }
 
-    private void Test_AddDataDailyMedium()
+    private void Test_AddDataDaily(int size)
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
@@ -127,7 +171,7 @@ public partial class ChartControl : UserControl
         Random r = new Random(DateTime.Now.Second);
 
         int lastClose = -1;
-        for (int i = 0; i < 200; i++)
+        for (int i = 0; i < size; i++)
         {
             int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
             int close = r.Next(10, 100);
@@ -148,7 +192,7 @@ public partial class ChartControl : UserControl
         vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
     }
 
-    private void Test_AddDataMonthlyMedium()
+    private void Test_AddDataMonthly(int size)
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
@@ -156,7 +200,7 @@ public partial class ChartControl : UserControl
         Random r = new Random(DateTime.Now.Second);
 
         int lastClose = -1;
-        for (int i = 0; i < 200; i++)
+        for (int i = 0; i < size; i++)
         {
             int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
             int close = r.Next(10, 100);

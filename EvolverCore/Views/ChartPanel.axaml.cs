@@ -59,6 +59,8 @@ public partial class ChartPanel : Decorator
         
         foreach (AvaloniaProperty p in penProperties)
             p.Changed.AddClassHandler<ChartPanel>((c, _) => c.InvalidatePenCache());
+
+        
     }
 
     public ChartPanel()
@@ -69,6 +71,7 @@ public partial class ChartPanel : Decorator
         PointerPressed += OnPointerPressed;
         PointerMoved += OnPointerMoved;
         PointerReleased += OnPointerReleased;
+        SizeChanged += PanelSizeChanged;
 
         ContextMenu = ChartPanelContextMenu.CreateDefault();
     }
@@ -79,10 +82,11 @@ public partial class ChartPanel : Decorator
         PointerPressed -= OnPointerPressed;
         PointerMoved -= OnPointerMoved;
         PointerReleased -= OnPointerReleased;
+        SizeChanged -= PanelSizeChanged;
 
         if (_vm != null)
         {
-            _vm.Data.CollectionChanged -= Data_CollectionChanged;
+            _vm.Data.CollectionChanged -= DataCollectionChanged;
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged -= AxisPropertyChanged;
             _vm.YAxis.PropertyChanged -= AxisPropertyChanged;
         }
@@ -103,7 +107,7 @@ public partial class ChartPanel : Decorator
 
         if (_vm != null)
         {
-            _vm.Data.CollectionChanged -= Data_CollectionChanged;
+            _vm.Data.CollectionChanged -= DataCollectionChanged;
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged -= AxisPropertyChanged;
             _vm.YAxis.PropertyChanged -= AxisPropertyChanged;
         }
@@ -112,76 +116,84 @@ public partial class ChartPanel : Decorator
 
         if (_vm != null)
         {
-            _vm.Data.CollectionChanged += Data_CollectionChanged;
+            _vm.Data.CollectionChanged += DataCollectionChanged;
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged += AxisPropertyChanged;
             _vm.YAxis.PropertyChanged += AxisPropertyChanged;
         }
     }
 
-    private void Data_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    private void DataCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
         _visibleBarDataPoints.Clear();
-        UpdateAxisRanges();
-
-        //InvalidateVisual();
+        //UpdateAxisRanges();
+        UpdateVisibleRange();
     }
 
-    private void UpdateAxisRanges()
+    private void PanelSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        if(_vm == null || _vm.XAxis==null) return;
-
-        if (_vm.Data.Count == 0)
-        {
-            // Default empty view
-            _vm.XAxis.Min = DateTime.Today;
-            _vm.XAxis.Max = DateTime.Today.AddDays(1);
-            _vm.YAxis.Min = 0;
-            _vm.YAxis.Max = 100;
-            return;
-        }
-
-        DateTime xMin = DateTime.MaxValue;
-        DateTime xMax = DateTime.MinValue;
-        double yMin = double.MaxValue;
-        double yMax = double.MinValue;
-
-        foreach (BarDataSeries series in _vm.Data)
-        {
-            // X Axis: Time range
-            var minTime = series.Min(b => b.Time);
-            var maxTime = series.Max(b => b.Time);
-
-            // Add small padding (5% of range or 1 hour, whichever is larger)
-            var timePadding = TimeSpan.FromTicks(Math.Max(
-                (maxTime - minTime).Ticks / 20,
-                TimeSpan.FromHours(1).Ticks));
-
-            DateTime n = minTime - timePadding;
-            xMin = xMin < n ? xMin : n;
-
-            n = maxTime + timePadding;
-            xMax = xMax > n ? xMax : n;
-
-            // Y Axis: Price range (use High/Low for candlesticks)
-            var minPrice = series.Min(b => b.Low);
-            var maxPrice = series.Max(b => b.High);
-
-            var priceRange = maxPrice - minPrice;
-            var pricePadding = priceRange * 0.1; // 10% padding
-            if (pricePadding < 0.01) pricePadding = 1; // Minimum padding
-
-            double m = minPrice - pricePadding;
-            yMin = yMin < m ? yMin : m;
-
-            m = maxPrice + pricePadding;
-            yMax = yMax > m ? yMax : m;
-        }
-
-        _vm.XAxis.Min = xMin;
-        _vm.XAxis.Max = xMax;
-        _vm.YAxis.Min = yMin;
-        _vm.YAxis.Max = yMax;
+        _visibleBarDataPoints.Clear();
+        UpdateVisibleRange();
     }
+
+    //////////
+    //Replaced by UpdateVisibleRange()
+    //////////
+    //private void UpdateAxisRanges()
+    //{
+    //    if(_vm == null || _vm.XAxis==null) return;
+
+    //    if (_vm.Data.Count == 0)
+    //    {
+    //        // Default empty view
+    //        _vm.XAxis.Min = DateTime.Today;
+    //        _vm.XAxis.Max = DateTime.Today.AddDays(1);
+    //        _vm.YAxis.Min = 0;
+    //        _vm.YAxis.Max = 100;
+    //        return;
+    //    }
+
+    //    DateTime xMin = DateTime.MaxValue;
+    //    DateTime xMax = DateTime.MinValue;
+    //    double yMin = double.MaxValue;
+    //    double yMax = double.MinValue;
+
+    //    foreach (BarDataSeries series in _vm.Data)
+    //    {
+    //        // X Axis: Time range
+    //        var minTime = series.Min(b => b.Time);
+    //        var maxTime = series.Max(b => b.Time);
+
+    //        // Add small padding (5% of range or 1 hour, whichever is larger)
+    //        var timePadding = TimeSpan.FromTicks(Math.Max(
+    //            (maxTime - minTime).Ticks / 20,
+    //            TimeSpan.FromHours(1).Ticks));
+
+    //        DateTime n = minTime - timePadding;
+    //        xMin = xMin < n ? xMin : n;
+
+    //        n = maxTime + timePadding;
+    //        xMax = xMax > n ? xMax : n;
+
+    //        // Y Axis: Price range (use High/Low for candlesticks)
+    //        var minPrice = series.Min(b => b.Low);
+    //        var maxPrice = series.Max(b => b.High);
+
+    //        var priceRange = maxPrice - minPrice;
+    //        var pricePadding = priceRange * 0.1; // 10% padding
+    //        if (pricePadding < 0.01) pricePadding = 1; // Minimum padding
+
+    //        double m = minPrice - pricePadding;
+    //        yMin = yMin < m ? yMin : m;
+
+    //        m = maxPrice + pricePadding;
+    //        yMax = yMax > m ? yMax : m;
+    //    }
+
+    //    _vm.XAxis.Min = xMin;
+    //    _vm.XAxis.Max = xMax;
+    //    _vm.YAxis.Min = yMin;
+    //    _vm.YAxis.Max = yMax;
+    //}
 
     private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -465,6 +477,17 @@ public partial class ChartPanel : Decorator
         return ticks;
     }
 
+
+    public static readonly StyledProperty<double> PrefererredCandleWidthProperty =
+    AvaloniaProperty.Register<ChartPanel, double>(nameof(PrefererredCandleWidth), 5);
+    public double PrefererredCandleWidth
+    {
+        get { return GetValue(PrefererredCandleWidthProperty); }
+        set {
+            double v = Math.Clamp(value, 3, 31);
+            SetValue(PrefererredCandleWidthProperty, value);
+        }
+    }
 
     #region CandleOutline pen properties
     private Pen? _cachedCandleOutlinePen;
@@ -828,6 +851,63 @@ public partial class ChartPanel : Decorator
         }
     }
 
+    private void UpdateVisibleRange()
+    {
+        if (_vm == null) return;
+        
+        if (_vm.Data.Count == 0)
+        {
+            if (_vm.XAxis != null)
+            {
+                _vm.XAxis.Min = DateTime.Today;
+                _vm.XAxis.Max = DateTime.Today.AddDays(1);
+            }
+
+            _vm.YAxis.Min = 0;
+            _vm.YAxis.Max = 100;
+            return;
+        }
+
+        if (_vm.XAxis == null) return;
+
+        _visibleBarDataPoints.Clear();
+
+        var bars = _vm.Data[0];
+
+        double preferredWidth = _vm.PreferredCandleWidth;
+        int maxVisible = (int)(Bounds.Width / preferredWidth);
+        maxVisible = Math.Max(maxVisible, 50);  // Minimum to avoid too-narrow views
+
+        IEnumerable<TimeDataBar> visibleBars;
+        if (bars.Count <= maxVisible)
+        {
+            visibleBars = bars.Tolist();
+        }
+        else
+        {
+            visibleBars = bars.TakeLast(maxVisible);  // Last N bars (most recent)
+        }
+
+        // X Range
+        var minTime = visibleBars.Min(b => b.Time);
+        var maxTime = visibleBars.Max(b => b.Time);
+        var timeRange = maxTime - minTime;
+        var timePadding = timeRange * 0.05;  // 5% padding
+
+        _vm.XAxis.Min = minTime - timePadding;
+        _vm.XAxis.Max = maxTime + timePadding;
+
+        // Y Range (use visible only)
+        var minPrice = visibleBars.Min(b => b.Low);
+        var maxPrice = visibleBars.Max(b => b.High);
+        var priceRange = maxPrice - minPrice;
+        var pricePadding = priceRange * 0.1;  // 10% padding
+        if (pricePadding < 0.01) pricePadding = 1;
+
+        _vm.YAxis.Min = minPrice - pricePadding;
+        _vm.YAxis.Max = maxPrice + pricePadding;
+    }
+
     private void DrawCandlesticks(DrawingContext context)
     {
         if (_vm == null) return;
@@ -905,8 +985,6 @@ public partial class ChartPanel : Decorator
 
         _cachedCrosshairPen ??= new Pen(CrosshairLineColor, CrosshairLineThickness, CrosshairLineDashStyle);
 
-
-
         // Vertical line
         double snappedX = _vm.CrosshairTime.HasValue
             ? ChartPanel.MapXToScreen(_vm.XAxis, _vm.CrosshairTime.Value, Bounds)
@@ -915,7 +993,7 @@ public partial class ChartPanel : Decorator
 
         // Horizontal line
         double snappedY = _vm.CrosshairPrice.HasValue
-            ? ChartPanel.MapYToScreen(_vm.YAxis, _vm.CrosshairPrice.Value, Bounds)    //Bounds.Height - ((_vm.CrosshairPrice.Value - _vm.YAxis.Min) / (_vm.YAxis.Max - _vm.YAxis.Min) * Bounds.Height)
+            ? ChartPanel.MapYToScreen(_vm.YAxis, _vm.CrosshairPrice.Value, Bounds)
             : pos.Y;
         context.DrawLine(_cachedCrosshairPen, new Point(0, snappedY), new Point(Bounds.Width, snappedY));
 

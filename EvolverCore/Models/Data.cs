@@ -180,6 +180,16 @@ namespace EvolverCore
             return !(index < 0 || index >= _values.Count);
         }
 
+        public IEnumerable<T> TakeLast(int count)
+        {
+            return _values.TakeLast(count);
+        }
+
+        public IEnumerable<T> Tolist()
+        {
+            return _values.ToList();
+        }
+
         public T GetValue(int barsAgo) { return this[barsAgo]; }
         public T this[int barsAgo]
         {
