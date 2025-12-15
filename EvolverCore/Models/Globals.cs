@@ -7,6 +7,12 @@ using System.Threading.Tasks;
 
 namespace EvolverCore
 {
+    public enum CrosshairSnapMode
+    {
+        Free,
+        NearestBarPrice
+    }
+
     public sealed class Globals
     {
         private static readonly Globals _instance = new Globals();

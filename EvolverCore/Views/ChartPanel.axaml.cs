@@ -8,7 +8,9 @@ using EvolverCore.Views.Components;
 using EvolverCore.Views.ContextMenus;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 
 
 namespace EvolverCore;
@@ -49,7 +51,10 @@ public partial class ChartPanel : Decorator
             WickDashStyleProperty,
             CandleOutlineThicknessProperty,
             CandleOutlineDashStyleProperty,
-            CandleOutlineColorProperty
+            CandleOutlineColorProperty,
+            CrosshairLineColorProperty,
+            CrosshairLineThicknessProperty,
+            CrosshairLineDashStyleProperty
         };
         
         foreach (AvaloniaProperty p in penProperties)
@@ -115,6 +120,7 @@ public partial class ChartPanel : Decorator
 
     private void Data_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
+        _visibleBarDataPoints.Clear();
         UpdateAxisRanges();
 
         //InvalidateVisual();
@@ -179,6 +185,7 @@ public partial class ChartPanel : Decorator
 
     private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        _visibleBarDataPoints.Clear();
         InvalidateVisual();
     }
 
@@ -203,48 +210,134 @@ public partial class ChartPanel : Decorator
         }
     }
 
-
+    private string _nearestPriceLabel = string.Empty;
+    private struct PriceCoordPair
+    {
+        public PriceCoordPair(double price,double yCoord,string label) { YCoord = yCoord;Price = price; Label = label; }
+        public double Price;
+        public double YCoord;
+        public string Label;
+    }
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (!_isDragging || _vm == null || _vm.XAxis == null)
+        if ( _vm == null || _vm.XAxis == null)
         {
             e.Handled = true;
             return;
         }
 
-
         var currentPos = e.GetPosition(this);
-        var delta = currentPos - _dragStart; // delta.X and delta.Y in pixels
 
-
-
-        if (Math.Abs(delta.X) > 0.5) // avoid jitter
+        if (_isDragging)
         {
-            TimeSpan currentSpan = _dragStartXMax - _dragStartXMin;
-            if (currentSpan > TimeSpan.Zero)
+            _vm.CrosshairTime = null;
+            _vm.CrosshairPrice = null;
+            _nearestPriceLabel = string.Empty;
+
+            var delta = currentPos - _dragStart; // delta.X and delta.Y in pixels
+
+            if (Math.Abs(delta.X) > 0.5) // avoid jitter
             {
-                double totalMs = currentSpan.TotalMilliseconds;
-                double fractionShift = delta.X / Bounds.Width;  // -1.0 to 1.0 for full drag left/right
-                double msToShift = fractionShift * totalMs * PanSensitivity * -1;  // Negative for natural direction (drag right to pan left)
+                TimeSpan currentSpan = _dragStartXMax - _dragStartXMin;
+                if (currentSpan > TimeSpan.Zero)
+                {
+                    double totalMs = currentSpan.TotalMilliseconds;
+                    double fractionShift = delta.X / Bounds.Width;  // -1.0 to 1.0 for full drag left/right
+                    double msToShift = fractionShift * totalMs * PanSensitivity * -1;  // Negative for natural direction (drag right to pan left)
 
-                long ticksToShift = (long)(msToShift * TimeSpan.TicksPerMillisecond);
+                    long ticksToShift = (long)(msToShift * TimeSpan.TicksPerMillisecond);
 
-                _vm.XAxis.Min = _dragStartXMin.AddTicks(ticksToShift);
-                _vm.XAxis.Max = _dragStartXMax.AddTicks(ticksToShift);
+                    _vm.XAxis.Min = _dragStartXMin.AddTicks(ticksToShift);
+                    _vm.XAxis.Max = _dragStartXMax.AddTicks(ticksToShift);
+                }
+            }
+
+            if (Math.Abs(delta.Y) > 0.5)
+            {
+                double currentRange = _dragStartYMax - _dragStartYMin;
+                if (currentRange > 0)
+                {
+                    double pixelsPerUnit = Bounds.Height / currentRange;
+                    double unitsToShift = delta.Y * pixelsPerUnit * ScrollSensitivity; // positive delta.Y = drag down to view moves down
+
+                    _vm.YAxis.Min = _dragStartYMin + unitsToShift;
+                    _vm.YAxis.Max = _dragStartYMax + unitsToShift;
+                }
             }
         }
-
-        if (Math.Abs(delta.Y) > 0.5)
+        else
         {
-            double currentRange = _dragStartYMax - _dragStartYMin;
-            if (currentRange > 0)
-            {
-                double pixelsPerUnit = Bounds.Height / currentRange;
-                double unitsToShift = delta.Y * pixelsPerUnit * ScrollSensitivity; // positive delta.Y = drag down to view moves down
+            _vm.MousePosition = currentPos;
+            _nearestPriceLabel = string.Empty;
 
-                _vm.YAxis.Min = _dragStartYMin + unitsToShift;
-                _vm.YAxis.Max = _dragStartYMax + unitsToShift;
+            if (_vm.YAxis != null)
+            {
+                if (CrosshairSnapMode == CrosshairSnapMode.Free || _vm.Data.Count == 0)
+                {
+                    double xFraction = currentPos.X / Bounds.Width;
+                    TimeSpan span = _vm.XAxis.Max - _vm.XAxis.Min;
+                    _vm.CrosshairTime = _vm.XAxis.Min + TimeSpan.FromTicks((long)(xFraction * span.Ticks));
+
+                    double yFraction = 1.0 - (currentPos.Y / Bounds.Height); // Invert Y
+                    double range = _vm.YAxis.Max - _vm.YAxis.Min;
+                    _vm.CrosshairPrice = _vm.YAxis.Min + yFraction * range;
+                }
+                else if (CrosshairSnapMode == CrosshairSnapMode.NearestBarPrice)
+                {
+                    double xFraction = currentPos.X / Bounds.Width;
+                    TimeSpan totalSpan = _vm.XAxis.Max - _vm.XAxis.Min;
+                    DateTime mouseTime = _vm.XAxis.Min + TimeSpan.FromTicks((long)(xFraction * totalSpan.Ticks));
+
+                    if (_vm.Data.Count != _visibleBarDataPoints.Count)
+                    {
+                        CalculateVisibleBarDataPoints();
+                    }
+
+                    List<IDataPoint> nearestPoints = new List<IDataPoint>();
+                    foreach (List<IDataPoint> visibleData in _visibleBarDataPoints)
+                    {
+                        var nearestPoint = visibleData
+                            .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
+                            .First();
+                        nearestPoints.Add(nearestPoint);
+                    }
+
+                    TimeDataBar? nearestBar = nearestPoints
+                             .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
+                             .First() as TimeDataBar;
+
+                    if (nearestBar != null)
+                    {
+                        _vm.CrosshairTime = nearestBar.Time;
+
+                        //..get y coords for each price..then order by and pick first
+                        List<PriceCoordPair> yPairs = new List<PriceCoordPair>();
+
+                        yPairs.Add(new PriceCoordPair(nearestBar.Open, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Open, Bounds),"O:"));
+                        yPairs.Add(new PriceCoordPair(nearestBar.High, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.High, Bounds), "H:"));
+                        yPairs.Add(new PriceCoordPair(nearestBar.Low, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Low, Bounds), "L:"));
+                        yPairs.Add(new PriceCoordPair(nearestBar.Close, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Close, Bounds), "C:"));
+
+                        PriceCoordPair nearestPair = yPairs
+                             .OrderBy(b => Math.Abs((b.YCoord - currentPos.Y)))
+                             .First();
+
+                        _vm.CrosshairPrice = nearestPair.Price;
+                        _nearestPriceLabel = nearestPair.Label;
+                    }
+                    else
+                    {
+                        _vm.CrosshairTime = null;
+                        _vm.CrosshairPrice = null;
+                    }
+
+                    // Optional: Store full OHLC for readout
+                    //_vm.CrosshairHigh = nearestBar.High;
+                    //_vm.CrosshairLow = nearestBar.Low;
+                    //_vm.CrosshairOpen = nearestBar.Open;
+
+                }
             }
         }
 
@@ -327,7 +420,6 @@ public partial class ChartPanel : Decorator
         if (range <= 0) return bounds.Height;
         return bounds.Height - ((worldY - vm.Min) / range * bounds.Height);  // y=0 at bottom
     }
-
 
     public static bool IsMajorTick(DateTime dt) => dt.TimeOfDay == TimeSpan.Zero || dt.Hour % 6 == 0;
 
@@ -464,7 +556,6 @@ public partial class ChartPanel : Decorator
     }
     #endregion
 
-
     #region PanSensitivity property
     public static readonly StyledProperty<double> PanSensitivityProperty =
         AvaloniaProperty.Register<ChartPanel, double>(nameof(PanSensitivity), 1);
@@ -486,6 +577,16 @@ public partial class ChartPanel : Decorator
     {
         get { return GetValue(ShowGridLinesProperty); }
         set { SetValue(ShowGridLinesProperty, value); }
+    }
+    #endregion
+
+    #region ShowCrosshair property
+    public static readonly StyledProperty<bool> ShowCrosshairProperty =
+        AvaloniaProperty.Register<ChartPanel, bool>(nameof(ShowCrosshair), true);
+    public bool ShowCrosshair
+    {
+        get { return GetValue(ShowCrosshairProperty); }
+        set { SetValue(ShowCrosshairProperty, value); }
     }
     #endregion
 
@@ -555,6 +656,80 @@ public partial class ChartPanel : Decorator
     }
     #endregion
 
+    #region Crosshair properties
+    #region CrosshairSnapMode property
+    public static readonly StyledProperty<CrosshairSnapMode> CrosshairSnapModeProperty =
+        AvaloniaProperty.Register<ChartPanel, CrosshairSnapMode>(nameof(CrosshairSnapMode), CrosshairSnapMode.NearestBarPrice);
+    public CrosshairSnapMode CrosshairSnapMode
+    {
+        get { return GetValue(CrosshairSnapModeProperty); }
+        set { SetValue(CrosshairSnapModeProperty, value); }
+    }
+    #endregion
+
+    #region Crosshair pen properties
+    Pen? _cachedCrosshairPen;
+
+    public static readonly StyledProperty<IBrush> CrosshairLineColorProperty =
+    AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CrosshairLineColor), Brushes.Gray);
+    public IBrush CrosshairLineColor
+    {
+        get { return GetValue(CrosshairLineColorProperty); }
+        set { SetValue(CrosshairLineColorProperty, value); }
+    }
+
+    public static readonly StyledProperty<double> CrosshairLineThicknessProperty =
+    AvaloniaProperty.Register<ChartPanel, double>(nameof(CrosshairLineThickness), 1);
+    public double CrosshairLineThickness
+    {
+        get { return GetValue(CrosshairLineThicknessProperty); }
+        set { SetValue(CrosshairLineThicknessProperty, value); }
+    }
+
+    public static readonly StyledProperty<IDashStyle?> CrosshairLineDashStyleProperty =
+    AvaloniaProperty.Register<ChartPanel, IDashStyle?>(nameof(CrosshairLineDashStyle), null);
+    public IDashStyle? CrosshairLineDashStyle
+    {
+        get { return GetValue(CrosshairLineDashStyleProperty); }
+        set { SetValue(CrosshairLineDashStyleProperty, value); }
+    }
+    #endregion
+
+    #region Crosshair readout properties
+    #region CrosshairReadoutForegroundColor property
+    public static readonly StyledProperty<IBrush> CrosshairReadoutForegroundColorProperty =
+        AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CrosshairReadoutForegroundColor), Brushes.White);
+    public IBrush CrosshairReadoutForegroundColor
+    {
+        get { return GetValue(CrosshairReadoutForegroundColorProperty); }
+        set { SetValue(CrosshairReadoutForegroundColorProperty, value); }
+    }
+    #endregion
+
+    #region CrosshairReadoutBackgroundColor property
+    public static readonly StyledProperty<IBrush> CrosshairReadoutBackgroundColorProperty =
+        AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CrosshairReadoutBackgroundColor), Brushes.Black);
+    public IBrush CrosshairReadoutBackgroundColor
+    {
+        get { return GetValue(CrosshairReadoutBackgroundColorProperty); }
+        set { SetValue(CrosshairReadoutBackgroundColorProperty, value); }
+    }
+    #endregion
+    
+    #region CrosshairReadoutFontSize property
+    public static readonly StyledProperty<int> CrosshairReadoutFontSizeProperty =
+        AvaloniaProperty.Register<ChartPanel, int>(nameof(CrosshairReadoutFontSize), 12);
+    public int CrosshairReadoutFontSize
+    {
+        get { return GetValue(CrosshairReadoutFontSizeProperty); }
+        set { SetValue(CrosshairReadoutFontSizeProperty, value); }
+    }
+    #endregion
+
+    Typeface _crosshairReadoutTypeface = new Typeface("Consolas");
+    #endregion
+    #endregion
+
     #region ConnectedChartYAxis property
     private ChartYAxis? _connectedChartYAxis;
     public ChartYAxis? ConnectedChartYAxis
@@ -574,9 +749,12 @@ public partial class ChartPanel : Decorator
         _cachedGridLinesBoldPen = null;
         _cachedWickPen = null;
         _cachedCandleOutlinePen = null;
+        _cachedCrosshairPen = null;
     }
 
     List<ChartComponentBase> _attachedComponents = new List<ChartComponentBase>();
+    List<List<IDataPoint>> _visibleBarDataPoints = new List<List<IDataPoint>>();
+
 
     internal void AttachChartComponent(ChartComponentBase component)
     {
@@ -604,6 +782,8 @@ public partial class ChartPanel : Decorator
             {
                 component.Render(context);
             }
+
+            DrawCrosshair(context);
         }
     }
 
@@ -635,6 +815,19 @@ public partial class ChartPanel : Decorator
         }
     }
 
+    private void CalculateVisibleBarDataPoints()
+    {
+        if (_vm == null || _vm.XAxis == null || _vm.Data.Count==0) return;
+
+        _visibleBarDataPoints.Clear();
+
+        for (int i = 0; i < _vm.Data.Count; i++)
+        {
+            IEnumerable<IDataPoint> v = _vm.Data[i].Where(p => p.X >= _vm.XAxis.Min && p.X <= _vm.XAxis.Max);
+            _visibleBarDataPoints.Add(v.ToList());
+        }
+    }
+
     private void DrawCandlesticks(DrawingContext context)
     {
         if (_vm == null) return;
@@ -646,12 +839,20 @@ public partial class ChartPanel : Decorator
         if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
         double pixelsPerTick = Bounds.Width / xSpan.Ticks;
 
-        foreach (BarDataSeries bars in _vm.Data)
+        if (_vm.Data.Count != _visibleBarDataPoints.Count)
         {
-            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(bars) / 2)); // auto-scale width
+            CalculateVisibleBarDataPoints();
+        }
 
-            foreach (var bar in bars)
+        for(int i=0; i <_visibleBarDataPoints.Count;  i++)
+        {
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(_vm.Data[i]) / 2)); // auto-scale width
+
+            foreach (var dataPoint in _visibleBarDataPoints[i])
             {
+                TimeDataBar? bar = dataPoint as TimeDataBar;
+                if(bar == null) continue;
+                
                 if (bar.Time < xAxis.Min || bar.Time > xAxis.Max) continue;
 
                 double xCenter = (bar.Time - xAxis.Min).Ticks * pixelsPerTick;
@@ -693,5 +894,56 @@ public partial class ChartPanel : Decorator
                 }
             }
         }
+    }
+
+    private void DrawCrosshair(DrawingContext context)
+    {
+        if (_vm == null || !_vm.ShowCrosshair || !_vm.MousePosition.HasValue || !_vm.CrosshairTime.HasValue || !_vm.CrosshairPrice.HasValue || _vm.XAxis == null)
+            return;
+
+        Point pos = _vm.MousePosition.Value;
+
+        _cachedCrosshairPen ??= new Pen(CrosshairLineColor, CrosshairLineThickness, CrosshairLineDashStyle);
+
+
+
+        // Vertical line
+        double snappedX = _vm.CrosshairTime.HasValue
+            ? ChartPanel.MapXToScreen(_vm.XAxis, _vm.CrosshairTime.Value, Bounds)
+            : pos.X;
+        context.DrawLine(_cachedCrosshairPen, new Point(snappedX, 0), new Point(snappedX, Bounds.Height));
+
+        // Horizontal line
+        double snappedY = _vm.CrosshairPrice.HasValue
+            ? ChartPanel.MapYToScreen(_vm.YAxis, _vm.CrosshairPrice.Value, Bounds)    //Bounds.Height - ((_vm.CrosshairPrice.Value - _vm.YAxis.Min) / (_vm.YAxis.Max - _vm.YAxis.Min) * Bounds.Height)
+            : pos.Y;
+        context.DrawLine(_cachedCrosshairPen, new Point(0, snappedY), new Point(Bounds.Width, snappedY));
+
+
+        var sb = new StringBuilder();
+        sb.AppendLine(_vm.CrosshairTime.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+
+        if (_vm.CrosshairPrice.HasValue)
+            sb.AppendLine($"{_nearestPriceLabel} {_vm.CrosshairPrice.Value:F5}");
+
+        var fullText = sb.ToString();
+
+        var formatted = new FormattedText(
+            fullText,
+            CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            _crosshairReadoutTypeface,
+            CrosshairReadoutFontSize,
+            CrosshairReadoutForegroundColor);
+
+        double readoutX = Math.Min(snappedX + 10, Bounds.Width - formatted.Width - 10);
+        double readoutY = Math.Max(pos.Y - formatted.Height - 10, 10);
+
+        var readoutRect = new Rect(readoutX - 5, readoutY - 5,
+            formatted.Width + 10, formatted.Height + 10);
+
+        context.FillRectangle(CrosshairReadoutBackgroundColor, readoutRect);
+        context.DrawRectangle(_cachedCrosshairPen, readoutRect);
+        context.DrawText(formatted, new Point(readoutX, readoutY));
     }
 }

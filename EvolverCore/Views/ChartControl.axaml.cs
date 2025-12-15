@@ -31,17 +31,41 @@ public partial class ChartControl : UserControl
         PrimaryYAxis.SetConnectedChartPanel(PrimaryChartPanel);
         PrimaryChartPanel.SetConnectedChartYAxis(PrimaryYAxis);
 
-        MenuItem testMenu= new MenuItem();
-        testMenu.Header = "Test - Add Random BarData";
-        testMenu.Command = new RelayCommand(Test_AddRandomBarData);
+        MenuItem testMenu = new MenuItem();
+        testMenu.Header = "Test";
+
+
+        MenuItem testDataHourlyMedium = new MenuItem();
+        testDataHourlyMedium.Header = "Add Data - Hourly/Medium";
+        testDataHourlyMedium.Command = new RelayCommand(Test_AddDataHourlyMedium);
+        testMenu.Items.Add(testDataHourlyMedium);
+
+        MenuItem testDataSecondsMedium = new MenuItem();
+        testDataSecondsMedium.Header = "Add Data - Seconds/Medium";
+        testDataSecondsMedium.Command = new RelayCommand(Test_AddDataSecondsMedium);
+        testMenu.Items.Add(testDataSecondsMedium);
+
+        MenuItem testDataDailyMedium = new MenuItem();
+        testDataDailyMedium.Header = "Add Data - Daily/Medium";
+        testDataDailyMedium.Command = new RelayCommand(Test_AddDataDailyMedium);
+        testMenu.Items.Add(testDataDailyMedium);
+
+        MenuItem testDataMonthlyMedium = new MenuItem();
+        testDataMonthlyMedium.Header = "Add Data - Monthly/Medium";
+        testDataMonthlyMedium.Command = new RelayCommand(Test_AddDataMonthlyMedium);
+        testMenu.Items.Add(testDataMonthlyMedium);
+
+
+
         ChartMenu.Items.Add(testMenu);
     }
 
-    private void Test_AddRandomBarData()
+    #region test cases
+    private void Test_AddDataHourlyMedium()
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
-        DateTime startTime = new DateTime(2020,1,1,8,0,0);
+        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
         Random r = new Random(DateTime.Now.Second);
 
         int lastClose = -1;
@@ -50,7 +74,7 @@ public partial class ChartControl : UserControl
             int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
             int close = r.Next(10, 100);
             int volume = r.Next(100, 1000);
-            int high = open > close ? open + r.Next(0,15) : close + r.Next(0,15);
+            int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
             int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
 
             TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
@@ -66,6 +90,93 @@ public partial class ChartControl : UserControl
         vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
     }
 
+    private void Test_AddDataSecondsMedium()
+    {
+        ///Load some random primary data
+        BarDataSeries barDataSeries = new BarDataSeries();
+        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
+        Random r = new Random(DateTime.Now.Second);
+
+        int lastClose = -1;
+        for (int i = 0; i < 200; i++)
+        {
+            int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
+            int close = r.Next(10, 100);
+            int volume = r.Next(100, 1000);
+            int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
+            int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
+
+            TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
+            barDataSeries.Add(bar);
+            lastClose = close;
+            startTime = startTime.AddSeconds(1);
+        }
+
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null) { return; }
+
+        vm.PrimaryChartPanelViewModel.Data.Clear();
+        vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+    }
+
+    private void Test_AddDataDailyMedium()
+    {
+        ///Load some random primary data
+        BarDataSeries barDataSeries = new BarDataSeries();
+        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
+        Random r = new Random(DateTime.Now.Second);
+
+        int lastClose = -1;
+        for (int i = 0; i < 200; i++)
+        {
+            int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
+            int close = r.Next(10, 100);
+            int volume = r.Next(100, 1000);
+            int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
+            int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
+
+            TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
+            barDataSeries.Add(bar);
+            lastClose = close;
+            startTime = startTime.AddDays(1);
+        }
+
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null) { return; }
+
+        vm.PrimaryChartPanelViewModel.Data.Clear();
+        vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+    }
+
+    private void Test_AddDataMonthlyMedium()
+    {
+        ///Load some random primary data
+        BarDataSeries barDataSeries = new BarDataSeries();
+        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
+        Random r = new Random(DateTime.Now.Second);
+
+        int lastClose = -1;
+        for (int i = 0; i < 200; i++)
+        {
+            int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
+            int close = r.Next(10, 100);
+            int volume = r.Next(100, 1000);
+            int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
+            int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
+
+            TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
+            barDataSeries.Add(bar);
+            lastClose = close;
+            startTime = startTime.AddMonths(1);
+        }
+
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null) { return; }
+
+        vm.PrimaryChartPanelViewModel.Data.Clear();
+        vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+    }
+    #endregion
 
     public override void Render(DrawingContext context)
     {
