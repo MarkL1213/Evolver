@@ -19,7 +19,9 @@ namespace EvolverCore
         Minute,
         Hour,
         Day,
-        Week
+        Week,
+        Month,
+        Year
     }
 
     public enum BarPointValue
@@ -41,6 +43,8 @@ namespace EvolverCore
     {
         public Interval Type;
         public int Value;
+
+        public DataInterval(Interval type, int value) { Type = type;Value = value; }
     }
 
     public record TimeDataBar : IDataPoint
@@ -138,6 +142,8 @@ namespace EvolverCore
         public DataSeries() { }
 
         public int Count { get { return _values.Count; } }
+
+        public DataInterval Interval { get; internal set; }
 
         public IEnumerator<T> GetEnumerator() { return _values.GetEnumerator(); }
 

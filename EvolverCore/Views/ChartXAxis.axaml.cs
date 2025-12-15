@@ -102,17 +102,29 @@ public partial class ChartXAxis : Decorator
     {
         if (_vm == null || _vm.SharedXAxis == null) return;
 
-        List<DateTime> ticks = ChartPanel.ComputeDateTimeTicks(_vm.SharedXAxis.Min, _vm.SharedXAxis.Max);
+        DataInterval dataInterval = _vm.PrimaryChartPanelViewModel.Data.Count ==0? new DataInterval(Interval.Hour,2):
+            _vm.PrimaryChartPanelViewModel.Data[0].Interval;
 
-        foreach (DateTime tick in ticks)
+        List<DateTime> ticks = ChartPanel.ComputeDateTimeTicks(_vm.SharedXAxis.Min, _vm.SharedXAxis.Max, Bounds, dataInterval);
+
+        for (int i = 1; i <= ticks.Count; i++)
         {
+            DateTime tick = ticks[i - 1];
             double x = ChartPanel.MapXToScreen(_vm.SharedXAxis, tick, Bounds);
-            //string label = tick.Hour == 0 && tick.Minute == 0
-            //    ? tick.ToString("HH:mm")
-            //    : tick.ToString("HH:mm:ss");
-            string label = tick.ToString("d") + '\n' + tick.ToString("t");
+            string label = string.Empty;
 
-            var ft = new FormattedText(label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, _typeface , FontSize, LabelColor)
+            switch (dataInterval.Type)
+            {
+                case Interval.Second: label = tick.ToString("HH:mm:ss"); break;
+                case Interval.Minute: label = tick.ToString("HH:mm"); break;
+                case Interval.Hour: label = (tick.Hour==0 && tick.Minute==0)? tick.ToString("MMM d") : tick.ToString("HH:mm"); break;
+                case Interval.Day: label = tick.ToString("MMM"); break;
+                case Interval.Month: label = i % 2 == 0 ? tick.ToString("MMM") : tick.ToString("y"); break;
+                case Interval.Year: label = tick.ToString("yyyy"); break;
+                default: label = tick.ToString("d") + " " + tick.ToString("HH:mm:ss"); break;
+            }
+
+            var ft = new FormattedText(label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, _typeface, FontSize, LabelColor)
             {
                 TextAlignment = TextAlignment.Center
             };

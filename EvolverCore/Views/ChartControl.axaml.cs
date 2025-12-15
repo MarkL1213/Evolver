@@ -109,6 +109,7 @@ public partial class ChartControl : UserControl
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
+        barDataSeries.Interval = new DataInterval(Interval.Hour, 1);
         DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
         Random r = new Random(DateTime.Now.Second);
 
@@ -138,6 +139,7 @@ public partial class ChartControl : UserControl
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
+        barDataSeries.Interval = new DataInterval(Interval.Second, 1);
         DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
         Random r = new Random(DateTime.Now.Second);
 
@@ -167,6 +169,7 @@ public partial class ChartControl : UserControl
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
+        barDataSeries.Interval = new DataInterval(Interval.Day, 1);
         DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
         Random r = new Random(DateTime.Now.Second);
 
@@ -196,6 +199,7 @@ public partial class ChartControl : UserControl
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
+        barDataSeries.Interval = new DataInterval(Interval.Month, 1);
         DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
         Random r = new Random(DateTime.Now.Second);
 

@@ -231,6 +231,9 @@ public partial class ChartPanel : Decorator
         public string Label;
     }
 
+    private DateTime _lastPointerMovedInvalidateVisual = DateTime.MinValue;
+    private const double _pointerMoveDebounceMs = 16;
+
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
         if ( _vm == null || _vm.XAxis == null)
@@ -353,7 +356,11 @@ public partial class ChartPanel : Decorator
             }
         }
 
-        InvalidateVisual();  // Immediate redraw
+        //if ((DateTime.Now - _lastPointerMovedInvalidateVisual).TotalMilliseconds > _pointerMoveDebounceMs)
+        //{
+            InvalidateVisual();  // Immediate redraw
+         //   _lastPointerMovedInvalidateVisual = DateTime.Now;
+        //}
         e.Handled = true;
     }
 
@@ -435,27 +442,58 @@ public partial class ChartPanel : Decorator
 
     public static bool IsMajorTick(DateTime dt) => dt.TimeOfDay == TimeSpan.Zero || dt.Hour % 6 == 0;
 
-    public static List<DateTime> ComputeDateTimeTicks(DateTime min, DateTime max)
+    private static DateTime AlignToInterval(DateTime dt, DataInterval interval)
     {
-        var ticks = new List<DateTime>();
-        var range = max - min;
-        if(range <= TimeSpan.Zero) return ticks;
-
-        TimeSpan interval = range switch
+        return interval.Type switch
         {
-            var r when r <= TimeSpan.FromMinutes(1) => TimeSpan.FromSeconds(10),
-            var r when r <= TimeSpan.FromMinutes(10) => TimeSpan.FromMinutes(1),
-            var r when r <= TimeSpan.FromHours(1) => TimeSpan.FromMinutes(10),
-            var r when r <= TimeSpan.FromDays(1) => TimeSpan.FromHours(1),
-            var r when r <= TimeSpan.FromDays(7) => TimeSpan.FromDays(1),
+            Interval.Second => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, (dt.Second / 10) * 10),
+            Interval.Minute => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, (dt.Minute / 5) * 5, 0),
+            Interval.Hour => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, 0, 0),
+            Interval.Day => new DateTime(dt.Year, dt.Month, dt.Day),
+            Interval.Week => dt.Date.AddDays(-(int)dt.DayOfWeek), // Monday start
+            Interval.Month => new DateTime(dt.Year, dt.Month, 1),
+            _ => dt.Date
+        };
+    }
+    public static List<DateTime> ComputeDateTimeTicks(DateTime min, DateTime max, Rect bounds, DataInterval interval)
+    {
+        if (min >= max) return new List<DateTime>();
+
+        // Determine base tick interval from data interval
+        TimeSpan baseInterval = interval.Type switch
+        {
+            Interval.Second => TimeSpan.FromSeconds(Math.Max(10, interval.Value * 6)), // e.g., 1s bars to ticks every 10s
+            Interval.Minute => TimeSpan.FromMinutes(Math.Max(1, interval.Value * 5)),   // 1m to every 5m, 5m to every 25m
+            Interval.Hour => TimeSpan.FromHours(Math.Max(1, interval.Value * 4)),
+            Interval.Day => TimeSpan.FromDays(Math.Max(1, interval.Value * 7)),      // 1d to weekly ticks
+            Interval.Week => TimeSpan.FromDays(30),                                  // Weekly to monthly
+            Interval.Month => TimeSpan.FromDays(90),                                  // Monthly to quarterly
+            Interval.Year => TimeSpan.FromDays(365*10),                                  // Yearly to decade
             _ => TimeSpan.FromDays(1)
         };
 
-        DateTime start = min.Date + interval * ((min.TimeOfDay.Ticks + interval.Ticks - 1) / interval.Ticks);
-        if (start < min) start += interval;
+        // Cap number of ticks to avoid overcrowding (~10–20 max)
+        TimeSpan visibleSpan = max - min;
+        int estimatedTicks = (int)(visibleSpan / baseInterval);
+        if (estimatedTicks > 20)
+        {
+            // Increase interval to reduce density
+            baseInterval = TimeSpan.FromTicks(baseInterval.Ticks * (estimatedTicks / 15 + 1));
+        }
+        else if (estimatedTicks < 5 && baseInterval > TimeSpan.FromMinutes(1))
+        {
+            // Decrease if too sparse
+            baseInterval = TimeSpan.FromTicks(baseInterval.Ticks / 2);
+        }
 
-        for (var t = start; t <= max; t += interval)
+        // Align start to a "nice" boundary based on interval type
+        DateTime start = AlignToInterval(min, interval);
+
+        var ticks = new List<DateTime>();
+        for (DateTime t = start; t <= max; t += baseInterval)
+        {
             ticks.Add(t);
+        }
 
         return ticks;
     }
@@ -822,7 +860,9 @@ public partial class ChartPanel : Decorator
         _cachedGridLinesPen ??= new Pen(GridLinesColor, GridLinesThickness, GridLinesDashStyle);
         _cachedGridLinesBoldPen ??= new Pen(GridLinesBoldColor, GridLinesBoldThickness, GridLinesBoldDashStyle);
 
-        var xTicks = ComputeDateTimeTicks(_vm.XAxis.Min,_vm.XAxis.Max);
+        DataInterval dataInterval = _vm.Data.Count > 0 ? _vm.Data[0].Interval : new DataInterval(Interval.Hour, 2);
+
+        var xTicks = ComputeDateTimeTicks(_vm.XAxis.Min, _vm.XAxis.Max, Bounds, dataInterval);
         foreach (var tick in xTicks)
         {
             double x = MapXToScreen(_vm.XAxis,tick,Bounds);
