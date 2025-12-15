@@ -448,7 +448,10 @@ public partial class ChartPanel : Decorator
         if (vm == null) return bounds.Height;
         double range = vm.Max - vm.Min;
         if (range <= 0) return bounds.Height;
-        return bounds.Height - ((worldY - vm.Min) / range * bounds.Height);  // y=0 at bottom
+
+        double calcY = worldY;// Y < bounds.Height ? worldY : bounds.Height;
+
+        return bounds.Height - ((calcY - vm.Min) / range * bounds.Height);  // y=0 at bottom
     }
 
     public static bool IsMajorTick(DateTime dt) => dt.TimeOfDay == TimeSpan.Zero || dt.Hour % 6 == 0;
@@ -850,7 +853,6 @@ public partial class ChartPanel : Decorator
             if (_vm == null) return;
 
             IOrderedEnumerable<ChartComponentBase> orderedComponents = _attachedComponents.OrderBy(r => r.RenderOrder);
-
             foreach (ChartComponentBase component in orderedComponents)
             {
                 component.Render(context);
@@ -949,15 +951,27 @@ public partial class ChartPanel : Decorator
         _vm.XAxis.Min = minTime - timePadding;
         _vm.XAxis.Max = maxTime + timePadding;
 
-        // Y Range (use visible only)
-        var minPrice = visibleBars.Min(b => b.Low);
-        var maxPrice = visibleBars.Max(b => b.High);
-        var priceRange = maxPrice - minPrice;
-        var pricePadding = priceRange * 0.1;  // 10% padding
-        if (pricePadding < 0.01) pricePadding = 1;
 
-        _vm.YAxis.Min = minPrice - pricePadding;
-        _vm.YAxis.Max = maxPrice + pricePadding;
+        // Y Range (use visible only)
+        var minY = visibleBars.Min(b => b.Low);
+        var maxY = visibleBars.Max(b => b.High);
+
+        List<TimeDataBar> vBars = visibleBars.ToList();
+        foreach (ChartComponentBase component in _attachedComponents)
+        {
+            double componentMinY = component.MinY(vBars[0].Time, vBars[vBars.Count - 1].Time);
+            double componentMaxY = component.MaxY(vBars[0].Time, vBars[vBars.Count - 1].Time);
+
+            minY = componentMinY < minY ? componentMinY : minY;
+            maxY = componentMaxY > maxY ? componentMaxY : maxY;
+        }
+        
+        var yRange = maxY - minY;
+        var yPadding = yRange * 0.1;  // 10% padding
+        if (yPadding < 0.01) yPadding = 1;
+
+        _vm.YAxis.Min = minY - yPadding;
+        _vm.YAxis.Max = maxY + yPadding;
     }
 
     private void DrawCandlesticks(DrawingContext context)

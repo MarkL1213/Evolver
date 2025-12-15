@@ -38,7 +38,7 @@ namespace EvolverCore.Views.Components
             set { SetValue(NameProperty, value); }
         }
         #endregion
-        
+
         #region Description property
         public static readonly StyledProperty<string> DescriptionProperty =
             AvaloniaProperty.Register<ChartComponentBase, string>(nameof(Description), string.Empty);
@@ -69,6 +69,14 @@ namespace EvolverCore.Views.Components
         }
         #endregion
 
+        public virtual double MinY(DateTime rangeMin, DateTime rangeMax)
+        {
+            return 0;
+        }
+        public virtual double MaxY(DateTime rangeMin, DateTime rangeMax)
+        {
+            return 100;
+        }
 
         public virtual void Render(DrawingContext context) { }
     }

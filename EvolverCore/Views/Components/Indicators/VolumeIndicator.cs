@@ -1,10 +1,12 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
 using EvolverCore.Views.Components;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static EvolverCore.ChartControl;
 
 namespace EvolverCore.Views.Components
 {
@@ -19,6 +21,21 @@ namespace EvolverCore.Views.Components
         {
         }
 
+        public override double MinY(DateTime rangeMin, DateTime rangeMax)
+        {
+            return 0;
+        }
+        public override double MaxY(DateTime rangeMin, DateTime rangeMax)
+        {
+            if (_vm == null || _vm.Data == null) return 100;
+
+            List<TimeDataBar> vBars = _vm.Data.
+                Where(p => p.X >= rangeMin && p.X <= rangeMax)
+                .ToList();
+
+            return  vBars.Count >0 ? vBars.Max(p => p.Volume) : 100;
+        }
+
         internal void SetDataContext(VolumeIndicatorViewModel vm)
         {
             if (_vm != null)
@@ -28,6 +45,18 @@ namespace EvolverCore.Views.Components
 
             UpdateCache();
             _vm.PropertyChanged += (_, __) => UpdateCache();
+
+            ChartPanelViewModel? panelVM = Parent.DataContext as ChartPanelViewModel;
+            if (panelVM != null && _vm.Data != null && _vm.Data.Count > 0)
+            {
+                panelVM.YAxis.Min = 0;
+                panelVM.YAxis.Max = _vm.Data.Max(p => p.Volume);
+                if (Parent.ConnectedChartYAxis != null)
+                {
+                    ChartPanelViewModel? parentYAxisVM = Parent.ConnectedChartYAxis.DataContext as ChartPanelViewModel;
+                    Parent.ConnectedChartYAxis.InvalidateVisual();
+                }
+            }
 
             Parent.InvalidateVisual();
         }
@@ -39,6 +68,7 @@ namespace EvolverCore.Views.Components
                 _bullPen = new Pen(_vm.BullBrush, 1);
             }
         }
+
 
         private void DrawHistogram(DrawingContext context)
         {
@@ -64,13 +94,13 @@ namespace EvolverCore.Views.Components
 
                 double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, bar.Time, bounds);
                 double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
-                double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, 50, bounds);//TEMP set volume to 50. get drawing working before worrying about scale problem
+                double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, bar.Volume, bounds);
 
                 var bodyBrush = _vm.BullBrush;
                 Pen? pen = _bullPen;
                 if (pen == null) { return; }
 
-                var rect = new Rect(xCenter - halfBarWidth, bounds.Height - zeroY, halfBarWidth * 2.0, zeroY - volumeY);
+                var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
 
                 context.FillRectangle(bodyBrush, rect);
                 context.DrawRectangle(pen, rect);
@@ -80,10 +110,7 @@ namespace EvolverCore.Views.Components
 
         public override void Render(DrawingContext context)
         {
-            using (DrawingContext.PushedState p = context.PushClip(Parent.Bounds))
-            {
-                DrawHistogram(context);
-            }
+            DrawHistogram(context);
         }
     }
 }

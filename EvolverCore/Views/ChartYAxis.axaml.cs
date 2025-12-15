@@ -123,6 +123,8 @@ public partial class ChartYAxis : Decorator
         {
             _vm.YAxis.PropertyChanged += AxisPropertyChanged;
         }
+
+        InvalidateVisual();
     }
 
     private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
