@@ -97,7 +97,6 @@ namespace EvolverCore.Views.Components
             ChartPanelViewModel? panelVM = Parent.DataContext as ChartPanelViewModel;
             if (Properties == null || panelVM == null || panelVM.XAxis == null) return;
 
-            VisibleDataPoints.Clear();
             if (Properties.Data == null || Properties.Data.Count == 0) return;
 
             IEnumerable<IDataPoint> v = Properties.Data.Where(p => p.X >= panelVM.XAxis.Min && p.X <= panelVM.XAxis.Max);

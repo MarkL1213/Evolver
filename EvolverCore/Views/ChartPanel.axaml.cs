@@ -126,13 +126,13 @@ public partial class ChartPanel : Decorator
     private void ComponentCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
         foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
-        UpdateVisibleRange();
+        //UpdateVisibleRange();
     }
 
     private void PanelSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
-        UpdateVisibleRange();
+        //UpdateVisibleRange();
     }
 
     //////////
@@ -305,6 +305,9 @@ public partial class ChartPanel : Decorator
                     double xFraction = currentPos.X / Bounds.Width;
                     TimeSpan totalSpan = _vm.XAxis.Max - _vm.XAxis.Min;
                     DateTime mouseTime = _vm.XAxis.Min + TimeSpan.FromTicks((long)(xFraction * totalSpan.Ticks));
+
+                    if (dataComponent.VisibleDataPoints.Count == 0)
+                        dataComponent.CalculateVisibleDataPoints();
 
                     TimeDataBar? nearestBar = dataComponent.VisibleDataPoints
                         .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
@@ -900,9 +903,9 @@ public partial class ChartPanel : Decorator
         }
     }
 
-    private void UpdateVisibleRange()
+    internal void UpdateXAxisRange()
     {
-        if (_vm == null) return;
+        if (_vm == null || _vm.XAxis == null) return;
         Data? dataComponent = GetFirstDataComponent();
 
         if (_vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
@@ -913,32 +916,21 @@ public partial class ChartPanel : Decorator
                 _vm.XAxis.Max = DateTime.Today.AddDays(1);
             }
 
-            _vm.YAxis.Min = 0;
-            _vm.YAxis.Max = 100;
             return;
         }
 
-        if (_vm.XAxis == null) return;
-
-
-        //FIXME move this property to the data component's plot view model
-        double preferredWidth = _vm.PreferredCandleWidth;
-
+        DataPlotViewModel? dataPlotVM = dataComponent.Plot.Properties as DataPlotViewModel;
+        double preferredWidth = dataPlotVM == null ? 3 : dataPlotVM.PreferredCandleWidth;
 
         int maxVisible = (int)(Bounds.Width / preferredWidth);
         maxVisible = Math.Max(maxVisible, 50);  // Minimum to avoid too-narrow views
 
         IEnumerable<TimeDataBar> visibleBars;
         if (dataComponent.Properties.Data.Count <= maxVisible)
-        {
             visibleBars = dataComponent.Properties.Data.Tolist();
-        }
         else
-        {
             visibleBars = dataComponent.Properties.Data.TakeLast(maxVisible);  // Last N bars (most recent)
-        }
 
-        // X Range
         var minTime = visibleBars.Min(b => b.Time);
         var maxTime = visibleBars.Max(b => b.Time);
         var timeRange = maxTime - minTime;
@@ -946,22 +938,26 @@ public partial class ChartPanel : Decorator
 
         _vm.XAxis.Min = minTime - timePadding;
         _vm.XAxis.Max = maxTime + timePadding;
+    }
 
+    public void UpdateYAxisRange()
+    {
+        if (_vm == null) return;
+        if ( _vm.XAxis == null)
+        {
+            _vm.YAxis.Min = 0;
+            _vm.YAxis.Max = 100;
+
+            return;
+        }
 
         // Y Range (use visible only)
         var minY = double.MaxValue;
         var maxY = double.MinValue;
-
         
-        //FIXME: move these to data component overrides
-        //minY = visibleBars.Min(b => b.Low);
-        //maxY = visibleBars.Max(b => b.High);
-        
-
-        List<TimeDataBar> vBars = visibleBars.ToList();
         foreach (ChartComponentBase component in _attachedComponents)
         {
-            component.UpdateVisualRange(vBars[0].Time, vBars[vBars.Count - 1].Time);
+            component.UpdateVisualRange(_vm.XAxis.Min, _vm.XAxis.Max);
             double componentMinY = component.MinY();
             double componentMaxY = component.MaxY();
 

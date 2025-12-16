@@ -107,6 +107,25 @@ public partial class ChartControl : UserControl
 
         ChartMenu.Items.Add(testMenu);
     }
+    private void AddDataPlotToPrimary(BarDataSeries barDataSeries)
+    {
+        PrimaryChartPanel.DetachAllChartComponents();
+        Data dataComponent = new Data(PrimaryChartPanel);
+        dataComponent.ChartPanelNumber = 0;
+        dataComponent.Properties.Data = barDataSeries;
+        dataComponent.Properties.RenderOrder = 0;
+
+        DataPlotViewModel dataProperties = new DataPlotViewModel();
+        dataProperties.Component = dataComponent.Properties;
+        dataProperties.Style = PlotStyle.Candlestick;
+
+        ChartPlot dataPlot = new ChartPlot(dataComponent);
+        dataPlot.Properties = dataProperties;
+        dataComponent.AddPlot(dataPlot);
+
+        PrimaryChartPanel.AttachChartComponent(dataComponent);
+        PrimaryChartPanel.UpdateXAxisRange();
+    }
 
     private void Test_AddVolumeIndicator()
     {
@@ -125,6 +144,7 @@ public partial class ChartControl : UserControl
         VolumeIndicator vi = new VolumeIndicator(panel.Panel);
         vi.SetDataContext(vivm);
         panel.Panel.AttachChartComponent(vi);
+        panel.Panel.UpdateYAxisRange();
     }
 
     private void Test_RemoveVolumeIndicator()
@@ -160,28 +180,9 @@ public partial class ChartControl : UserControl
             startTime = startTime.AddHours(1);
         }
 
-        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null) { return; }
-
-        PrimaryChartPanel.DetachAllChartComponents();
-        Data dataComponent = new Data(PrimaryChartPanel);
-        dataComponent.ChartPanelNumber = 0;
-        dataComponent.Properties.Data = barDataSeries;
-        dataComponent.Properties.RenderOrder = 0;
-        
-        DataPlotViewModel dataProperties = new DataPlotViewModel();
-        dataProperties.Component = dataComponent.Properties;
-        dataProperties.Style = PlotStyle.Candlestick;
-
-        ChartPlot dataPlot = new ChartPlot(dataComponent);
-        dataPlot.Properties = dataProperties;
-        dataComponent.AddPlot(dataPlot);
-
-        PrimaryChartPanel.AttachChartComponent(dataComponent);
-
+        AddDataPlotToPrimary(barDataSeries);
     }
-
-    private void Test_AddDataSeconds(int size)
+        private void Test_AddDataSeconds(int size)
     {
         ///Load some random primary data
         BarDataSeries barDataSeries = new BarDataSeries();
@@ -204,11 +205,7 @@ public partial class ChartControl : UserControl
             startTime = startTime.AddSeconds(1);
         }
 
-        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null) { return; }
-
-        //vm.PrimaryChartPanelViewModel.Data.Clear();
-        //vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+        AddDataPlotToPrimary(barDataSeries);
     }
 
     private void Test_AddDataDaily(int size)
@@ -234,11 +231,7 @@ public partial class ChartControl : UserControl
             startTime = startTime.AddDays(1);
         }
 
-        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null) { return; }
-
-        //vm.PrimaryChartPanelViewModel.Data.Clear();
-        //vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+        AddDataPlotToPrimary(barDataSeries);
     }
 
     private void Test_AddDataMonthly(int size)
@@ -264,11 +257,7 @@ public partial class ChartControl : UserControl
             startTime = startTime.AddMonths(1);
         }
 
-        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null) { return; }
-
-        //vm.PrimaryChartPanelViewModel.Data.Clear();
-        //vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+        AddDataPlotToPrimary(barDataSeries);
     }
     #endregion
 

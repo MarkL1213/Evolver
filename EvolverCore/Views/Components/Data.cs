@@ -18,6 +18,25 @@ namespace EvolverCore.Views
 
         public ChartPlot Plot { get; private set; }
 
+        public override double MinY()
+        {
+            if (VisibleDataPoints.Count == 0)
+                CalculateVisibleDataPoints();
+            if (VisibleDataPoints.Count == 0)
+                return 0;
+
+            return VisibleDataPoints.Min(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.Low; else return 0; });
+        }
+        public override double MaxY()
+        {
+            if (VisibleDataPoints.Count == 0)
+                CalculateVisibleDataPoints();
+            if (VisibleDataPoints.Count == 0)
+                return 100;
+
+            return VisibleDataPoints.Max(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.High; else return 100; });
+        }
+
         internal void AddPlot(ChartPlot plot)
         {
             DataViewModel? vm = Properties as DataViewModel;

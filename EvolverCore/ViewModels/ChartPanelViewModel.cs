@@ -9,7 +9,7 @@ namespace EvolverCore.ViewModels
 {
     internal partial class ChartPanelViewModel : ViewModelBase
     {
-        public static double DefaultPreferredCandleWidth = 5;
+        
         public static double DefaultScrollSensitivity = .25;
         public static double DefaultPanSensitivity = 1;
         public static bool DefaultShowGridLines = true;
@@ -50,8 +50,7 @@ namespace EvolverCore.ViewModels
         
         internal ObservableCollection<ChartComponentViewModel> ChartComponents { get; } = new ObservableCollection<ChartComponentViewModel>();
 
-        [ObservableProperty] private double _preferredCandleWidth = DefaultPreferredCandleWidth;
-        [ObservableProperty] double _scrollSensitivity = DefaultScrollSensitivity;
+                [ObservableProperty] double _scrollSensitivity = DefaultScrollSensitivity;
         [ObservableProperty] double _panSensitivity = DefaultPanSensitivity;
         [ObservableProperty] bool _showGridLines = DefaultShowGridLines;
         [ObservableProperty] bool _showCrosshair = DefaultShowCrosshair;
