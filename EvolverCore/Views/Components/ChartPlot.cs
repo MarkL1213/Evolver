@@ -34,9 +34,44 @@ namespace EvolverCore.Views
                 p.Changed.AddClassHandler<ChartPlot>((c, _) => c.InvalidatePenCache());
         }
 
-        internal ChartPlotViewModel Properties { get; set; } = new ChartPlotViewModel();
+        ChartPlotViewModel _properties = new ChartPlotViewModel();
+        internal ChartPlotViewModel Properties {
+            get { return _properties; }
+            set
+            {
+                if (_properties != null)
+                {
+                    _properties.PropertyChanged -= (_, __) => OnPropertyChanged();
+                }
+
+                _properties = value;
+
+                if (_properties != null)
+                {
+                    _properties.PropertyChanged += (_, __) => OnPropertyChanged();
+                    OnPropertiesChanged();
+                }
+            }
+        }
 
         internal ChartComponentBase Parent { get; private set; }
+
+        private void OnPropertiesChanged()
+        {
+            Style = _properties.Style;
+            PlotFillColor = _properties.PlotFillBrush;
+
+            PlotLineColor = _properties.PlotLineBrush;
+            PlotLineThickness = _properties.PlotLineThickness;
+            PlotLineStyle = _properties.PlotLineStyle;
+
+            InvalidatePenCache();
+        }
+
+        private void OnPropertyChanged()
+        {
+            int i = 0;
+        }
 
         #region Style property
         public static readonly StyledProperty<PlotStyle> StyleProperty =
@@ -49,9 +84,9 @@ namespace EvolverCore.Views
         #endregion
         
         #region PlotFillColor property
-        public static readonly StyledProperty<IBrush> PlotFillColorProperty =
-            AvaloniaProperty.Register<ChartPlot, IBrush>(nameof(PlotFillColor), Brushes.Cyan);
-        public IBrush PlotFillColor
+        public static readonly StyledProperty<IBrush?> PlotFillColorProperty =
+            AvaloniaProperty.Register<ChartPlot, IBrush?>(nameof(PlotFillColor), Brushes.Cyan);
+        public IBrush? PlotFillColor
         {
             get { return GetValue(PlotFillColorProperty); }
             set { SetValue(PlotFillColorProperty, value); }
@@ -60,9 +95,9 @@ namespace EvolverCore.Views
 
         #region PlotLine pen properties
         private Pen? _cachedPlotLinePen;
-        public static readonly StyledProperty<IBrush> PlotLineColorProperty =
-            AvaloniaProperty.Register<ChartPlot, IBrush>(nameof(PlotLineColor), Brushes.Cyan);
-        public IBrush PlotLineColor
+        public static readonly StyledProperty<IBrush?> PlotLineColorProperty =
+            AvaloniaProperty.Register<ChartPlot, IBrush?>(nameof(PlotLineColor), Brushes.Cyan);
+        public IBrush? PlotLineColor
         {
             get { return GetValue(PlotLineColorProperty); }
             set { SetValue(PlotLineColorProperty, value); }
@@ -86,6 +121,22 @@ namespace EvolverCore.Views
         #endregion
 
         internal void InvalidatePenCache() { _cachedPlotLinePen = null; }
+
+        public double MinY(DateTime rangeMin, DateTime rangeMax)
+        {
+            return 0;
+        }
+        public double MaxY(DateTime rangeMin, DateTime rangeMax)
+        {
+            ChartComponentViewModel? vm = Properties.Component;
+            if (vm == null || vm.Data == null) return 100;
+
+            List<TimeDataBar> vBars = vm.Data.
+                Where(p => p.X >= rangeMin && p.X <= rangeMax)
+                .ToList();
+
+            return vBars.Count > 0 ? vBars.Max(p => new BarPricePoint(p, Properties.PriceField).Y) : 100;
+        }
 
         public void Render(DrawingContext context)
         {
@@ -129,48 +180,89 @@ namespace EvolverCore.Views
 
         private void DrawHistogram(DrawingContext context)
         {
-            ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
-            ChartComponentViewModel cm = Parent.Properties;
-            if (vm == null || vm.XAxis == null || cm.Data == null) return;
+            ChartComponentViewModel componentVM = Parent.Properties;
+            if (componentVM.Data == null || componentVM.Data.Count == 0) return;
+
+            ChartPanelViewModel? panelVM = Parent.Parent.DataContext as ChartPanelViewModel;
+            if (panelVM == null || panelVM.XAxis == null) return;
             Rect bounds = Parent.Parent.Bounds;
 
-            _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
+            TimeSpan xSpan = panelVM.XAxis.Max - panelVM.XAxis.Min;
+            double yRange = panelVM.YAxis.Max - panelVM.YAxis.Min;
+            if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
+            double pixelsPerTick = bounds.Width / xSpan.Ticks;
 
-            TimeSpan xSpan = vm.XAxis.Max - vm.XAxis.Min;
-            if (xSpan <= TimeSpan.Zero) return;
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(componentVM.Data) / 2)); // auto-scale width
 
-            List<TimeDataBar> visiblePoints = cm.Data
-                .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
-                .ToList();
-
-            // Find max value in visible range for proper scaling
-            double maxValue = 0;
-            foreach (IDataPoint dataPoint in visiblePoints) { maxValue = Math.Max(maxValue, dataPoint.Y); }
-
-            if (maxValue == 0) return;
-
-            double pixelsPerTick = bounds.Width / xSpan.TotalMilliseconds;
-            double barWidth = pixelsPerTick * BarDataSeries.IntervalTicks(cm.Data);
-            double maxBarHeight = bounds.Height * 0.9; // Tallest bar takes ~90% of panel height (adjustable)
-
-            foreach (IDataPoint dataPoint in visiblePoints)
+            foreach (var dataPoint in componentVM.Data)
             {
-                if (dataPoint.X < vm.XAxis.Min || dataPoint.X > vm.XAxis.Max) continue;
+                TimeDataBar? bar = dataPoint as TimeDataBar;
+                if (bar == null) continue;
 
-                double xCenter = (dataPoint.X - vm.XAxis.Min).TotalMilliseconds * pixelsPerTick;
-                TimeDataBar? tdb = dataPoint as TimeDataBar;
-                double Y = tdb != null ? new BarPricePoint(tdb, Properties.PriceField).Y : dataPoint.Y;
-                double valueRatio = Y / maxValue;
-                double barHeight = valueRatio * maxBarHeight;
+                if (bar.Time < panelVM.XAxis.Min || bar.Time > panelVM.XAxis.Max) continue;
 
-                var rect = new Rect(
-                    xCenter - barWidth * 0.4,
-                    bounds.Height - barHeight,
-                    barWidth * 0.8,
-                    barHeight);
+                double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, bar.Time, bounds);
+                double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
 
-                context.DrawRectangle(PlotFillColor, _cachedPlotLinePen, rect);
+                BarPricePoint value = new BarPricePoint(dataPoint, Properties.PriceField);
+                double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, value.Y, bounds);
+
+                var fillBrush = Properties.PlotFillBrush;
+
+                _cachedPlotLinePen ??= new Pen(Properties.PlotLineBrush, Properties.PlotLineThickness, Properties.PlotLineStyle);
+                if (fillBrush ==null || _cachedPlotLinePen == null) { return; }
+
+                var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
+
+                context.FillRectangle(fillBrush, rect);
+                context.DrawRectangle(_cachedPlotLinePen, rect);
             }
         }
+
+        //private void DrawHistogram(DrawingContext context)
+        //{
+        //    ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
+        //    ChartComponentViewModel cm = Parent.Properties;
+        //    if (vm == null || vm.XAxis == null || cm.Data == null) return;
+        //    Rect bounds = Parent.Parent.Bounds;
+
+        //    _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
+
+        //    TimeSpan xSpan = vm.XAxis.Max - vm.XAxis.Min;
+        //    if (xSpan <= TimeSpan.Zero) return;
+
+        //    List<TimeDataBar> visiblePoints = cm.Data
+        //        .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
+        //        .ToList();
+
+        //    // Find max value in visible range for proper scaling
+        //    double maxValue = 0;
+        //    foreach (IDataPoint dataPoint in visiblePoints) { maxValue = Math.Max(maxValue, dataPoint.Y); }
+
+        //    if (maxValue == 0) return;
+
+        //    double pixelsPerTick = bounds.Width / xSpan.TotalMilliseconds;
+        //    double barWidth = pixelsPerTick * BarDataSeries.IntervalTicks(cm.Data);
+        //    double maxBarHeight = bounds.Height * 0.9; // Tallest bar takes ~90% of panel height (adjustable)
+
+        //    foreach (IDataPoint dataPoint in visiblePoints)
+        //    {
+        //        if (dataPoint.X < vm.XAxis.Min || dataPoint.X > vm.XAxis.Max) continue;
+
+        //        double xCenter = (dataPoint.X - vm.XAxis.Min).TotalMilliseconds * pixelsPerTick;
+        //        TimeDataBar? tdb = dataPoint as TimeDataBar;
+        //        double Y = tdb != null ? new BarPricePoint(tdb, Properties.PriceField).Y : dataPoint.Y;
+        //        double valueRatio = Y / maxValue;
+        //        double barHeight = valueRatio * maxBarHeight;
+
+        //        var rect = new Rect(
+        //            xCenter - barWidth * 0.4,
+        //            bounds.Height - barHeight,
+        //            barWidth * 0.8,
+        //            barHeight);
+
+        //        context.DrawRectangle(PlotFillColor, _cachedPlotLinePen, rect);
+        //    }
+        //}
     }
 }

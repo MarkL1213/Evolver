@@ -119,7 +119,6 @@ public partial class ChartControl : UserControl
         VolumeIndicator vi = new VolumeIndicator(panel.Panel);
         vi.SetDataContext(vivm);
         panel.Panel.AttachChartComponent(vi);
-        //panel.Panel.InvalidateVisual();
     }
 
     private void Test_RemoveVolumeIndicator()

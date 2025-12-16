@@ -953,14 +953,20 @@ public partial class ChartPanel : Decorator
 
 
         // Y Range (use visible only)
-        var minY = visibleBars.Min(b => b.Low);
-        var maxY = visibleBars.Max(b => b.High);
+        var minY = double.MaxValue;
+        var maxY = double.MinValue;
+        if (!IsSubPanel)
+        {
+            minY = visibleBars.Min(b => b.Low);
+            maxY = visibleBars.Max(b => b.High);
+        }
 
         List<TimeDataBar> vBars = visibleBars.ToList();
         foreach (ChartComponentBase component in _attachedComponents)
         {
-            double componentMinY = component.MinY(vBars[0].Time, vBars[vBars.Count - 1].Time);
-            double componentMaxY = component.MaxY(vBars[0].Time, vBars[vBars.Count - 1].Time);
+            component.UpdateVisualRange(vBars[0].Time, vBars[vBars.Count - 1].Time);
+            double componentMinY = component.MinY();
+            double componentMaxY = component.MaxY();
 
             minY = componentMinY < minY ? componentMinY : minY;
             maxY = componentMaxY > maxY ? componentMaxY : maxY;

@@ -25,7 +25,12 @@ namespace EvolverCore.Views.Components
             Parent = parent;
         }
 
-        internal ChartComponentViewModel Properties { get; set; } = new ChartComponentViewModel();
+        ChartComponentViewModel _properties = new ChartComponentViewModel();
+        internal ChartComponentViewModel Properties
+        {
+            get { return _properties; }
+            set { SetDataContext(value); }
+        }
 
         public ChartPanel Parent { get; private set; }
 
@@ -69,14 +74,19 @@ namespace EvolverCore.Views.Components
         }
         #endregion
 
-        public virtual double MinY(DateTime rangeMin, DateTime rangeMax)
+        internal void SetDataContext(ChartComponentViewModel vm)
         {
-            return 0;
+            _properties = vm;
+
+            ConfigurePlots();
+
+            Parent.InvalidateVisual();
         }
-        public virtual double MaxY(DateTime rangeMin, DateTime rangeMax)
-        {
-            return 100;
-        }
+
+        public virtual double MinY() { return 0; }
+        public virtual double MaxY() { return 100; }
+        public virtual void ConfigurePlots() { }
+        public virtual void UpdateVisualRange(DateTime rangeMin, DateTime rangeMax) { }
 
         public virtual void Render(DrawingContext context) { }
     }
