@@ -34,17 +34,6 @@ namespace EvolverCore.ViewModels
 
         public static IBrush DefaultBackgroundColor = Brushes.Black;
         
-        public static IBrush DefaultCandleUpColor = Brushes.DodgerBlue;
-        public static IBrush DefaultCandleDownColor = Brushes.Red;
-
-        public static IBrush DefaultWickColor = Brushes.DarkGray;
-        public static double DefaultWickThickness = 1;
-        public static IDashStyle? DefaultWickDashStyle = null;
-
-        public static IBrush DefaultCandleOutlineColor = Brushes.DarkGray;
-        public static double DefaultCandleOutlineThickness = 1;
-        public static IDashStyle? DefaultCandleOutlineDashStyle = null;
-
         internal ChartXAxisViewModel? XAxis { set; get; }
         internal ChartYAxisViewModel YAxis { get; } = new ChartYAxisViewModel();
         
@@ -56,17 +45,6 @@ namespace EvolverCore.ViewModels
         [ObservableProperty] bool _showCrosshair = DefaultShowCrosshair;
 
         [ObservableProperty] IBrush _backgroundColor = DefaultBackgroundColor;
-
-        [ObservableProperty] IBrush _candleUpColor = DefaultCandleUpColor;
-        [ObservableProperty] IBrush _candleDownColor = DefaultCandleDownColor;
-
-        [ObservableProperty] IBrush _candleOutlineColor = DefaultCandleOutlineColor;
-        [ObservableProperty] double _candleOutlineThickness = DefaultCandleOutlineThickness;
-        [ObservableProperty] IDashStyle? _candleOutlineDashStyle = DefaultCandleOutlineDashStyle;
-
-        [ObservableProperty] IBrush _wickColor = DefaultWickColor;
-        [ObservableProperty] double _wickThickness = DefaultWickThickness;
-        [ObservableProperty] IDashStyle? _wickDashStyle = DefaultWickDashStyle;
 
         [ObservableProperty] IBrush _gridLinesColor = DefaultGridLinesColor;
         [ObservableProperty] double _gridLinesThickness = DefaultGridLinesThickness;

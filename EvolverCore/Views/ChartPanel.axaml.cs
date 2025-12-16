@@ -28,15 +28,7 @@ public partial class ChartPanel : Decorator
             GridLinesDashStyleProperty,
             GridLinesBoldColorProperty,
             GridLinesBoldThicknessProperty,
-            GridLinesBoldDashStyleProperty,
-            CandleDownColorProperty,
-            CandleUpColorProperty,
-            WickColorProperty,
-            WickDashStyleProperty,
-            WickThicknessProperty,
-            CandleOutlineThicknessProperty,
-            CandleOutlineDashStyleProperty,
-            CandleOutlineColorProperty
+            GridLinesBoldDashStyleProperty
             );
 
         AvaloniaProperty[] penProperties =
@@ -47,12 +39,6 @@ public partial class ChartPanel : Decorator
             GridLinesBoldColorProperty,
             GridLinesBoldThicknessProperty,
             GridLinesBoldDashStyleProperty,
-            WickThicknessProperty,
-            WickColorProperty,
-            WickDashStyleProperty,
-            CandleOutlineThicknessProperty,
-            CandleOutlineDashStyleProperty,
-            CandleOutlineColorProperty,
             CrosshairLineColorProperty,
             CrosshairLineThicknessProperty,
             CrosshairLineDashStyleProperty
@@ -93,7 +79,9 @@ public partial class ChartPanel : Decorator
         }
     }
 
-    internal int PanelNumber { set; get; } = 0;
+    public int PanelNumber { get; internal set; } = 0;
+    private string _nearestPriceLabel = string.Empty;
+    private List<ChartComponentBase> _attachedComponents = new List<ChartComponentBase>();
     private Point _dragStart;
     private DateTime _dragStartXMin;
     private DateTime _dragStartXMax;
@@ -102,6 +90,15 @@ public partial class ChartPanel : Decorator
     private bool _isDragging;
     private ChartPanelViewModel? _vm;
 
+    private struct PriceCoordPair
+    {
+        public PriceCoordPair(double price, double yCoord, string label) { YCoord = yCoord; Price = price; Label = label; }
+        public double Price;
+        public double YCoord;
+        public string Label;
+    }
+
+    #region callbacks
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
@@ -135,70 +132,17 @@ public partial class ChartPanel : Decorator
         //UpdateVisibleRange();
     }
 
-    //////////
-    //Replaced by UpdateVisibleRange()
-    //////////
-    //private void UpdateAxisRanges()
-    //{
-    //    if(_vm == null || _vm.XAxis==null) return;
-
-    //    if (_vm.Data.Count == 0)
-    //    {
-    //        // Default empty view
-    //        _vm.XAxis.Min = DateTime.Today;
-    //        _vm.XAxis.Max = DateTime.Today.AddDays(1);
-    //        _vm.YAxis.Min = 0;
-    //        _vm.YAxis.Max = 100;
-    //        return;
-    //    }
-
-    //    DateTime xMin = DateTime.MaxValue;
-    //    DateTime xMax = DateTime.MinValue;
-    //    double yMin = double.MaxValue;
-    //    double yMax = double.MinValue;
-
-    //    foreach (BarDataSeries series in _vm.Data)
-    //    {
-    //        // X Axis: Time range
-    //        var minTime = series.Min(b => b.Time);
-    //        var maxTime = series.Max(b => b.Time);
-
-    //        // Add small padding (5% of range or 1 hour, whichever is larger)
-    //        var timePadding = TimeSpan.FromTicks(Math.Max(
-    //            (maxTime - minTime).Ticks / 20,
-    //            TimeSpan.FromHours(1).Ticks));
-
-    //        DateTime n = minTime - timePadding;
-    //        xMin = xMin < n ? xMin : n;
-
-    //        n = maxTime + timePadding;
-    //        xMax = xMax > n ? xMax : n;
-
-    //        // Y Axis: Price range (use High/Low for candlesticks)
-    //        var minPrice = series.Min(b => b.Low);
-    //        var maxPrice = series.Max(b => b.High);
-
-    //        var priceRange = maxPrice - minPrice;
-    //        var pricePadding = priceRange * 0.1; // 10% padding
-    //        if (pricePadding < 0.01) pricePadding = 1; // Minimum padding
-
-    //        double m = minPrice - pricePadding;
-    //        yMin = yMin < m ? yMin : m;
-
-    //        m = maxPrice + pricePadding;
-    //        yMax = yMax > m ? yMax : m;
-    //    }
-
-    //    _vm.XAxis.Min = xMin;
-    //    _vm.XAxis.Max = xMax;
-    //    _vm.YAxis.Min = yMin;
-    //    _vm.YAxis.Max = yMax;
-    //}
-
     private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
         InvalidateVisual();
+    }
+    
+    private void InvalidatePenCache()
+    {
+        _cachedGridLinesPen = null;
+        _cachedGridLinesBoldPen = null;
+        _cachedCrosshairPen = null;
     }
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -221,18 +165,6 @@ public partial class ChartPanel : Decorator
             e.Handled = true;
         }
     }
-
-    private string _nearestPriceLabel = string.Empty;
-    private struct PriceCoordPair
-    {
-        public PriceCoordPair(double price,double yCoord,string label) { YCoord = yCoord;Price = price; Label = label; }
-        public double Price;
-        public double YCoord;
-        public string Label;
-    }
-
-    private DateTime _lastPointerMovedInvalidateVisual = DateTime.MinValue;
-    private const double _pointerMoveDebounceMs = 16;
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
@@ -308,34 +240,15 @@ public partial class ChartPanel : Decorator
 
                     if (dataComponent.VisibleDataPoints.Count == 0)
                         dataComponent.CalculateVisibleDataPoints();
+                    if (dataComponent.VisibleDataPoints.Count == 0)
+                    {
+                        //FIXME : no visible data fall back to free mode
+                        return;
+                    }
 
-                    TimeDataBar? nearestBar = dataComponent.VisibleDataPoints
+                        TimeDataBar? nearestBar = dataComponent.VisibleDataPoints
                         .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
                         .First() as TimeDataBar;
-
-                    //List<IDataPoint> nearestPoints = new List<IDataPoint>();
-                    //foreach (List<IDataPoint> visibleData in VisibleBarDataPoints)
-                    //{
-                    //    if (visibleData.Count == 0) continue;
-
-                    //    var nearestPoint = visibleData
-                    //        .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
-                    //        .First();
-                    //    nearestPoints.Add(nearestPoint);
-                    //}
-
-                    //if (nearestPoints.Count == 0)
-                    //{
-                    //    _vm.CrosshairTime = null;
-                    //    _vm.CrosshairPrice = null;
-                    //    InvalidateVisual();
-                    //    e.Handled = true;
-                    //    return;
-                    //}
-
-                    //TimeDataBar? nearestBar = nearestPoints
-                    //         .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
-                    //         .First() as TimeDataBar;
 
                     if (nearestBar != null)
                     {
@@ -426,8 +339,9 @@ public partial class ChartPanel : Decorator
         InvalidateVisual();
         e.Handled = true;
     }
+    #endregion
 
-    // Mapping helpers (add to class)
+    #region static coordinate and axis tick helpers
     internal static double MapXToScreen(ChartXAxisViewModel vm,DateTime dateX, Rect bounds)
     {
         if (vm == null) return 0;
@@ -522,95 +436,9 @@ public partial class ChartPanel : Decorator
 
         return ticks;
     }
-
-
-    public static readonly StyledProperty<double> PrefererredCandleWidthProperty =
-    AvaloniaProperty.Register<ChartPanel, double>(nameof(PrefererredCandleWidth), 5);
-    public double PrefererredCandleWidth
-    {
-        get { return GetValue(PrefererredCandleWidthProperty); }
-        set {
-            double v = Math.Clamp(value, 3, 31);
-            SetValue(PrefererredCandleWidthProperty, value);
-        }
-    }
-
-    #region CandleOutline pen properties
-    private Pen? _cachedCandleOutlinePen;
-
-    public static readonly StyledProperty<IBrush> CandleOutlineColorProperty =
-    AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CandleOutlineColor), Brushes.DarkGray);
-    public IBrush CandleOutlineColor
-    {
-        get { return GetValue(CandleOutlineColorProperty); }
-        set { SetValue(CandleOutlineColorProperty, value); }
-    }
-
-    public static readonly StyledProperty<double> CandleOutlineThicknessProperty =
-    AvaloniaProperty.Register<ChartPanel, double>(nameof(CandleOutlineThickness), 1);
-    public double CandleOutlineThickness
-    {
-        get { return GetValue(CandleOutlineThicknessProperty); }
-        set { SetValue(CandleOutlineThicknessProperty, value); }
-    }
-
-    public static readonly StyledProperty<IDashStyle?> CandleOutlineDashStyleProperty =
-    AvaloniaProperty.Register<ChartPanel, IDashStyle?>(nameof(CandleOutlineDashStyle), null);
-    public IDashStyle? CandleOutlineDashStyle
-    {
-        get { return GetValue(CandleOutlineDashStyleProperty); }
-        set { SetValue(CandleOutlineDashStyleProperty, value); }
-    }
     #endregion
 
-    #region Wick pen properties
-    private Pen? _cachedWickPen;
-
-    public static readonly StyledProperty<IBrush> WickColorProperty =
-    AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(WickColor), Brushes.DarkGray);
-    public IBrush WickColor
-    {
-        get { return GetValue(WickColorProperty); }
-        set { SetValue(WickColorProperty, value); }
-    }
-
-    public static readonly StyledProperty<double> WickThicknessProperty =
-    AvaloniaProperty.Register<ChartPanel, double>(nameof(WickThickness), 1);
-    public double WickThickness
-    {
-        get { return GetValue(WickThicknessProperty); }
-        set { SetValue(WickThicknessProperty, value); }
-    }
-
-    public static readonly StyledProperty<IDashStyle?> WickDashStyleProperty =
-    AvaloniaProperty.Register<ChartPanel, IDashStyle?>(nameof(WickDashStyle), null);
-    public IDashStyle? WickDashStyle
-    {
-        get { return GetValue(WickDashStyleProperty); }
-        set { SetValue(WickDashStyleProperty, value); }
-    }
-    #endregion
-
-    #region CandleUpColor property
-    public static readonly StyledProperty<IBrush> CandleUpColorProperty =
-        AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CandleUpColor), Brushes.Green);
-    public IBrush CandleUpColor
-    {
-        get { return GetValue(CandleUpColorProperty); }
-        set { SetValue(CandleUpColorProperty, value); }
-    }
-    #endregion
-
-    #region CandleDownColor property
-    public static readonly StyledProperty<IBrush> CandleDownColorProperty =
-        AvaloniaProperty.Register<ChartPanel, IBrush>(nameof(CandleDownColor), Brushes.Red);
-    public IBrush CandleDownColor
-    {
-        get { return GetValue(CandleDownColorProperty); }
-        set { SetValue(CandleDownColorProperty, value); }
-    }
-    #endregion
-
+    #region Properties
     #region ScrollSensitivity property
     public static readonly StyledProperty<double> ScrollSensitivityProperty =
         AvaloniaProperty.Register<ChartPanel, double>(nameof(ScrollSensitivity), .25);
@@ -811,18 +639,8 @@ public partial class ChartPanel : Decorator
         _connectedChartYAxis = chartChartYAxis;
     }
     #endregion
-
-    private void InvalidatePenCache()
-    {
-        _cachedGridLinesPen = null;
-        _cachedGridLinesBoldPen = null;
-        _cachedWickPen = null;
-        _cachedCandleOutlinePen = null;
-        _cachedCrosshairPen = null;
-    }
-
-    List<ChartComponentBase> _attachedComponents = new List<ChartComponentBase>();
-
+    #endregion
+    
     internal void AttachChartComponent(ChartComponentBase component)
     {
         if (_vm == null) return;
@@ -846,6 +664,77 @@ public partial class ChartPanel : Decorator
         return dataComponent;
     }
 
+    internal void UpdateXAxisRange()
+    {
+        if (_vm == null || _vm.XAxis == null) return;
+        Data? dataComponent = GetFirstDataComponent();
+
+        if (_vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
+        {
+            if (_vm.XAxis != null)
+            {
+                _vm.XAxis.Min = DateTime.Today;
+                _vm.XAxis.Max = DateTime.Today.AddDays(1);
+            }
+
+            return;
+        }
+
+        DataPlotViewModel? dataPlotVM = dataComponent.Plot.Properties as DataPlotViewModel;
+        double preferredWidth = dataPlotVM == null ? 3 : dataPlotVM.PreferredCandleWidth;
+
+        int maxVisible = (int)(Bounds.Width / preferredWidth);
+        maxVisible = Math.Max(maxVisible, 50);  // Minimum to avoid too-narrow views
+
+        IEnumerable<TimeDataBar> visibleBars;
+        if (dataComponent.Properties.Data.Count <= maxVisible)
+            visibleBars = dataComponent.Properties.Data.Tolist();
+        else
+            visibleBars = dataComponent.Properties.Data.TakeLast(maxVisible);  // Last N bars (most recent)
+
+        var minTime = visibleBars.Min(b => b.Time);
+        var maxTime = visibleBars.Max(b => b.Time);
+        var timeRange = maxTime - minTime;
+        var timePadding = timeRange * 0.05;  // 5% padding
+
+        _vm.XAxis.Min = minTime - timePadding;
+        _vm.XAxis.Max = maxTime + timePadding;
+    }
+
+    public void UpdateYAxisRange()
+    {
+        if (_vm == null) return;
+        if (_vm.XAxis == null)
+        {
+            _vm.YAxis.Min = 0;
+            _vm.YAxis.Max = 100;
+
+            return;
+        }
+
+        // Y Range (use visible only)
+        var minY = double.MaxValue;
+        var maxY = double.MinValue;
+
+        foreach (ChartComponentBase component in _attachedComponents)
+        {
+            component.UpdateVisualRange(_vm.XAxis.Min, _vm.XAxis.Max);
+            double componentMinY = component.MinY();
+            double componentMaxY = component.MaxY();
+
+            minY = componentMinY < minY ? componentMinY : minY;
+            maxY = componentMaxY > maxY ? componentMaxY : maxY;
+        }
+
+        var yRange = maxY - minY;
+        var yPadding = yRange * 0.1;  // 10% padding
+        if (yPadding < 0.01) yPadding = 1;
+
+        _vm.YAxis.Min = minY - yPadding;
+        _vm.YAxis.Max = maxY + yPadding;
+    }
+
+    #region render functions
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -903,144 +792,6 @@ public partial class ChartPanel : Decorator
         }
     }
 
-    internal void UpdateXAxisRange()
-    {
-        if (_vm == null || _vm.XAxis == null) return;
-        Data? dataComponent = GetFirstDataComponent();
-
-        if (_vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
-        {
-            if (_vm.XAxis != null)
-            {
-                _vm.XAxis.Min = DateTime.Today;
-                _vm.XAxis.Max = DateTime.Today.AddDays(1);
-            }
-
-            return;
-        }
-
-        DataPlotViewModel? dataPlotVM = dataComponent.Plot.Properties as DataPlotViewModel;
-        double preferredWidth = dataPlotVM == null ? 3 : dataPlotVM.PreferredCandleWidth;
-
-        int maxVisible = (int)(Bounds.Width / preferredWidth);
-        maxVisible = Math.Max(maxVisible, 50);  // Minimum to avoid too-narrow views
-
-        IEnumerable<TimeDataBar> visibleBars;
-        if (dataComponent.Properties.Data.Count <= maxVisible)
-            visibleBars = dataComponent.Properties.Data.Tolist();
-        else
-            visibleBars = dataComponent.Properties.Data.TakeLast(maxVisible);  // Last N bars (most recent)
-
-        var minTime = visibleBars.Min(b => b.Time);
-        var maxTime = visibleBars.Max(b => b.Time);
-        var timeRange = maxTime - minTime;
-        var timePadding = timeRange * 0.05;  // 5% padding
-
-        _vm.XAxis.Min = minTime - timePadding;
-        _vm.XAxis.Max = maxTime + timePadding;
-    }
-
-    public void UpdateYAxisRange()
-    {
-        if (_vm == null) return;
-        if ( _vm.XAxis == null)
-        {
-            _vm.YAxis.Min = 0;
-            _vm.YAxis.Max = 100;
-
-            return;
-        }
-
-        // Y Range (use visible only)
-        var minY = double.MaxValue;
-        var maxY = double.MinValue;
-        
-        foreach (ChartComponentBase component in _attachedComponents)
-        {
-            component.UpdateVisualRange(_vm.XAxis.Min, _vm.XAxis.Max);
-            double componentMinY = component.MinY();
-            double componentMaxY = component.MaxY();
-
-            minY = componentMinY < minY ? componentMinY : minY;
-            maxY = componentMaxY > maxY ? componentMaxY : maxY;
-        }
-        
-        var yRange = maxY - minY;
-        var yPadding = yRange * 0.1;  // 10% padding
-        if (yPadding < 0.01) yPadding = 1;
-
-        _vm.YAxis.Min = minY - yPadding;
-        _vm.YAxis.Max = maxY + yPadding;
-    }
-
-    //private void DrawCandlesticks(DrawingContext context)
-    //{
-    //    if (_vm == null) return;
-    //    if (_vm.Data.Count == 0) return;
-    //    if (_vm.XAxis is not { } xAxis || _vm.YAxis is not { } yAxis) return;
-
-    //    TimeSpan xSpan = xAxis.Max - xAxis.Min;
-    //    double yRange = yAxis.Max - yAxis.Min;
-    //    if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
-    //    double pixelsPerTick = Bounds.Width / xSpan.Ticks;
-
-    //    if (_vm.Data.Count != VisibleBarDataPoints.Count)
-    //    {
-    //        CalculateVisibleBarDataPoints();
-    //    }
-
-    //    for(int i=0; i <VisibleBarDataPoints.Count;  i++)
-    //    {
-    //        double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(_vm.Data[i]) / 2)); // auto-scale width
-
-    //        foreach (var dataPoint in VisibleBarDataPoints[i])
-    //        {
-    //            TimeDataBar? bar = dataPoint as TimeDataBar;
-    //            if(bar == null) continue;
-                
-    //            if (bar.Time < xAxis.Min || bar.Time > xAxis.Max) continue;
-
-    //            double xCenter = (bar.Time - xAxis.Min).Ticks * pixelsPerTick;
-
-    //            double highY = Bounds.Height - (bar.High - yAxis.Min) / yRange * Bounds.Height;
-    //            double lowY = Bounds.Height - (bar.Low - yAxis.Min) / yRange * Bounds.Height;
-    //            double openY = Bounds.Height - (bar.Open - yAxis.Min) / yRange * Bounds.Height;
-    //            double closeY = Bounds.Height - (bar.Close - yAxis.Min) / yRange * Bounds.Height;
-
-    //            bool isBull = bar.Close >= bar.Open;
-    //            var bodyBrush = isBull ? CandleUpColor : CandleDownColor;
-    //            _cachedWickPen ??= new Pen(WickColor, WickThickness, WickDashStyle);
-    //            _cachedCandleOutlinePen ??= new Pen(CandleOutlineColor, CandleOutlineThickness, CandleOutlineDashStyle);
-
-    //            // Wick (high-low line)
-    //            context.DrawLine(_cachedWickPen, new Point(xCenter, highY), new Point(xCenter, lowY));
-
-    //            // Body (rectangle)
-    //            double bodyTop = Math.Min(openY, closeY);
-    //            double bodyBottom = Math.Max(openY, closeY);
-    //            double bodyHeight = bodyBottom - bodyTop;
-
-    //            if (bodyHeight < 1) // Doji or very small body to draw as line
-    //            {
-    //                context.DrawLine(_cachedWickPen, new Point(xCenter - halfBarWidth, bodyTop),
-    //                                        new Point(xCenter + halfBarWidth, bodyTop));
-    //            }
-    //            else
-    //            {
-    //                var bodyRect = new Rect(xCenter - halfBarWidth, bodyTop, halfBarWidth * 2, bodyHeight);
-    //                context.DrawRectangle(bodyBrush, _cachedCandleOutlinePen, bodyRect);
-    //                if (bodyHeight > 1)
-    //                {
-    //                    // Top/bottom lines for open/close levels
-    //                    context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
-    //                    if (openY != closeY)  // Avoid double line on doji
-    //                        context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
-
     private void DrawCrosshair(DrawingContext context)
     {
         if (_vm == null || !_vm.ShowCrosshair || !_vm.MousePosition.HasValue || !_vm.CrosshairTime.HasValue || !_vm.CrosshairPrice.HasValue || _vm.XAxis == null)
@@ -1089,4 +840,5 @@ public partial class ChartPanel : Decorator
         context.DrawRectangle(_cachedCrosshairPen, readoutRect);
         context.DrawText(formatted, new Point(readoutX, readoutY));
     }
+    #endregion
 }
