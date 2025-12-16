@@ -7,6 +7,7 @@ using EvolverCore.Views.ContextMenus;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using EvolverCore.Views;
 
 namespace EvolverCore;
 
@@ -98,12 +99,18 @@ public partial class ChartXAxis : Decorator
         context.FillRectangle(BackgroundColor, new Rect(0, 0, Bounds.Width, Bounds.Height));
     }
 
+    public ChartPanel? DataPanel { get; internal set; }
+
     private void DrawXAxisLabels(DrawingContext context)
     {
-        if (_vm == null || _vm.SharedXAxis == null) return;
+        if (_vm == null || _vm.SharedXAxis == null || DataPanel == null) return;
 
-        DataInterval dataInterval = _vm.PrimaryChartPanelViewModel.Data.Count ==0? new DataInterval(Interval.Hour,2):
-            _vm.PrimaryChartPanelViewModel.Data[0].Interval;
+        Data? dataComponent = DataPanel.GetFirstDataComponent();
+        DataInterval dataInterval;
+        if (dataComponent == null || dataComponent.Properties.Data == null)
+            dataInterval = new DataInterval(Interval.Hour, 2);
+        else
+            dataInterval = dataComponent.Properties.Data.Interval;
 
         List<DateTime> ticks = ChartPanel.ComputeDateTimeTicks(_vm.SharedXAxis.Min, _vm.SharedXAxis.Max, Bounds, dataInterval);
 

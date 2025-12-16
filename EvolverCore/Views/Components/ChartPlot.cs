@@ -14,7 +14,8 @@ namespace EvolverCore.Views
     public enum PlotStyle
     {
         Line,
-        Bar
+        Bar,
+        Candlestick
     }
 
     internal class ChartPlot : AvaloniaObject
@@ -35,7 +36,8 @@ namespace EvolverCore.Views
         }
 
         ChartPlotViewModel _properties = new ChartPlotViewModel();
-        internal ChartPlotViewModel Properties {
+        internal ChartPlotViewModel Properties
+        {
             get { return _properties; }
             set
             {
@@ -82,7 +84,7 @@ namespace EvolverCore.Views
             set { SetValue(StyleProperty, value); }
         }
         #endregion
-        
+
         #region PlotFillColor property
         public static readonly StyledProperty<IBrush?> PlotFillColorProperty =
             AvaloniaProperty.Register<ChartPlot, IBrush?>(nameof(PlotFillColor), Brushes.Cyan);
@@ -120,7 +122,12 @@ namespace EvolverCore.Views
         }
         #endregion
 
-        internal void InvalidatePenCache() { _cachedPlotLinePen = null; }
+        internal void InvalidatePenCache()
+        {
+            _cachedPlotLinePen = null;
+            _cachedWickPen = null;
+            _cachedCandleOutlinePen = null;
+        }
 
         public double MinY(DateTime rangeMin, DateTime rangeMax)
         {
@@ -142,6 +149,7 @@ namespace EvolverCore.Views
         {
             if (Style == PlotStyle.Bar) { DrawHistogram(context); }
             else if (Style == PlotStyle.Line) { DrawCurve(context); }
+            else if (Style == PlotStyle.Candlestick) { DrawCandlesticks(context); }
         }
 
         private void DrawCurve(DrawingContext context)
@@ -158,7 +166,7 @@ namespace EvolverCore.Views
             {
                 List<BarPricePoint> visibleDataPoints = cm.Data
                         .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
-                        .Select(p => new BarPricePoint(p as TimeDataBar,Properties.PriceField))
+                        .Select(p => new BarPricePoint(p as TimeDataBar, Properties.PriceField))
                         .ToList();
                 visiblePoints = visibleDataPoints
                         .Select(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds)))
@@ -210,7 +218,7 @@ namespace EvolverCore.Views
                 var fillBrush = Properties.PlotFillBrush;
 
                 _cachedPlotLinePen ??= new Pen(Properties.PlotLineBrush, Properties.PlotLineThickness, Properties.PlotLineStyle);
-                if (fillBrush ==null || _cachedPlotLinePen == null) { return; }
+                if (fillBrush == null || _cachedPlotLinePen == null) { return; }
 
                 var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
 
@@ -219,50 +227,77 @@ namespace EvolverCore.Views
             }
         }
 
-        //private void DrawHistogram(DrawingContext context)
-        //{
-        //    ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
-        //    ChartComponentViewModel cm = Parent.Properties;
-        //    if (vm == null || vm.XAxis == null || cm.Data == null) return;
-        //    Rect bounds = Parent.Parent.Bounds;
+        Pen? _cachedWickPen = null;
+        Pen? _cachedCandleOutlinePen = null;
 
-        //    _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
+        private void DrawCandlesticks(DrawingContext context)
+        {
+            DataPlotViewModel? plotVM = Properties as DataPlotViewModel;
+            if (plotVM == null) return;
 
-        //    TimeSpan xSpan = vm.XAxis.Max - vm.XAxis.Min;
-        //    if (xSpan <= TimeSpan.Zero) return;
+            ChartComponentViewModel? componentVM = plotVM.Component;
+            if (componentVM == null || componentVM.Data == null || componentVM.Data.Count == 0) return;
 
-        //    List<TimeDataBar> visiblePoints = cm.Data
-        //        .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
-        //        .ToList();
+            ChartPanelViewModel? panelVM = Parent.Parent.DataContext as ChartPanelViewModel;
+            if (panelVM == null) return;
+            if (panelVM.XAxis is not { } xAxis || panelVM.YAxis is not { } yAxis) return;
 
-        //    // Find max value in visible range for proper scaling
-        //    double maxValue = 0;
-        //    foreach (IDataPoint dataPoint in visiblePoints) { maxValue = Math.Max(maxValue, dataPoint.Y); }
+            Rect bounds = Parent.Parent.Bounds;
 
-        //    if (maxValue == 0) return;
+            TimeSpan xSpan = xAxis.Max - xAxis.Min;
+            double yRange = yAxis.Max - yAxis.Min;
+            if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
+            double pixelsPerTick = bounds.Width / xSpan.Ticks;
 
-        //    double pixelsPerTick = bounds.Width / xSpan.TotalMilliseconds;
-        //    double barWidth = pixelsPerTick * BarDataSeries.IntervalTicks(cm.Data);
-        //    double maxBarHeight = bounds.Height * 0.9; // Tallest bar takes ~90% of panel height (adjustable)
+            ChartPanel panel = Parent.Parent;
 
-        //    foreach (IDataPoint dataPoint in visiblePoints)
-        //    {
-        //        if (dataPoint.X < vm.XAxis.Min || dataPoint.X > vm.XAxis.Max) continue;
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(componentVM.Data) / 2)); // auto-scale width
 
-        //        double xCenter = (dataPoint.X - vm.XAxis.Min).TotalMilliseconds * pixelsPerTick;
-        //        TimeDataBar? tdb = dataPoint as TimeDataBar;
-        //        double Y = tdb != null ? new BarPricePoint(tdb, Properties.PriceField).Y : dataPoint.Y;
-        //        double valueRatio = Y / maxValue;
-        //        double barHeight = valueRatio * maxBarHeight;
+            foreach (var dataPoint in Parent.VisibleDataPoints)
+            {
+                TimeDataBar? bar = dataPoint as TimeDataBar;
+                if (bar == null) continue;
 
-        //        var rect = new Rect(
-        //            xCenter - barWidth * 0.4,
-        //            bounds.Height - barHeight,
-        //            barWidth * 0.8,
-        //            barHeight);
+                if (bar.Time < xAxis.Min || bar.Time > xAxis.Max) continue;
 
-        //        context.DrawRectangle(PlotFillColor, _cachedPlotLinePen, rect);
-        //    }
-        //}
+                double xCenter = (bar.Time - xAxis.Min).Ticks * pixelsPerTick;
+
+                double highY = bounds.Height - (bar.High - yAxis.Min) / yRange * bounds.Height;
+                double lowY = bounds.Height - (bar.Low - yAxis.Min) / yRange * bounds.Height;
+                double openY = bounds.Height - (bar.Open - yAxis.Min) / yRange * bounds.Height;
+                double closeY = bounds.Height - (bar.Close - yAxis.Min) / yRange * bounds.Height;
+
+                bool isBull = bar.Close >= bar.Open;
+                var bodyBrush = isBull ? plotVM.CandleUpColor : plotVM.CandleDownColor;
+                _cachedWickPen ??= new Pen(plotVM.WickColor, plotVM.WickThickness, plotVM.WickDashStyle);
+                _cachedCandleOutlinePen ??= new Pen(plotVM.CandleOutlineColor, plotVM.CandleOutlineThickness, plotVM.CandleOutlineDashStyle);
+
+                // Wick (high-low line)
+                context.DrawLine(_cachedWickPen, new Point(xCenter, highY), new Point(xCenter, lowY));
+
+                // Body (rectangle)
+                double bodyTop = Math.Min(openY, closeY);
+                double bodyBottom = Math.Max(openY, closeY);
+                double bodyHeight = bodyBottom - bodyTop;
+
+                if (bodyHeight < 1) // Doji or very small body to draw as line
+                {
+                    context.DrawLine(_cachedWickPen, new Point(xCenter - halfBarWidth, bodyTop),
+                                            new Point(xCenter + halfBarWidth, bodyTop));
+                }
+                else
+                {
+                    var bodyRect = new Rect(xCenter - halfBarWidth, bodyTop, halfBarWidth * 2, bodyHeight);
+                    context.DrawRectangle(bodyBrush, _cachedCandleOutlinePen, bodyRect);
+                    if (bodyHeight > 1)
+                    {
+                        // Top/bottom lines for open/close levels
+                        context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
+                        if (openY != closeY)  // Avoid double line on doji
+                            context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
+                    }
+                }
+            }
+        }
     }
 }

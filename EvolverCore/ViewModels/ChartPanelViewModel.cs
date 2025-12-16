@@ -48,7 +48,6 @@ namespace EvolverCore.ViewModels
         internal ChartXAxisViewModel? XAxis { set; get; }
         internal ChartYAxisViewModel YAxis { get; } = new ChartYAxisViewModel();
         
-        internal ObservableCollection<BarDataSeries> Data { get; } = new ObservableCollection<BarDataSeries>();
         internal ObservableCollection<ChartComponentViewModel> ChartComponents { get; } = new ObservableCollection<ChartComponentViewModel>();
 
         [ObservableProperty] private double _preferredCandleWidth = DefaultPreferredCandleWidth;

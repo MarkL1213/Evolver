@@ -86,6 +86,24 @@ namespace EvolverCore.Views.Components
         public virtual double MinY() { return 0; }
         public virtual double MaxY() { return 100; }
         public virtual void ConfigurePlots() { }
+
+        private List<IDataPoint> _visibleDataPoints = new List<IDataPoint>();
+        public List<IDataPoint> VisibleDataPoints { get { return _visibleDataPoints; } }
+
+        public virtual void CalculateVisibleDataPoints()
+        {
+            VisibleDataPoints.Clear();
+
+            ChartPanelViewModel? panelVM = Parent.DataContext as ChartPanelViewModel;
+            if (Properties == null || panelVM == null || panelVM.XAxis == null) return;
+
+            VisibleDataPoints.Clear();
+            if (Properties.Data == null || Properties.Data.Count == 0) return;
+
+            IEnumerable<IDataPoint> v = Properties.Data.Where(p => p.X >= panelVM.XAxis.Min && p.X <= panelVM.XAxis.Max);
+            VisibleDataPoints.AddRange(v.ToList());
+        }
+
         public virtual void UpdateVisualRange(DateTime rangeMin, DateTime rangeMax) { }
 
         public virtual void Render(DrawingContext context) { }

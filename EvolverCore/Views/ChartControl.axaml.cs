@@ -10,6 +10,7 @@ using EvolverCore.ViewModels;
 using EvolverCore.Views.Components;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
+using EvolverCore.Views;
 
 namespace EvolverCore;
 
@@ -31,6 +32,8 @@ public partial class ChartControl : UserControl
 
         PrimaryYAxis.SetConnectedChartPanel(PrimaryChartPanel);
         PrimaryChartPanel.SetConnectedChartYAxis(PrimaryYAxis);
+
+        PrimaryXAxis.DataPanel = PrimaryChartPanel;
 
         AddTestMenu();
     }
@@ -108,9 +111,12 @@ public partial class ChartControl : UserControl
     private void Test_AddVolumeIndicator()
     {
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null|| vm.PrimaryChartPanelViewModel.Data.Count ==0) return;
+        if (vm == null|| vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
 
-        VolumeIndicatorViewModel vivm = new VolumeIndicatorViewModel(vm.PrimaryChartPanelViewModel.Data[0]);
+        Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        if(dataComponent == null || dataComponent.Properties.Data == null) return;
+
+        VolumeIndicatorViewModel vivm = new VolumeIndicatorViewModel(dataComponent.Properties.Data);
 
         SubPanel? panel = AddNewSubPanel();
         if (panel == null) return;
@@ -128,10 +134,7 @@ public partial class ChartControl : UserControl
 
     private void Test_ClearData()
     {
-        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null) { return; }
-
-        vm.PrimaryChartPanelViewModel.Data.Clear();
+        PrimaryChartPanel.DetachAllChartComponents();
     }
 
     private void Test_AddDataHourly(int size)
@@ -160,8 +163,22 @@ public partial class ChartControl : UserControl
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;
         if (vm == null) { return; }
 
-        vm.PrimaryChartPanelViewModel.Data.Clear();
-        vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+        PrimaryChartPanel.DetachAllChartComponents();
+        Data dataComponent = new Data(PrimaryChartPanel);
+        dataComponent.ChartPanelNumber = 0;
+        dataComponent.Properties.Data = barDataSeries;
+        dataComponent.Properties.RenderOrder = 0;
+        
+        DataPlotViewModel dataProperties = new DataPlotViewModel();
+        dataProperties.Component = dataComponent.Properties;
+        dataProperties.Style = PlotStyle.Candlestick;
+
+        ChartPlot dataPlot = new ChartPlot(dataComponent);
+        dataPlot.Properties = dataProperties;
+        dataComponent.AddPlot(dataPlot);
+
+        PrimaryChartPanel.AttachChartComponent(dataComponent);
+
     }
 
     private void Test_AddDataSeconds(int size)
@@ -190,8 +207,8 @@ public partial class ChartControl : UserControl
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;
         if (vm == null) { return; }
 
-        vm.PrimaryChartPanelViewModel.Data.Clear();
-        vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+        //vm.PrimaryChartPanelViewModel.Data.Clear();
+        //vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
     }
 
     private void Test_AddDataDaily(int size)
@@ -220,8 +237,8 @@ public partial class ChartControl : UserControl
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;
         if (vm == null) { return; }
 
-        vm.PrimaryChartPanelViewModel.Data.Clear();
-        vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+        //vm.PrimaryChartPanelViewModel.Data.Clear();
+        //vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
     }
 
     private void Test_AddDataMonthly(int size)
@@ -250,8 +267,8 @@ public partial class ChartControl : UserControl
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;
         if (vm == null) { return; }
 
-        vm.PrimaryChartPanelViewModel.Data.Clear();
-        vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
+        //vm.PrimaryChartPanelViewModel.Data.Clear();
+        //vm.PrimaryChartPanelViewModel.Data.Add(barDataSeries);
     }
     #endregion
 
@@ -282,10 +299,10 @@ public partial class ChartControl : UserControl
         int subPanelCount = vm.SubPanelViewModels.Count;
 
         ChartPanelViewModel subVM = new ChartPanelViewModel { XAxis = vm.SharedXAxis};
-        foreach (BarDataSeries bds in vm.PrimaryChartPanelViewModel.Data)
-        {
-            subVM.Data.Add(bds);
-        }
+        //foreach (BarDataSeries bds in vm.PrimaryChartPanelViewModel.Data)
+        //{
+        //    subVM.Data.Add(bds);
+        //}
 
 
         SubPanel subPanel = new SubPanel();
@@ -315,7 +332,7 @@ public partial class ChartControl : UserControl
         Grid.SetRow(cp, (subPanelCount * 2) + 2);
         Grid.SetColumn(cp, 0);
         cp.DataContext = subVM;
-        cp.IsSubPanel = true;
+        //cp.IsSubPanel = true;
         subPanel.Panel = cp;
         ChartPanelGrid.Children.Add(cp);
 

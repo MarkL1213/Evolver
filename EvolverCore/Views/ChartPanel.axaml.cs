@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using EvolverCore.Views;
 
 
 namespace EvolverCore;
@@ -86,7 +87,7 @@ public partial class ChartPanel : Decorator
 
         if (_vm != null)
         {
-            _vm.Data.CollectionChanged -= DataCollectionChanged;
+            _vm.ChartComponents.CollectionChanged -= ComponentCollectionChanged;
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged -= AxisPropertyChanged;
             _vm.YAxis.PropertyChanged -= AxisPropertyChanged;
         }
@@ -107,7 +108,7 @@ public partial class ChartPanel : Decorator
 
         if (_vm != null)
         {
-            _vm.Data.CollectionChanged -= DataCollectionChanged;
+            _vm.ChartComponents.CollectionChanged -= ComponentCollectionChanged;
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged -= AxisPropertyChanged;
             _vm.YAxis.PropertyChanged -= AxisPropertyChanged;
         }
@@ -116,22 +117,21 @@ public partial class ChartPanel : Decorator
 
         if (_vm != null)
         {
-            _vm.Data.CollectionChanged += DataCollectionChanged;
+            _vm.ChartComponents.CollectionChanged += ComponentCollectionChanged;
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged += AxisPropertyChanged;
             _vm.YAxis.PropertyChanged += AxisPropertyChanged;
         }
     }
 
-    private void DataCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    private void ComponentCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
-        _visibleBarDataPoints.Clear();
-        //UpdateAxisRanges();
+        foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
         UpdateVisibleRange();
     }
 
     private void PanelSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        _visibleBarDataPoints.Clear();
+        foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
         UpdateVisibleRange();
     }
 
@@ -197,7 +197,7 @@ public partial class ChartPanel : Decorator
 
     private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        _visibleBarDataPoints.Clear();
+        foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
         InvalidateVisual();
     }
 
@@ -288,7 +288,9 @@ public partial class ChartPanel : Decorator
 
             if (_vm.YAxis != null)
             {
-                if (CrosshairSnapMode == CrosshairSnapMode.Free || _vm.Data.Count == 0 || IsSubPanel)
+                Data? dataComponent = GetFirstDataComponent();
+
+                if (CrosshairSnapMode == CrosshairSnapMode.Free || _vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
                 {
                     double xFraction = currentPos.X / Bounds.Width;
                     TimeSpan span = _vm.XAxis.Max - _vm.XAxis.Min;
@@ -304,34 +306,33 @@ public partial class ChartPanel : Decorator
                     TimeSpan totalSpan = _vm.XAxis.Max - _vm.XAxis.Min;
                     DateTime mouseTime = _vm.XAxis.Min + TimeSpan.FromTicks((long)(xFraction * totalSpan.Ticks));
 
-                    if (_vm.Data.Count != _visibleBarDataPoints.Count)
-                    {
-                        CalculateVisibleBarDataPoints();
-                    }
+                    TimeDataBar? nearestBar = dataComponent.VisibleDataPoints
+                        .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
+                        .First() as TimeDataBar;
 
-                    List<IDataPoint> nearestPoints = new List<IDataPoint>();
-                    foreach (List<IDataPoint> visibleData in _visibleBarDataPoints)
-                    {
-                        if (visibleData.Count == 0) continue;
+                    //List<IDataPoint> nearestPoints = new List<IDataPoint>();
+                    //foreach (List<IDataPoint> visibleData in VisibleBarDataPoints)
+                    //{
+                    //    if (visibleData.Count == 0) continue;
 
-                        var nearestPoint = visibleData
-                            .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
-                            .First();
-                        nearestPoints.Add(nearestPoint);
-                    }
+                    //    var nearestPoint = visibleData
+                    //        .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
+                    //        .First();
+                    //    nearestPoints.Add(nearestPoint);
+                    //}
 
-                    if (nearestPoints.Count == 0)
-                    {
-                        _vm.CrosshairTime = null;
-                        _vm.CrosshairPrice = null;
-                        InvalidateVisual();
-                        e.Handled = true;
-                        return;
-                    }
+                    //if (nearestPoints.Count == 0)
+                    //{
+                    //    _vm.CrosshairTime = null;
+                    //    _vm.CrosshairPrice = null;
+                    //    InvalidateVisual();
+                    //    e.Handled = true;
+                    //    return;
+                    //}
 
-                    TimeDataBar? nearestBar = nearestPoints
-                             .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
-                             .First() as TimeDataBar;
+                    //TimeDataBar? nearestBar = nearestPoints
+                    //         .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
+                    //         .First() as TimeDataBar;
 
                     if (nearestBar != null)
                     {
@@ -357,21 +358,11 @@ public partial class ChartPanel : Decorator
                         _vm.CrosshairTime = null;
                         _vm.CrosshairPrice = null;
                     }
-
-                    // Optional: Store full OHLC for readout
-                    //_vm.CrosshairHigh = nearestBar.High;
-                    //_vm.CrosshairLow = nearestBar.Low;
-                    //_vm.CrosshairOpen = nearestBar.Open;
-
                 }
             }
         }
 
-        //if ((DateTime.Now - _lastPointerMovedInvalidateVisual).TotalMilliseconds > _pointerMoveDebounceMs)
-        //{
-        InvalidateVisual();  // Immediate redraw
-        //   _lastPointerMovedInvalidateVisual = DateTime.Now;
-        //}
+        InvalidateVisual();
         e.Handled = true;
     }
 
@@ -828,9 +819,6 @@ public partial class ChartPanel : Decorator
     }
 
     List<ChartComponentBase> _attachedComponents = new List<ChartComponentBase>();
-    List<List<IDataPoint>> _visibleBarDataPoints = new List<List<IDataPoint>>();
-
-    internal bool IsSubPanel { get; set; } = false;
 
     internal void AttachChartComponent(ChartComponentBase component)
     {
@@ -838,6 +826,21 @@ public partial class ChartPanel : Decorator
         _attachedComponents.Add(component);
         _vm.ChartComponents.Add(component.Properties);
         InvalidateVisual();
+    }
+
+    internal void DetachAllChartComponents()
+    {
+        _attachedComponents.Clear();
+        if (_vm != null) _vm.ChartComponents.Clear();
+        InvalidateVisual();
+    }
+
+    internal Data? GetFirstDataComponent()
+    {
+        if (_vm == null || _attachedComponents.Count == 0) return null;
+
+        Data? dataComponent = _attachedComponents.FirstOrDefault(p => p is Data) as Data;
+        return dataComponent;
     }
 
     public override void Render(DrawingContext context)
@@ -848,7 +851,7 @@ public partial class ChartPanel : Decorator
         {
             DrawBackground(context);
             if (ShowGridLines) DrawGridLines(context);
-            if (!IsSubPanel) DrawCandlesticks(context);
+            //if (!IsSubPanel) DrawCandlesticks(context);
 
             if (_vm == null) return;
 
@@ -874,7 +877,12 @@ public partial class ChartPanel : Decorator
         _cachedGridLinesPen ??= new Pen(GridLinesColor, GridLinesThickness, GridLinesDashStyle);
         _cachedGridLinesBoldPen ??= new Pen(GridLinesBoldColor, GridLinesBoldThickness, GridLinesBoldDashStyle);
 
-        DataInterval dataInterval = _vm.Data.Count > 0 ? _vm.Data[0].Interval : new DataInterval(Interval.Hour, 2);
+        Data? dataComponent = GetFirstDataComponent();
+        DataInterval dataInterval;
+        if (dataComponent == null || dataComponent.Properties.Data == null)
+            dataInterval = new DataInterval(Interval.Hour, 2);
+        else
+            dataInterval = dataComponent.Properties.Data.Interval;
 
         var xTicks = ComputeDateTimeTicks(_vm.XAxis.Min, _vm.XAxis.Max, Bounds, dataInterval);
         foreach (var tick in xTicks)
@@ -892,24 +900,12 @@ public partial class ChartPanel : Decorator
         }
     }
 
-    private void CalculateVisibleBarDataPoints()
-    {
-        if (_vm == null || _vm.XAxis == null || _vm.Data.Count==0) return;
-
-        _visibleBarDataPoints.Clear();
-
-        for (int i = 0; i < _vm.Data.Count; i++)
-        {
-            IEnumerable<IDataPoint> v = _vm.Data[i].Where(p => p.X >= _vm.XAxis.Min && p.X <= _vm.XAxis.Max);
-            _visibleBarDataPoints.Add(v.ToList());
-        }
-    }
-
     private void UpdateVisibleRange()
     {
         if (_vm == null) return;
-        
-        if (_vm.Data.Count == 0)
+        Data? dataComponent = GetFirstDataComponent();
+
+        if (_vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
         {
             if (_vm.XAxis != null)
             {
@@ -924,22 +920,22 @@ public partial class ChartPanel : Decorator
 
         if (_vm.XAxis == null) return;
 
-        _visibleBarDataPoints.Clear();
 
-        var bars = _vm.Data[0];
-
+        //FIXME move this property to the data component's plot view model
         double preferredWidth = _vm.PreferredCandleWidth;
+
+
         int maxVisible = (int)(Bounds.Width / preferredWidth);
         maxVisible = Math.Max(maxVisible, 50);  // Minimum to avoid too-narrow views
 
         IEnumerable<TimeDataBar> visibleBars;
-        if (bars.Count <= maxVisible)
+        if (dataComponent.Properties.Data.Count <= maxVisible)
         {
-            visibleBars = bars.Tolist();
+            visibleBars = dataComponent.Properties.Data.Tolist();
         }
         else
         {
-            visibleBars = bars.TakeLast(maxVisible);  // Last N bars (most recent)
+            visibleBars = dataComponent.Properties.Data.TakeLast(maxVisible);  // Last N bars (most recent)
         }
 
         // X Range
@@ -955,11 +951,12 @@ public partial class ChartPanel : Decorator
         // Y Range (use visible only)
         var minY = double.MaxValue;
         var maxY = double.MinValue;
-        if (!IsSubPanel)
-        {
-            minY = visibleBars.Min(b => b.Low);
-            maxY = visibleBars.Max(b => b.High);
-        }
+
+        
+        //FIXME: move these to data component overrides
+        //minY = visibleBars.Min(b => b.Low);
+        //maxY = visibleBars.Max(b => b.High);
+        
 
         List<TimeDataBar> vBars = visibleBars.ToList();
         foreach (ChartComponentBase component in _attachedComponents)
@@ -980,73 +977,73 @@ public partial class ChartPanel : Decorator
         _vm.YAxis.Max = maxY + yPadding;
     }
 
-    private void DrawCandlesticks(DrawingContext context)
-    {
-        if (_vm == null) return;
-        if (_vm.Data.Count == 0) return;
-        if (_vm.XAxis is not { } xAxis || _vm.YAxis is not { } yAxis) return;
+    //private void DrawCandlesticks(DrawingContext context)
+    //{
+    //    if (_vm == null) return;
+    //    if (_vm.Data.Count == 0) return;
+    //    if (_vm.XAxis is not { } xAxis || _vm.YAxis is not { } yAxis) return;
 
-        TimeSpan xSpan = xAxis.Max - xAxis.Min;
-        double yRange = yAxis.Max - yAxis.Min;
-        if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
-        double pixelsPerTick = Bounds.Width / xSpan.Ticks;
+    //    TimeSpan xSpan = xAxis.Max - xAxis.Min;
+    //    double yRange = yAxis.Max - yAxis.Min;
+    //    if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
+    //    double pixelsPerTick = Bounds.Width / xSpan.Ticks;
 
-        if (_vm.Data.Count != _visibleBarDataPoints.Count)
-        {
-            CalculateVisibleBarDataPoints();
-        }
+    //    if (_vm.Data.Count != VisibleBarDataPoints.Count)
+    //    {
+    //        CalculateVisibleBarDataPoints();
+    //    }
 
-        for(int i=0; i <_visibleBarDataPoints.Count;  i++)
-        {
-            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(_vm.Data[i]) / 2)); // auto-scale width
+    //    for(int i=0; i <VisibleBarDataPoints.Count;  i++)
+    //    {
+    //        double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(_vm.Data[i]) / 2)); // auto-scale width
 
-            foreach (var dataPoint in _visibleBarDataPoints[i])
-            {
-                TimeDataBar? bar = dataPoint as TimeDataBar;
-                if(bar == null) continue;
+    //        foreach (var dataPoint in VisibleBarDataPoints[i])
+    //        {
+    //            TimeDataBar? bar = dataPoint as TimeDataBar;
+    //            if(bar == null) continue;
                 
-                if (bar.Time < xAxis.Min || bar.Time > xAxis.Max) continue;
+    //            if (bar.Time < xAxis.Min || bar.Time > xAxis.Max) continue;
 
-                double xCenter = (bar.Time - xAxis.Min).Ticks * pixelsPerTick;
+    //            double xCenter = (bar.Time - xAxis.Min).Ticks * pixelsPerTick;
 
-                double highY = Bounds.Height - (bar.High - yAxis.Min) / yRange * Bounds.Height;
-                double lowY = Bounds.Height - (bar.Low - yAxis.Min) / yRange * Bounds.Height;
-                double openY = Bounds.Height - (bar.Open - yAxis.Min) / yRange * Bounds.Height;
-                double closeY = Bounds.Height - (bar.Close - yAxis.Min) / yRange * Bounds.Height;
+    //            double highY = Bounds.Height - (bar.High - yAxis.Min) / yRange * Bounds.Height;
+    //            double lowY = Bounds.Height - (bar.Low - yAxis.Min) / yRange * Bounds.Height;
+    //            double openY = Bounds.Height - (bar.Open - yAxis.Min) / yRange * Bounds.Height;
+    //            double closeY = Bounds.Height - (bar.Close - yAxis.Min) / yRange * Bounds.Height;
 
-                bool isBull = bar.Close >= bar.Open;
-                var bodyBrush = isBull ? CandleUpColor : CandleDownColor;
-                _cachedWickPen ??= new Pen(WickColor, WickThickness, WickDashStyle);
-                _cachedCandleOutlinePen ??= new Pen(CandleOutlineColor, CandleOutlineThickness, CandleOutlineDashStyle);
+    //            bool isBull = bar.Close >= bar.Open;
+    //            var bodyBrush = isBull ? CandleUpColor : CandleDownColor;
+    //            _cachedWickPen ??= new Pen(WickColor, WickThickness, WickDashStyle);
+    //            _cachedCandleOutlinePen ??= new Pen(CandleOutlineColor, CandleOutlineThickness, CandleOutlineDashStyle);
 
-                // Wick (high-low line)
-                context.DrawLine(_cachedWickPen, new Point(xCenter, highY), new Point(xCenter, lowY));
+    //            // Wick (high-low line)
+    //            context.DrawLine(_cachedWickPen, new Point(xCenter, highY), new Point(xCenter, lowY));
 
-                // Body (rectangle)
-                double bodyTop = Math.Min(openY, closeY);
-                double bodyBottom = Math.Max(openY, closeY);
-                double bodyHeight = bodyBottom - bodyTop;
+    //            // Body (rectangle)
+    //            double bodyTop = Math.Min(openY, closeY);
+    //            double bodyBottom = Math.Max(openY, closeY);
+    //            double bodyHeight = bodyBottom - bodyTop;
 
-                if (bodyHeight < 1) // Doji or very small body to draw as line
-                {
-                    context.DrawLine(_cachedWickPen, new Point(xCenter - halfBarWidth, bodyTop),
-                                            new Point(xCenter + halfBarWidth, bodyTop));
-                }
-                else
-                {
-                    var bodyRect = new Rect(xCenter - halfBarWidth, bodyTop, halfBarWidth * 2, bodyHeight);
-                    context.DrawRectangle(bodyBrush, _cachedCandleOutlinePen, bodyRect);
-                    if (bodyHeight > 1)
-                    {
-                        // Top/bottom lines for open/close levels
-                        context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
-                        if (openY != closeY)  // Avoid double line on doji
-                            context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
-                    }
-                }
-            }
-        }
-    }
+    //            if (bodyHeight < 1) // Doji or very small body to draw as line
+    //            {
+    //                context.DrawLine(_cachedWickPen, new Point(xCenter - halfBarWidth, bodyTop),
+    //                                        new Point(xCenter + halfBarWidth, bodyTop));
+    //            }
+    //            else
+    //            {
+    //                var bodyRect = new Rect(xCenter - halfBarWidth, bodyTop, halfBarWidth * 2, bodyHeight);
+    //                context.DrawRectangle(bodyBrush, _cachedCandleOutlinePen, bodyRect);
+    //                if (bodyHeight > 1)
+    //                {
+    //                    // Top/bottom lines for open/close levels
+    //                    context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, openY), new Point(xCenter + halfBarWidth, openY));
+    //                    if (openY != closeY)  // Avoid double line on doji
+    //                        context.DrawLine(_cachedCandleOutlinePen, new Point(xCenter - halfBarWidth, closeY), new Point(xCenter + halfBarWidth, closeY));
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
 
     private void DrawCrosshair(DrawingContext context)
     {
