@@ -104,6 +104,8 @@ namespace EvolverCore
         public DateTime Time;
         public double Value;
 
+        public TimeDataPoint(DateTime time, double value) { Time = time; Value = value; }
+
         public DateTime X { get { return Time; } }
         public double Y { get { return Value; } }
 
@@ -111,7 +113,7 @@ namespace EvolverCore
         {
             get
             {
-                return new TimeDataPoint() { Time = DateTime.MinValue, Value = 0 };
+                return new TimeDataPoint(DateTime.MinValue, double.NaN);
             }
         }
 
@@ -140,6 +142,8 @@ namespace EvolverCore
         List<T> _values = new List<T>();
 
         public DataSeries() { }
+
+        public void Clear() { _values.Clear(); }
 
         public int Count { get { return _values.Count; } }
 
@@ -196,6 +200,7 @@ namespace EvolverCore
             return _values.ToList();
         }
 
+        public T GetValueAt(int index) { return _values[index]; }
         public T GetValue(int barsAgo) { return this[barsAgo]; }
         public T this[int barsAgo]
         {

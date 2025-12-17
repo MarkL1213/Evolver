@@ -13,6 +13,8 @@ namespace EvolverCore.ViewModels
     {
         [ObservableProperty] ChartComponentViewModel? _component;
 
+        [ObservableProperty] TimeDataSeries _plotSeries = new TimeDataSeries();
+
         [ObservableProperty] BarPointValue _priceField = BarPointValue.Close;
 
         [ObservableProperty] IBrush? _plotFillBrush = Brushes.Cyan;
