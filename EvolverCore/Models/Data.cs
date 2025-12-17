@@ -200,6 +200,11 @@ namespace EvolverCore
             return _values.ToList();
         }
 
+        public IEnumerable<T> SkipWhile(Func<T,bool> skipper)
+        {
+            return _values.SkipWhile(skipper);
+        }
+
         public T GetValueAt(int index) { return _values[index]; }
         public T GetValue(int barsAgo) { return this[barsAgo]; }
         public T this[int barsAgo]
@@ -280,6 +285,12 @@ namespace EvolverCore
         public TimeDataSeries()
         {
             TimeZoneInfo = TimeZoneInfo.Local;
+        }
+
+        internal static long IntervalTicks(TimeDataSeries series)
+        {
+            if (series.Count < 2) return TimeSpan.FromMinutes(1).Ticks;
+            return (series[1].X - series[0].X).Ticks;
         }
 
     }

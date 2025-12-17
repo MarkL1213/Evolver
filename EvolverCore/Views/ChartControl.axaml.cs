@@ -11,6 +11,8 @@ using EvolverCore.Views.Components;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 using EvolverCore.Views;
+using EvolverCore.Views.Components.Indicators;
+using EvolverCore.ViewModels.Indicators;
 
 namespace EvolverCore;
 
@@ -105,6 +107,15 @@ public partial class ChartControl : UserControl
         testAddVolume.Command = new RelayCommand(Test_AddVolumeIndicator);
         testMenu.Items.Add(testAddVolume);
 
+        MenuItem testAddSMA = new MenuItem();
+        testAddSMA.Header = "Add SMA to Price";
+        testAddSMA.Command = new RelayCommand(Test_AddSMAToPrice);
+        testMenu.Items.Add(testAddSMA);
+
+        MenuItem testAddSMAToV = new MenuItem();
+        testAddSMAToV.Header = "Add SMA to Volume";
+        testAddSMAToV.Command = new RelayCommand(Test_AddSMAToVolume);
+        testMenu.Items.Add(testAddSMAToV);
         ChartMenu.Items.Add(testMenu);
     }
     private void AddDataPlotToPrimary(BarDataSeries barDataSeries)
@@ -127,6 +138,63 @@ public partial class ChartControl : UserControl
         PrimaryChartPanel.UpdateXAxisRange();
     }
 
+    private void Test_AddSMAToVolume()
+    {
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
+
+        Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        if (dataComponent == null || dataComponent.Properties.Data == null) return;
+
+        SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
+
+        //FIXME: temporarily using captured values, should be lookup based
+        ChartPanel volumePanel = _volPanel;
+        VolumeIndicator volumeIndicator = _volIndicator;
+        int volumePlotIndex = 0;
+
+        SMA vi = new SMA(volumePanel);
+        vi.SetDataContext(vivm);
+        vivm.Source = CalculationSource.IndicatorPlot;
+        vivm.SourceIndicator = volumeIndicator.Properties as IndicatorViewModel;
+        vivm.RenderOrder = 1;
+        vivm.SourcePlotIndex = volumePlotIndex;
+        vivm.ChartPlots[0].PlotLineBrush = Brushes.Orange;
+        vivm.ChartPlots[0].PlotLineThickness = 3;
+
+
+        vi.Calculate();
+        
+        
+        
+        volumePanel.AttachChartComponent(vi);
+
+        //panel.Panel.UpdateYAxisRange();
+    }
+
+    private void Test_AddSMAToPrice()
+    {
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
+
+        Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        if (dataComponent == null || dataComponent.Properties.Data == null) return;
+
+        SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
+
+        SMA vi = new SMA(PrimaryChartPanel);
+        vi.SetDataContext(vivm);
+        vivm.ChartPlots[0].PriceField = BarPointValue.HLC;
+        
+        vi.Calculate();
+        PrimaryChartPanel.AttachChartComponent(vi);
+
+        //panel.Panel.UpdateYAxisRange();
+    }
+
+    ChartPanel _volPanel;
+    VolumeIndicator _volIndicator;
+
     private void Test_AddVolumeIndicator()
     {
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;
@@ -139,12 +207,19 @@ public partial class ChartControl : UserControl
 
         SubPanel? panel = AddNewSubPanel();
         if (panel == null) return;
-        if (panel.Panel == null) { RemoveSubPanel(panel.ID); return; }
+        if (panel.Panel == null || panel.Panel.DataContext == null) { RemoveSubPanel(panel.ID); return; }
+        ChartPanelViewModel? panelVM = panel.Panel.DataContext as ChartPanelViewModel;
+        if (panelVM == null) { RemoveSubPanel(panel.ID); return; }
 
         VolumeIndicator vi = new VolumeIndicator(panel.Panel);
         vi.SetDataContext(vivm);
+
+        vi.Calculate();
         panel.Panel.AttachChartComponent(vi);
         panel.Panel.UpdateYAxisRange();
+
+        _volPanel = panel.Panel;
+        _volIndicator = vi;
     }
 
     private void Test_RemoveVolumeIndicator()

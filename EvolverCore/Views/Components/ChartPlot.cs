@@ -72,7 +72,7 @@ namespace EvolverCore.Views
 
         private void OnPropertyChanged()
         {
-            int i = 0;
+            OnPropertiesChanged();
         }
 
         #region Style property
@@ -122,6 +122,9 @@ namespace EvolverCore.Views
         }
         #endregion
 
+        Pen? _cachedWickPen = null;
+        Pen? _cachedCandleOutlinePen = null;
+
         internal void InvalidatePenCache()
         {
             _cachedPlotLinePen = null;
@@ -156,29 +159,18 @@ namespace EvolverCore.Views
         {
             ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
             ChartComponentViewModel cm = Parent.Properties;
-            if (vm == null || vm.XAxis == null || cm.Data == null) { return; }
+            
+            if (vm == null || vm.XAxis == null || Properties.PlotSeries.Count ==0) { return; }
             Rect bounds = Parent.Parent.Bounds;
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
 
             List<Point> visiblePoints;
-            if (cm.Data[0] is TimeDataBar)
-            {
-                List<BarPricePoint> visibleDataPoints = cm.Data
-                        .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
-                        .Select(p => new BarPricePoint(p as TimeDataBar, Properties.PriceField))
-                        .ToList();
-                visiblePoints = visibleDataPoints
-                        .Select(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds)))
-                        .ToList();
-            }
-            else
-            {
-                visiblePoints = cm.Data
+                visiblePoints = Properties.PlotSeries
+                    .SkipWhile(p => p.Y is double.NaN)
                     .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
-                    .Select<IDataPoint, Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds))).
-                    ToList();
-            }
+                    .Select<IDataPoint, Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds)))
+                    .ToList();
 
             if (visiblePoints.Count < 2) return;
 
@@ -188,8 +180,8 @@ namespace EvolverCore.Views
 
         private void DrawHistogram(DrawingContext context)
         {
-            ChartComponentViewModel componentVM = Parent.Properties;
-            if (componentVM.Data == null || componentVM.Data.Count == 0) return;
+            ChartPlotViewModel plotVM = Properties;
+            if (plotVM.PlotSeries == null || plotVM.PlotSeries.Count == 0) return;
 
             ChartPanelViewModel? panelVM = Parent.Parent.DataContext as ChartPanelViewModel;
             if (panelVM == null || panelVM.XAxis == null) return;
@@ -200,20 +192,15 @@ namespace EvolverCore.Views
             if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
             double pixelsPerTick = bounds.Width / xSpan.Ticks;
 
-            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(componentVM.Data) / 2)); // auto-scale width
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * TimeDataSeries.IntervalTicks(plotVM.PlotSeries) / 2)); // auto-scale width
 
-            foreach (var dataPoint in componentVM.Data)
+            foreach (var dataPoint in plotVM.PlotSeries)
             {
-                TimeDataBar? bar = dataPoint as TimeDataBar;
-                if (bar == null) continue;
+                if (dataPoint == null || dataPoint.X < panelVM.XAxis.Min || dataPoint.X > panelVM.XAxis.Max) continue;
 
-                if (bar.Time < panelVM.XAxis.Min || bar.Time > panelVM.XAxis.Max) continue;
-
-                double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, bar.Time, bounds);
+                double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
                 double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
-
-                BarPricePoint value = new BarPricePoint(dataPoint, Properties.PriceField);
-                double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, value.Y, bounds);
+                double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
 
                 var fillBrush = Properties.PlotFillBrush;
 
@@ -226,9 +213,6 @@ namespace EvolverCore.Views
                 context.DrawRectangle(_cachedPlotLinePen, rect);
             }
         }
-
-        Pen? _cachedWickPen = null;
-        Pen? _cachedCandleOutlinePen = null;
 
         private void DrawCandlesticks(DrawingContext context)
         {

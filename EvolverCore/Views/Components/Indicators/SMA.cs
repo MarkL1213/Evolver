@@ -22,7 +22,7 @@ namespace EvolverCore.Views.Components.Indicators
             AddPlot(plot);
         }
 
-        public void Calculate()
+        public override void Calculate()
         {
             if (Properties.Source == CalculationSource.BarData)
                 calculateFromBarData();

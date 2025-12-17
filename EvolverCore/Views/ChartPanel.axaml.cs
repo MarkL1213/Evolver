@@ -353,6 +353,8 @@ public partial class ChartPanel : Decorator
 
     internal static double MapYToScreen(ChartYAxisViewModel vm,double worldY, Rect bounds)
     {
+        if (worldY == double.NaN) return double.NaN;
+
         if (vm == null) return bounds.Height;
         double range = vm.Max - vm.Min;
         if (range <= 0) return bounds.Height;

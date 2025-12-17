@@ -105,6 +105,7 @@ namespace EvolverCore.Views.Components
 
         public virtual void UpdateVisualRange(DateTime rangeMin, DateTime rangeMax) { }
 
+        public virtual void Calculate() { }
         public virtual void Render(DrawingContext context) { }
     }
 }
