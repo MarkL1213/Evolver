@@ -9,11 +9,11 @@ using System.Collections.Generic;
 using System.Linq;
 using static EvolverCore.ChartControl;
 
-namespace EvolverCore.Views.Components
+namespace EvolverCore.Views.Components.Indicators
 {
-    public class VolumeIndicator : Indicator
+    public class Volume : Indicator
     {
-        public VolumeIndicator(ChartPanel panel) : base(panel)
+        public Volume(ChartPanel panel) : base(panel)
         {
         }
 
@@ -21,8 +21,9 @@ namespace EvolverCore.Views.Components
         {
             ChartPlotViewModel plotProperties = new ChartPlotViewModel();
             plotProperties.Component = Properties;
-            plotProperties.PriceField = BarPointValue.Volume;
+            plotProperties.PriceField = BarPriceValue.Volume;
             plotProperties.Style = PlotStyle.Bar;
+            plotProperties.Name = "Volume";
 
             ChartPlot plot = new ChartPlot(this) { Properties = plotProperties };
             AddPlot(plot);
@@ -30,7 +31,7 @@ namespace EvolverCore.Views.Components
 
         public override void Calculate()
         {
-            VolumeIndicatorViewModel? viVM = Properties as VolumeIndicatorViewModel;
+            VolumeViewModel? viVM = Properties as VolumeViewModel;
             if (viVM == null) return;
 
             BarDataSeries? inputSeries = viVM.Data;

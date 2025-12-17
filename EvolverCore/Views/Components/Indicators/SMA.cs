@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Views.Components.Indicators
 {
-    public partial class SMA : Indicator
+    public class SMA : Indicator
     {
         public SMA(ChartPanel panel) : base(panel) { }
 
@@ -17,6 +17,7 @@ namespace EvolverCore.Views.Components.Indicators
             ChartPlotViewModel plotProperties = new ChartPlotViewModel();
             plotProperties.Component = Properties;
             plotProperties.Style = PlotStyle.Line;
+            plotProperties.Name = "SMA";
 
             ChartPlot plot = new ChartPlot(this) { Properties = plotProperties };
             AddPlot(plot);
@@ -40,7 +41,7 @@ namespace EvolverCore.Views.Components.Indicators
 
             TimeDataSeries outputSeries = smaVM.ChartPlots[0].PlotSeries;
 
-            BarPointValue priceType = smaVM.ChartPlots[0].PriceField;
+            BarPriceValue priceType = smaVM.ChartPlots[0].PriceField;
 
             outputSeries.Clear();
             Queue<double> values = new Queue<double>();

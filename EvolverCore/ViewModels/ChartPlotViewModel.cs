@@ -15,12 +15,14 @@ namespace EvolverCore.ViewModels
 
         [ObservableProperty] TimeDataSeries _plotSeries = new TimeDataSeries();
 
-        [ObservableProperty] BarPointValue _priceField = BarPointValue.Close;
+        [ObservableProperty] BarPriceValue _priceField = BarPriceValue.Close;
 
         [ObservableProperty] IBrush? _plotFillBrush = Brushes.Cyan;
         [ObservableProperty] IBrush? _plotLineBrush = Brushes.Turquoise;
         [ObservableProperty] double _plotLineThickness = 1.5;
         [ObservableProperty] IDashStyle? _plotLineStyle = null;
         [ObservableProperty] PlotStyle _style = PlotStyle.Line;
+
+        [ObservableProperty] string _name = string.Empty;
     }
 }

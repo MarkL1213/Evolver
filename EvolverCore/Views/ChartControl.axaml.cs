@@ -150,7 +150,7 @@ public partial class ChartControl : UserControl
 
         //FIXME: temporarily using captured values, should be lookup based
         ChartPanel volumePanel = _volPanel;
-        VolumeIndicator volumeIndicator = _volIndicator;
+        Volume volumeIndicator = _volIndicator;
         int volumePlotIndex = 0;
 
         SMA vi = new SMA(volumePanel);
@@ -184,7 +184,7 @@ public partial class ChartControl : UserControl
 
         SMA vi = new SMA(PrimaryChartPanel);
         vi.SetDataContext(vivm);
-        vivm.ChartPlots[0].PriceField = BarPointValue.HLC;
+        vivm.ChartPlots[0].PriceField = BarPriceValue.HLC;
         
         vi.Calculate();
         PrimaryChartPanel.AttachChartComponent(vi);
@@ -193,7 +193,7 @@ public partial class ChartControl : UserControl
     }
 
     ChartPanel _volPanel;
-    VolumeIndicator _volIndicator;
+    Volume _volIndicator;
 
     private void Test_AddVolumeIndicator()
     {
@@ -203,7 +203,7 @@ public partial class ChartControl : UserControl
         Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
         if(dataComponent == null || dataComponent.Properties.Data == null) return;
 
-        VolumeIndicatorViewModel vivm = new VolumeIndicatorViewModel(dataComponent.Properties.Data);
+        VolumeViewModel vivm = new VolumeViewModel(dataComponent.Properties.Data);
 
         SubPanel? panel = AddNewSubPanel();
         if (panel == null) return;
@@ -211,7 +211,7 @@ public partial class ChartControl : UserControl
         ChartPanelViewModel? panelVM = panel.Panel.DataContext as ChartPanelViewModel;
         if (panelVM == null) { RemoveSubPanel(panel.ID); return; }
 
-        VolumeIndicator vi = new VolumeIndicator(panel.Panel);
+        Volume vi = new Volume(panel.Panel);
         vi.SetDataContext(vivm);
 
         vi.Calculate();

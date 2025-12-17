@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 using MessagePack;
+using Microsoft.VisualBasic;
 
 namespace EvolverCore
 {
@@ -24,7 +25,7 @@ namespace EvolverCore
         Year
     }
 
-    public enum BarPointValue
+    public enum BarPriceValue
     {
         Open,
         High,
@@ -298,9 +299,9 @@ namespace EvolverCore
     public record BarPricePoint : IDataPoint
     {
         private readonly TimeDataBar _bar;  // Shared reference — no copy
-        private readonly BarPointValue _field;
+        private readonly BarPriceValue _field;
 
-        public BarPricePoint(TimeDataBar? bar, BarPointValue field)
+        public BarPricePoint(TimeDataBar? bar, BarPriceValue field)
         {
             _bar = bar ?? throw new ArgumentNullException(nameof(bar));
             _field = field;
@@ -310,17 +311,17 @@ namespace EvolverCore
 
         public double Y => _field switch
         {
-            BarPointValue.Open => _bar.Open,
-            BarPointValue.High => _bar.High,
-            BarPointValue.Low => _bar.Low,
-            BarPointValue.Close => _bar.Close,
-            BarPointValue.Bid => _bar.Bid,
-            BarPointValue.Ask => _bar.Ask,
-            BarPointValue.Volume => _bar.Volume,
-            BarPointValue.HL => (_bar.High + _bar.Low) / 2,
-            BarPointValue.OC => (_bar.Open + _bar.Close) / 2,
-            BarPointValue.HLC => (_bar.High + _bar.Low + _bar.Close) / 3,
-            BarPointValue.OHLC => (_bar.Open + _bar.High + _bar.Low + _bar.Close) / 4,
+            BarPriceValue.Open => _bar.Open,
+            BarPriceValue.High => _bar.High,
+            BarPriceValue.Low => _bar.Low,
+            BarPriceValue.Close => _bar.Close,
+            BarPriceValue.Bid => _bar.Bid,
+            BarPriceValue.Ask => _bar.Ask,
+            BarPriceValue.Volume => _bar.Volume,
+            BarPriceValue.HL => (_bar.High + _bar.Low) / 2,
+            BarPriceValue.OC => (_bar.Open + _bar.Close) / 2,
+            BarPriceValue.HLC => (_bar.High + _bar.Low + _bar.Close) / 3,
+            BarPriceValue.OHLC => (_bar.Open + _bar.High + _bar.Low + _bar.Close) / 4,
             _ => throw new NotSupportedException($"Unsupported PriceField: {_field}")
         };
 
@@ -339,7 +340,7 @@ namespace EvolverCore
             TimeZoneInfo = TimeZoneInfo.Local;
         }
 
-        internal BarPointValue ValueType { set; get; } = BarPointValue.Close;
+        internal BarPriceValue ValueType { set; get; } = BarPriceValue.Close;
 
         internal static long IntervalTicks(BarDataSeries series)
         {
@@ -352,5 +353,168 @@ namespace EvolverCore
     {
         public Instrument? Instrument { get; internal set; }
 
+    }
+
+
+
+    public abstract class NewSeriesBase
+    {
+    }
+
+    public class NewSeries<T> : NewSeriesBase
+    {
+        private List<T> _values = new List<T> ();
+
+        public DataInterval Interval { get; internal set; }
+        public int Count { get { return _values.Count; } }
+
+        public void Add(T item) { _values.Add(item); }
+        public void Clear() { _values.Clear(); }
+
+        public IEnumerator<T> GetEnumerator() { return _values.GetEnumerator(); }
+
+        public IEnumerable<T> Where(Func<T, bool> predicate)
+        {
+            return _values.Where(predicate);
+        }
+
+        public IEnumerable<T> Select(Func<T, int, T> selector)
+        {
+            return _values.Select(selector);
+        }
+
+        public IEnumerable<T> TakeLast(int count)
+        {
+            return _values.TakeLast(count);
+        }
+
+        public IEnumerable<T> Tolist()
+        {
+            return _values.ToList();
+        }
+
+        public IEnumerable<T> SkipWhile(Func<T, bool> skipper)
+        {
+            return _values.SkipWhile(skipper);
+        }
+
+        public T? Min(Func<T, T> selector)
+        {
+            return _values.Min(selector);
+        }
+
+        public T? Max(Func<T, T> selector)
+        {
+            return _values.Max(selector);
+        }
+
+        public bool IsDataValid(int barsAgo)
+        {
+            int c = _values.Count - 1;
+            if (barsAgo < 0 || barsAgo >= c)
+                return false;
+
+            return !(this[barsAgo] is double.NaN);
+        }
+        public bool IsDataValidAt(int index)
+        {
+            if (index < 0 || index >= _values.Count)
+                return false;
+
+            return !(_values[index] is double.NaN);
+        }
+
+        public T GetValueAt(int index) { return _values[index]; }
+        public T GetValue(int barsAgo) { return this[barsAgo]; }
+        public T this[int barsAgo]
+        {
+            get
+            {
+                int c = _values.Count - 1;
+                if (barsAgo < 0 || barsAgo >= c)
+                {
+                    throw new EvolverException();
+                }
+                return _values[c - barsAgo];
+            }
+        }
+
+
+    }
+    public class NewBarSeries
+    {
+        NewSeries<DateTime> _times = new NewSeries<DateTime> ();
+        List<NewSeriesBase> _barValues = new List<NewSeriesBase> ();
+
+        public NewBarSeries()
+        {
+            _barValues.Add(new NewSeries<double>());
+            _barValues.Add(new NewSeries<double>());
+            _barValues.Add(new NewSeries<double>());
+            _barValues.Add(new NewSeries<double>());
+            _barValues.Add(new NewSeries<long>());
+            _barValues.Add(new NewSeries<double>());
+            _barValues.Add(new NewSeries<double>());
+        }
+
+        public void AddNewBar(DateTime time)
+        {
+            _times.Add(time);
+            Open.Add(double.NaN);
+            High.Add(double.NaN);
+            Low.Add(double.NaN);
+            Close.Add(double.NaN);
+            Volume.Add(0);
+            Bid.Add(double.NaN);
+            Ask.Add(double.NaN);
+        }
+
+        public double PriceFieldValueAt(BarPriceValue priceField, int index)
+        {
+            switch (priceField)
+            {
+                case BarPriceValue.Open: return Open.GetValueAt(index);
+                case BarPriceValue.High: return High.GetValueAt(index);
+                case BarPriceValue.Low: return Low.GetValueAt(index);
+                case BarPriceValue.Close: return Close.GetValueAt(index);
+                case BarPriceValue.Bid: return Bid.GetValueAt(index);
+                case BarPriceValue.Ask: return Ask.GetValueAt(index);
+                case BarPriceValue.Volume: return Volume.GetValueAt(index);
+                case BarPriceValue.HL: return (High.GetValueAt(index) + Low.GetValueAt(index)) / 2;
+                case BarPriceValue.OC: return (Open.GetValueAt(index) + Close.GetValueAt(index)) / 2;
+                case BarPriceValue.HLC: return (High.GetValueAt(index) + Low.GetValueAt(index) + Close.GetValueAt(index)) / 3;
+                case BarPriceValue.OHLC: return (Open.GetValueAt(index) + High.GetValueAt(index) + Low.GetValueAt(index) + Close.GetValueAt(index)) / 4;
+                default:
+                    throw new NotSupportedException($"Unsupported PriceField: {priceField}");
+            }
+        }
+        public double PriceFieldValue(BarPriceValue priceField, int barsAgo)
+        {
+            switch (priceField)
+            {
+                case BarPriceValue.Open:   return Open[barsAgo];
+                case BarPriceValue.High:   return High[barsAgo];
+                case BarPriceValue.Low:    return Low[barsAgo];
+                case BarPriceValue.Close:  return Close[barsAgo];
+                case BarPriceValue.Bid:    return Bid[barsAgo];
+                case BarPriceValue.Ask:    return Ask[barsAgo];
+                case BarPriceValue.Volume: return Volume[barsAgo];
+                case BarPriceValue.HL:     return (High[barsAgo] + Low[barsAgo]) / 2;
+                case BarPriceValue.OC:     return (Open[barsAgo] + Close[barsAgo]) / 2;
+                case BarPriceValue.HLC:    return (High[barsAgo] + Low[barsAgo] + Close[barsAgo]) / 3;
+                case BarPriceValue.OHLC:   return (Open[barsAgo] + High[barsAgo] + Low[barsAgo] + Close[barsAgo]) / 4;
+                default:
+                    throw new NotSupportedException($"Unsupported PriceField: {priceField}");
+            }
+        }
+
+        public NewSeries<DateTime> Time { get { return _times; } }
+        public NewSeries<double> Open { get { return (NewSeries<double>)_barValues[0]; } }
+        public NewSeries<double> High { get { return (NewSeries<double>)_barValues[1]; } }
+        public NewSeries<double> Low { get { return (NewSeries<double>)_barValues[2]; } }
+        public NewSeries<double> Close { get { return (NewSeries<double>)_barValues[3]; } }
+        public NewSeries<long> Volume { get { return (NewSeries<long>)_barValues[4]; } }
+        public NewSeries<double> Bid { get { return (NewSeries<double>)_barValues[5]; } }
+        public NewSeries<double> Ask { get { return (NewSeries<double>)_barValues[6]; } }
     }
 }

@@ -2,14 +2,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.ObjectModel;
 using Avalonia.Media;
 
-namespace EvolverCore.ViewModels
+namespace EvolverCore.ViewModels.Indicators
 {
-    internal partial class VolumeIndicatorViewModel : IndicatorViewModel
+    internal partial class VolumeViewModel : IndicatorViewModel
     {
         [ObservableProperty] IBrush _bullBrush = Brushes.DodgerBlue;
         [ObservableProperty] IBrush _bearBrush = Brushes.Red;
 
-        public VolumeIndicatorViewModel(BarDataSeries barSeries)
+        public VolumeViewModel(BarDataSeries barSeries)
         {
             Name = "Volume";
             Data = barSeries;
