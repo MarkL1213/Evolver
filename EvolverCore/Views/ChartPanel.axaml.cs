@@ -12,6 +12,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using EvolverCore.Views;
+using System.Runtime.InteropServices;
 
 
 namespace EvolverCore;
@@ -279,6 +280,8 @@ public partial class ChartPanel : Decorator
         }
 
         InvalidateVisual();
+
+
         e.Handled = true;
     }
 
