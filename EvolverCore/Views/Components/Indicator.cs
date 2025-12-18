@@ -1,10 +1,12 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
 using EvolverCore.Views.Components;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -53,6 +55,38 @@ namespace EvolverCore.Views
                 _maxY = plotMax > _maxY ? plotMax : _maxY;
             }
         }
+
+        BarDataSeries Bars;
+        TimeDataSeries? Input;
+        ObservableCollection<ChartPlotViewModel> Outputs;
+        IndicatorState State;
+        public override void Calculate()
+        {
+            //setup state for next OnDataUpdate() call
+            IndicatorViewModel? oVM = Properties as IndicatorViewModel;
+            if (Properties.Data == null || oVM == null) return;
+
+            Bars = Properties.Data;
+            IndicatorViewModel? iVM = Properties.SourceIndicator as IndicatorViewModel;
+            if (iVM != null && Properties.SourcePlotIndex > 0 && Properties.SourcePlotIndex < iVM.ChartPlots.Count)
+                Input = iVM.ChartPlots[Properties.SourcePlotIndex].PlotSeries;
+            else
+                Input = null;
+
+            Outputs = oVM.ChartPlots;
+            for (int i = 0; i < Outputs.Count; i++) Outputs[i].PlotSeries.Clear();
+
+            State = oVM.State;
+
+            for (int i = 0; i < Properties.Data.Count; i++)
+            {
+                //set series current bar such that 0 barsAgo is the value to be calculated aka index=i
+                OnDataUpdate();
+            }
+        }
+
+        public virtual void OnDataUpdate()
+        { }
 
         public override void Render(DrawingContext context)
         {

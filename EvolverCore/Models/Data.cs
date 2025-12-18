@@ -45,14 +45,14 @@ namespace EvolverCore
         public Interval Type;
         public int Value;
 
-        public DataInterval(Interval type, int value) { Type = type;Value = value; }
+        public DataInterval(Interval type, int value) { Type = type; Value = value; }
     }
 
     public record TimeDataBar : IDataPoint
     {
-        public TimeDataBar(DateTime time,double open, double high, double low, double close, long volume, double bid,double ask)
+        public TimeDataBar(DateTime time, double open, double high, double low, double close, long volume, double bid, double ask)
         {
-            Time = DateTime.SpecifyKind(time,time.Kind);
+            Time = DateTime.SpecifyKind(time, time.Kind);
             Open = open;
             High = high;
             Low = low;
@@ -157,7 +157,7 @@ namespace EvolverCore
             return _values.Where(predicate);
         }
 
-        public IEnumerable<T> Select(Func<T,int,T> selector)
+        public IEnumerable<T> Select(Func<T, int, T> selector)
         {
             return _values.Select(selector);
         }
@@ -184,7 +184,7 @@ namespace EvolverCore
         {
             int c = _values.Count - 1;
             return !(barsAgo < 0 || barsAgo >= c);
-            
+
         }
         public bool IsDataValidAt(int index)
         {
@@ -201,7 +201,7 @@ namespace EvolverCore
             return _values.ToList();
         }
 
-        public IEnumerable<T> SkipWhile(Func<T,bool> skipper)
+        public IEnumerable<T> SkipWhile(Func<T, bool> skipper)
         {
             return _values.SkipWhile(skipper);
         }
@@ -237,7 +237,7 @@ namespace EvolverCore
                         bw.Write(bytes.Length);
                         bw.Write(bytes);
                     }
-                    
+
                 }
             }
             catch (Exception e)
@@ -254,13 +254,13 @@ namespace EvolverCore
                 using (FileStream fs = File.Open(fileName, File.Exists(fileName) ? FileMode.Truncate : FileMode.CreateNew, FileAccess.Write))
                 {
                     BinaryReader br = new BinaryReader(fs);
-                    while(br.BaseStream.Position < br.BaseStream.Length)
+                    while (br.BaseStream.Position < br.BaseStream.Length)
                     {
                         int size = br.ReadInt32();
 
                         byte[] bytes = br.ReadBytes(size);
                         T value = MessagePackSerializer.Deserialize<T>(bytes);
-                        
+
                         series._values.Add(value);
                     }
                 }
@@ -355,166 +355,4 @@ namespace EvolverCore
 
     }
 
-
-
-    public abstract class NewSeriesBase
-    {
-    }
-
-    public class NewSeries<T> : NewSeriesBase
-    {
-        private List<T> _values = new List<T> ();
-
-        public DataInterval Interval { get; internal set; }
-        public int Count { get { return _values.Count; } }
-
-        public void Add(T item) { _values.Add(item); }
-        public void Clear() { _values.Clear(); }
-
-        public IEnumerator<T> GetEnumerator() { return _values.GetEnumerator(); }
-
-        public IEnumerable<T> Where(Func<T, bool> predicate)
-        {
-            return _values.Where(predicate);
-        }
-
-        public IEnumerable<T> Select(Func<T, int, T> selector)
-        {
-            return _values.Select(selector);
-        }
-
-        public IEnumerable<T> TakeLast(int count)
-        {
-            return _values.TakeLast(count);
-        }
-
-        public IEnumerable<T> Tolist()
-        {
-            return _values.ToList();
-        }
-
-        public IEnumerable<T> SkipWhile(Func<T, bool> skipper)
-        {
-            return _values.SkipWhile(skipper);
-        }
-
-        public T? Min(Func<T, T> selector)
-        {
-            return _values.Min(selector);
-        }
-
-        public T? Max(Func<T, T> selector)
-        {
-            return _values.Max(selector);
-        }
-
-        public bool IsDataValid(int barsAgo)
-        {
-            int c = _values.Count - 1;
-            if (barsAgo < 0 || barsAgo >= c)
-                return false;
-
-            return !(this[barsAgo] is double.NaN);
-        }
-        public bool IsDataValidAt(int index)
-        {
-            if (index < 0 || index >= _values.Count)
-                return false;
-
-            return !(_values[index] is double.NaN);
-        }
-
-        public T GetValueAt(int index) { return _values[index]; }
-        public T GetValue(int barsAgo) { return this[barsAgo]; }
-        public T this[int barsAgo]
-        {
-            get
-            {
-                int c = _values.Count - 1;
-                if (barsAgo < 0 || barsAgo >= c)
-                {
-                    throw new EvolverException();
-                }
-                return _values[c - barsAgo];
-            }
-        }
-
-
-    }
-    public class NewBarSeries
-    {
-        NewSeries<DateTime> _times = new NewSeries<DateTime> ();
-        List<NewSeriesBase> _barValues = new List<NewSeriesBase> ();
-
-        public NewBarSeries()
-        {
-            _barValues.Add(new NewSeries<double>());
-            _barValues.Add(new NewSeries<double>());
-            _barValues.Add(new NewSeries<double>());
-            _barValues.Add(new NewSeries<double>());
-            _barValues.Add(new NewSeries<long>());
-            _barValues.Add(new NewSeries<double>());
-            _barValues.Add(new NewSeries<double>());
-        }
-
-        public void AddNewBar(DateTime time)
-        {
-            _times.Add(time);
-            Open.Add(double.NaN);
-            High.Add(double.NaN);
-            Low.Add(double.NaN);
-            Close.Add(double.NaN);
-            Volume.Add(0);
-            Bid.Add(double.NaN);
-            Ask.Add(double.NaN);
-        }
-
-        public double PriceFieldValueAt(BarPriceValue priceField, int index)
-        {
-            switch (priceField)
-            {
-                case BarPriceValue.Open: return Open.GetValueAt(index);
-                case BarPriceValue.High: return High.GetValueAt(index);
-                case BarPriceValue.Low: return Low.GetValueAt(index);
-                case BarPriceValue.Close: return Close.GetValueAt(index);
-                case BarPriceValue.Bid: return Bid.GetValueAt(index);
-                case BarPriceValue.Ask: return Ask.GetValueAt(index);
-                case BarPriceValue.Volume: return Volume.GetValueAt(index);
-                case BarPriceValue.HL: return (High.GetValueAt(index) + Low.GetValueAt(index)) / 2;
-                case BarPriceValue.OC: return (Open.GetValueAt(index) + Close.GetValueAt(index)) / 2;
-                case BarPriceValue.HLC: return (High.GetValueAt(index) + Low.GetValueAt(index) + Close.GetValueAt(index)) / 3;
-                case BarPriceValue.OHLC: return (Open.GetValueAt(index) + High.GetValueAt(index) + Low.GetValueAt(index) + Close.GetValueAt(index)) / 4;
-                default:
-                    throw new NotSupportedException($"Unsupported PriceField: {priceField}");
-            }
-        }
-        public double PriceFieldValue(BarPriceValue priceField, int barsAgo)
-        {
-            switch (priceField)
-            {
-                case BarPriceValue.Open:   return Open[barsAgo];
-                case BarPriceValue.High:   return High[barsAgo];
-                case BarPriceValue.Low:    return Low[barsAgo];
-                case BarPriceValue.Close:  return Close[barsAgo];
-                case BarPriceValue.Bid:    return Bid[barsAgo];
-                case BarPriceValue.Ask:    return Ask[barsAgo];
-                case BarPriceValue.Volume: return Volume[barsAgo];
-                case BarPriceValue.HL:     return (High[barsAgo] + Low[barsAgo]) / 2;
-                case BarPriceValue.OC:     return (Open[barsAgo] + Close[barsAgo]) / 2;
-                case BarPriceValue.HLC:    return (High[barsAgo] + Low[barsAgo] + Close[barsAgo]) / 3;
-                case BarPriceValue.OHLC:   return (Open[barsAgo] + High[barsAgo] + Low[barsAgo] + Close[barsAgo]) / 4;
-                default:
-                    throw new NotSupportedException($"Unsupported PriceField: {priceField}");
-            }
-        }
-
-        public NewSeries<DateTime> Time { get { return _times; } }
-        public NewSeries<double> Open { get { return (NewSeries<double>)_barValues[0]; } }
-        public NewSeries<double> High { get { return (NewSeries<double>)_barValues[1]; } }
-        public NewSeries<double> Low { get { return (NewSeries<double>)_barValues[2]; } }
-        public NewSeries<double> Close { get { return (NewSeries<double>)_barValues[3]; } }
-        public NewSeries<long> Volume { get { return (NewSeries<long>)_barValues[4]; } }
-        public NewSeries<double> Bid { get { return (NewSeries<double>)_barValues[5]; } }
-        public NewSeries<double> Ask { get { return (NewSeries<double>)_barValues[6]; } }
-    }
 }
