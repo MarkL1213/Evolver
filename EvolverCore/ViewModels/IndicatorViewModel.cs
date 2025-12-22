@@ -5,17 +5,14 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using EvolverCore.Models;
 
 namespace EvolverCore.ViewModels
 {
-    public enum IndicatorState
-    {
-        History,
-        Live
-    }
+
     internal partial class IndicatorViewModel : ChartComponentViewModel
     {
-        [ObservableProperty] IndicatorState _state = IndicatorState.History;
+        [ObservableProperty] Indicator? _indicator;
         internal ObservableCollection<ChartPlotViewModel> ChartPlots { get; } = new ObservableCollection<ChartPlotViewModel>();
     }
 }

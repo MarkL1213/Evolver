@@ -13,30 +13,18 @@ using CommunityToolkit.Mvvm.Input;
 using EvolverCore.Views;
 using EvolverCore.Views.Components.Indicators;
 using EvolverCore.ViewModels.Indicators;
+using Dock.Model.Mvvm.Controls;
+using Dock.Model.Core;
+using Dock.Avalonia.Controls;
 
 namespace EvolverCore;
 
 
-public partial class ChartControl : UserControl
+internal partial class ChartControl : UserControl
 {
     public ChartControl()
     {
-        ChartControlViewModel vm = new ChartControlViewModel();
-
         InitializeComponent();
-        DataContext = vm;
-
-        PrimaryChartPanel.ClearValue(DataContextProperty);
-        PrimaryChartPanel.DataContext = vm.PrimaryChartPanelViewModel;
-
-        PrimaryYAxis.ClearValue(DataContextProperty);
-        PrimaryYAxis.DataContext = vm.PrimaryChartPanelViewModel;
-
-        PrimaryYAxis.SetConnectedChartPanel(PrimaryChartPanel);
-        PrimaryChartPanel.SetConnectedChartYAxis(PrimaryYAxis);
-
-        PrimaryXAxis.DataPanel = PrimaryChartPanel;
-
         AddTestMenu();
     }
 
@@ -235,106 +223,68 @@ public partial class ChartControl : UserControl
     private void Test_AddDataHourly(int size)
     {
         ///Load some random primary data
-        BarDataSeries barDataSeries = new BarDataSeries();
-        barDataSeries.Interval = new DataInterval(Interval.Hour, 1);
-        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
-        Random r = new Random(DateTime.Now.Second);
+        BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Hour, 1), size);
 
-        int lastClose = -1;
-        for (int i = 0; i < size; i++)
+        if (barDataSeries != null)
         {
-            int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
-            int close = r.Next(10, 100);
-            int volume = r.Next(100, 1000);
-            int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
-            int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
-
-            TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
-            barDataSeries.Add(bar);
-            lastClose = close;
-            startTime = startTime.AddHours(1);
+            AddDataPlotToPrimary(barDataSeries);
         }
-
-        AddDataPlotToPrimary(barDataSeries);
     }
         private void Test_AddDataSeconds(int size)
     {
         ///Load some random primary data
-        BarDataSeries barDataSeries = new BarDataSeries();
-        barDataSeries.Interval = new DataInterval(Interval.Second, 1);
-        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
-        Random r = new Random(DateTime.Now.Second);
+        BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Second, 1), size);
 
-        int lastClose = -1;
-        for (int i = 0; i < size; i++)
+        if (barDataSeries != null)
         {
-            int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
-            int close = r.Next(10, 100);
-            int volume = r.Next(100, 1000);
-            int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
-            int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
-
-            TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
-            barDataSeries.Add(bar);
-            lastClose = close;
-            startTime = startTime.AddSeconds(1);
+            AddDataPlotToPrimary(barDataSeries);
         }
-
-        AddDataPlotToPrimary(barDataSeries);
     }
 
     private void Test_AddDataDaily(int size)
     {
         ///Load some random primary data
-        BarDataSeries barDataSeries = new BarDataSeries();
-        barDataSeries.Interval = new DataInterval(Interval.Day, 1);
-        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
-        Random r = new Random(DateTime.Now.Second);
+        BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Day, 1), size);
 
-        int lastClose = -1;
-        for (int i = 0; i < size; i++)
+        if (barDataSeries != null)
         {
-            int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
-            int close = r.Next(10, 100);
-            int volume = r.Next(100, 1000);
-            int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
-            int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
-
-            TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
-            barDataSeries.Add(bar);
-            lastClose = close;
-            startTime = startTime.AddDays(1);
+            AddDataPlotToPrimary(barDataSeries);
         }
-
-        AddDataPlotToPrimary(barDataSeries);
     }
 
     private void Test_AddDataMonthly(int size)
     {
         ///Load some random primary data
-        BarDataSeries barDataSeries = new BarDataSeries();
-        barDataSeries.Interval = new DataInterval(Interval.Month, 1);
-        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
-        Random r = new Random(DateTime.Now.Second);
+        BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Month, 1), size);
 
-        int lastClose = -1;
-        for (int i = 0; i < size; i++)
+        if (barDataSeries != null)
         {
-            int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
-            int close = r.Next(10, 100);
-            int volume = r.Next(100, 1000);
-            int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
-            int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
-
-            TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
-            barDataSeries.Add(bar);
-            lastClose = close;
-            startTime = startTime.AddMonths(1);
+            AddDataPlotToPrimary(barDataSeries);
         }
-
-        AddDataPlotToPrimary(barDataSeries);
     }
     #endregion
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+
+        //ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        
+        if (DataContext is ChartControlViewModel vm)
+        {
+            PrimaryChartPanel.ClearValue(DataContextProperty);
+            PrimaryChartPanel.DataContext = vm.PrimaryChartPanelViewModel;
+
+            PrimaryYAxis.ClearValue(DataContextProperty);
+            PrimaryYAxis.DataContext = vm.PrimaryChartPanelViewModel;
+        }
+        PrimaryYAxis.SetConnectedChartPanel(PrimaryChartPanel);
+        PrimaryChartPanel.SetConnectedChartYAxis(PrimaryYAxis);
+
+        PrimaryXAxis.DataPanel = PrimaryChartPanel;
+
+        PrimaryChartPanel.InvalidateVisual();
+    }
 
     public override void Render(DrawingContext context)
     {

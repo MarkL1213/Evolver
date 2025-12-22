@@ -1,8 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:controls="using:Dock.Model.Mvvm.Controls"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:evolvercore="using:EvolverCore"
+        xmlns:local="using:EvolverCore"
         xmlns:vm="using:EvolverCore.ViewModels"
+        xmlns:dock="using:Dock.Avalonia.Controls"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="EvolverCore.Views.MainWindow"
@@ -12,7 +14,6 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
-    
 
     <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <Grid.RowDefinitions>
@@ -25,11 +26,15 @@
         
         <Menu Grid.Row="0" Grid.Column="0">
             <MenuItem Header="_File">
+                <MenuItem Name="NewChartItem" Header="new Chart" />
+                <MenuItem Name="RemoveChartItem" Header="remove Chart" />
                 <MenuItem Name="ExitMenuItem" Header="E_xit" />
             </MenuItem>
         </Menu>
 
-        <evolvercore:ChartControl Grid.Row="1" Grid.Column="0"/>
+        <dock:DockControl x:Name="DockControl" Layout="{Binding Layout}" Grid.Row="1" Grid.Column="0">
+
+        </dock:DockControl>
     </Grid>
     
 </Window>

@@ -23,20 +23,29 @@ namespace EvolverCore
 
         private Globals()
         {
+            _sessionHoursCollection = new SessionHoursCollection();
+            _instrumentCollection = new InstrumentCollection();
+            _dataManager = new DataManager();
         }
 
         internal void Load()
         {
+            //_sessionHoursCollection.Load();
+
+            //_instrumentCollection.Load();
+
+            //_dataManager.Load();
         }
+
 
         SessionHoursCollection? _sessionHoursCollection;
         InstrumentCollection? _instrumentCollection;
-        InstrumentDataInfoCollection? _instrumentDatainfoCollection;
+        DataManager? _dataManager;
 
         public SessionHoursCollection? SessionHoursCollection { get { return _sessionHoursCollection; } }
 
         public InstrumentCollection? InstrumentCollection { get { return _instrumentCollection; } }
 
-        public InstrumentDataInfoCollection DataInfoCollection { get { return _instrumentDatainfoCollection; } }
+        internal DataManager? DataManager { get { return _dataManager; } }
     }
 }

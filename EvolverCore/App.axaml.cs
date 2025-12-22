@@ -44,5 +44,13 @@ namespace EvolverCore
                 BindingPlugins.DataValidators.Remove(plugin);
             }
         }
+
+        private void Application_ActualThemeVariantChanged(object? sender, System.EventArgs e)
+        {
+        }
+
+        private void Application_ActualThemeVariantChanged_1(object? sender, System.EventArgs e)
+        {
+        }
     }
 }

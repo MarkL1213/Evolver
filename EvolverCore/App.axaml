@@ -1,15 +1,31 @@
 <Application xmlns="https://github.com/avaloniaui"
+             xmlns:controls="using:Dock.Model.Mvvm.Controls"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="EvolverCore.App"
+             xmlns:dock="using:Dock.Avalonia.Controls"
+             xmlns:dockThemes="using:Dock.Avalonia.Themes.Fluent"
              xmlns:local="using:EvolverCore"
+             xmlns:vm="using:EvolverCore.ViewModels"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
     <Application.DataTemplates>
         <local:ViewLocator/>
+
+    <DataTemplate DataType="{x:Type vm:ChartControlViewModel}">
+        <local:ChartControl />
+    </DataTemplate>
     </Application.DataTemplates>
+
+<Application.Resources>
+        <DataTemplate x:Key="Tool1" DataType="{x:Type vm:Tool1ViewModel}">
+            <TextBlock Text="Hello from Tool 1! Drag me around."/>
+        </DataTemplate>
+</Application.Resources>
   
     <Application.Styles>
+        <dockThemes:DockFluentTheme />
         <FluentTheme />
     </Application.Styles>
+
 </Application>

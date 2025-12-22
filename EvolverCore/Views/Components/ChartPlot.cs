@@ -150,6 +150,8 @@ namespace EvolverCore.Views
 
         public void Render(DrawingContext context)
         {
+            if(Parent.Properties.IsHidden) return;
+
             if (Style == PlotStyle.Bar) { DrawHistogram(context); }
             else if (Style == PlotStyle.Line) { DrawCurve(context); }
             else if (Style == PlotStyle.Candlestick) { DrawCandlesticks(context); }

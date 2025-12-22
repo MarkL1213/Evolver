@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace EvolverCore.ViewModels
@@ -16,6 +17,7 @@ namespace EvolverCore.ViewModels
 
     internal partial class ChartComponentViewModel : ViewModelBase
     {
+        [JsonInclude]
         [ObservableProperty] BarDataSeries? _data = null;
         
         [ObservableProperty] IndicatorViewModel? _sourceIndicator = null;
@@ -27,5 +29,7 @@ namespace EvolverCore.ViewModels
         [ObservableProperty] string _description = string.Empty;
         [ObservableProperty] int _chartPanelNumber = 0;
         [ObservableProperty] int _renderOrder = 0;
+
+        [ObservableProperty] bool _isHidden;
     }
 }

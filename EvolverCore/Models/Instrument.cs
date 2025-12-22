@@ -106,68 +106,68 @@ namespace EvolverCore
 
     }
 
-    public class InstrumentDataInfoCollection : IDictionary<string, List<InstrumentDataInfo>>
+    public class InstrumentDataRecordCollection : IDictionary<string, List<InstrumentDataRecord>>
     {
-        Dictionary<string, List<InstrumentDataInfo>> _collection = new Dictionary<string, List<InstrumentDataInfo>>();
+        Dictionary<string, List<InstrumentDataRecord>> _collection = new Dictionary<string, List<InstrumentDataRecord>>();
 
-        public List<InstrumentDataInfo> this[string key] { get => ((IDictionary<string, List<InstrumentDataInfo>>)_collection)[key]; set => ((IDictionary<string, List<InstrumentDataInfo>>)_collection)[key] = value; }
+        public List<InstrumentDataRecord> this[string key] { get => ((IDictionary<string, List<InstrumentDataRecord>>)_collection)[key]; set => ((IDictionary<string, List<InstrumentDataRecord>>)_collection)[key] = value; }
 
-        public ICollection<string> Keys => ((IDictionary<string, List<InstrumentDataInfo>>)_collection).Keys;
+        public ICollection<string> Keys => ((IDictionary<string, List<InstrumentDataRecord>>)_collection).Keys;
 
-        public ICollection<List<InstrumentDataInfo>> Values => ((IDictionary<string, List<InstrumentDataInfo>>)_collection).Values;
+        public ICollection<List<InstrumentDataRecord>> Values => ((IDictionary<string, List<InstrumentDataRecord>>)_collection).Values;
 
-        public int Count => ((ICollection<KeyValuePair<string, List<InstrumentDataInfo>>>)_collection).Count;
+        public int Count => ((ICollection<KeyValuePair<string, List<InstrumentDataRecord>>>)_collection).Count;
 
-        public bool IsReadOnly => ((ICollection<KeyValuePair<string, List<InstrumentDataInfo>>>)_collection).IsReadOnly;
+        public bool IsReadOnly => ((ICollection<KeyValuePair<string, List<InstrumentDataRecord>>>)_collection).IsReadOnly;
 
-        public void Add(string key, List<InstrumentDataInfo> value)
+        public void Add(string key, List<InstrumentDataRecord> value)
         {
-            ((IDictionary<string, List<InstrumentDataInfo>>)_collection).Add(key, value);
+            ((IDictionary<string, List<InstrumentDataRecord>>)_collection).Add(key, value);
         }
 
-        public void Add(KeyValuePair<string, List<InstrumentDataInfo>> item)
+        public void Add(KeyValuePair<string, List<InstrumentDataRecord>> item)
         {
-            ((ICollection<KeyValuePair<string, List<InstrumentDataInfo>>>)_collection).Add(item);
+            ((ICollection<KeyValuePair<string, List<InstrumentDataRecord>>>)_collection).Add(item);
         }
 
         public void Clear()
         {
-            ((ICollection<KeyValuePair<string, List<InstrumentDataInfo>>>)_collection).Clear();
+            ((ICollection<KeyValuePair<string, List<InstrumentDataRecord>>>)_collection).Clear();
         }
 
-        public bool Contains(KeyValuePair<string, List<InstrumentDataInfo>> item)
+        public bool Contains(KeyValuePair<string, List<InstrumentDataRecord>> item)
         {
-            return ((ICollection<KeyValuePair<string, List<InstrumentDataInfo>>>)_collection).Contains(item);
+            return ((ICollection<KeyValuePair<string, List<InstrumentDataRecord>>>)_collection).Contains(item);
         }
 
         public bool ContainsKey(string key)
         {
-            return ((IDictionary<string, List<InstrumentDataInfo>>)_collection).ContainsKey(key);
+            return ((IDictionary<string, List<InstrumentDataRecord>>)_collection).ContainsKey(key);
         }
 
-        public void CopyTo(KeyValuePair<string, List<InstrumentDataInfo>>[] array, int arrayIndex)
+        public void CopyTo(KeyValuePair<string, List<InstrumentDataRecord>>[] array, int arrayIndex)
         {
-            ((ICollection<KeyValuePair<string, List<InstrumentDataInfo>>>)_collection).CopyTo(array, arrayIndex);
+            ((ICollection<KeyValuePair<string, List<InstrumentDataRecord>>>)_collection).CopyTo(array, arrayIndex);
         }
 
-        public IEnumerator<KeyValuePair<string, List<InstrumentDataInfo>>> GetEnumerator()
+        public IEnumerator<KeyValuePair<string, List<InstrumentDataRecord>>> GetEnumerator()
         {
-            return ((IEnumerable<KeyValuePair<string, List<InstrumentDataInfo>>>)_collection).GetEnumerator();
+            return ((IEnumerable<KeyValuePair<string, List<InstrumentDataRecord>>>)_collection).GetEnumerator();
         }
 
         public bool Remove(string key)
         {
-            return ((IDictionary<string, List<InstrumentDataInfo>>)_collection).Remove(key);
+            return ((IDictionary<string, List<InstrumentDataRecord>>)_collection).Remove(key);
         }
 
-        public bool Remove(KeyValuePair<string, List<InstrumentDataInfo>> item)
+        public bool Remove(KeyValuePair<string, List<InstrumentDataRecord>> item)
         {
-            return ((ICollection<KeyValuePair<string, List<InstrumentDataInfo>>>)_collection).Remove(item);
+            return ((ICollection<KeyValuePair<string, List<InstrumentDataRecord>>>)_collection).Remove(item);
         }
 
-        public bool TryGetValue(string key, [MaybeNullWhen(false)] out List<InstrumentDataInfo> value)
+        public bool TryGetValue(string key, [MaybeNullWhen(false)] out List<InstrumentDataRecord> value)
         {
-            return ((IDictionary<string, List<InstrumentDataInfo>>)_collection).TryGetValue(key, out value);
+            return ((IDictionary<string, List<InstrumentDataRecord>>)_collection).TryGetValue(key, out value);
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -176,10 +176,16 @@ namespace EvolverCore
         }
     }
 
-    public class InstrumentDataInfo
+    public class InstrumentDataRecord
     {
-        public string InstrumentName { get; internal set; }
+        public string InstrumentName { get; internal set; } = string.Empty;
         public long StartTime { get; internal set; }
         public long EndTime { get; internal set; }
+
+        public string FileName { get;internal set; } = string.Empty;
+
+        public DataInterval Interval { get; internal set; } = new DataInterval(EvolverCore.Interval.Minute, 1);
+
+        public InstrumentDataSeries? Data { get; internal set; } = null;
     }
 }

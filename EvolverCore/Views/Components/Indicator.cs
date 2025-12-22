@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
+using EvolverCore.Models;
 using EvolverCore.Views.Components;
 using System;
 using System.Collections.Generic;
@@ -76,8 +77,10 @@ namespace EvolverCore.Views
             Outputs = oVM.ChartPlots;
             for (int i = 0; i < Outputs.Count; i++) Outputs[i].PlotSeries.Clear();
 
-            State = oVM.State;
-
+            State = IndicatorState.Startup;
+            
+            
+            State = IndicatorState.History;
             for (int i = 0; i < Properties.Data.Count; i++)
             {
                 //set series current bar such that 0 barsAgo is the value to be calculated aka index=i

@@ -4,11 +4,13 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Reflection.Emit;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
+using EvolverCore.Models;
 using MessagePack;
 using Microsoft.VisualBasic;
 
@@ -46,6 +48,31 @@ namespace EvolverCore
         public int Value;
 
         public DataInterval(Interval type, int value) { Type = type; Value = value; }
+
+        public DateTime Add(DateTime dateTime,int n)
+        {
+            switch (Type)
+            {
+                case Interval.Second: return dateTime.AddSeconds(Value * n);
+                case Interval.Minute: return dateTime.AddMinutes(Value * n);
+                case Interval.Hour: return dateTime.AddHours(Value * n);
+                case Interval.Day: return dateTime.AddDays(Value * n);
+                case Interval.Week: return dateTime.AddDays(Value * n * 7);
+                case Interval.Month: return dateTime.AddMonths(Value * n);
+                case Interval.Year: return dateTime.AddYears(Value * n);
+                default:
+                    throw new EvolverException($"Unknown interval type in interval.Add() : type={Type}");
+            }
+
+
+            return dateTime;
+        }
+    }
+
+    public interface IDataPoint
+    {
+        public DateTime X { get; }
+        public double Y { get; }
     }
 
     public record TimeDataBar : IDataPoint
@@ -94,12 +121,6 @@ namespace EvolverCore
         }
     }
 
-    public interface IDataPoint
-    {
-        public DateTime X { get; }
-        public double Y { get; }
-    }
-
     public record TimeDataPoint : IDataPoint
     {
         public DateTime Time;
@@ -132,10 +153,6 @@ namespace EvolverCore
         public int Count { get; }
 
         public T GetValue(int barsAgo);
-    }
-
-    public class DataSeries
-    {
     }
 
     public class DataSeries<T> : IDataSeries<T> where T : IDataPoint
@@ -298,7 +315,7 @@ namespace EvolverCore
 
     public record BarPricePoint : IDataPoint
     {
-        private readonly TimeDataBar _bar;  // Shared reference — no copy
+        private readonly TimeDataBar _bar;
         private readonly BarPriceValue _field;
 
         public BarPricePoint(TimeDataBar? bar, BarPriceValue field)
@@ -347,12 +364,50 @@ namespace EvolverCore
             if (series.Count < 2) return TimeSpan.FromMinutes(1).Ticks;
             return (series[1].X - series[0].X).Ticks;
         }
+
+        public static BarDataSeries? RandomSeries(DateTime startTime, DataInterval interval,int size)
+        {
+            BarDataSeries barDataSeries = new BarDataSeries();
+            barDataSeries.Interval = interval;
+            Random r = new Random(DateTime.Now.Second);
+
+            int lastClose = -1;
+            for (int i = 0; i < size; i++)
+            {
+                int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
+                int close = r.Next(10, 100);
+                int volume = r.Next(100, 1000);
+                int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
+                int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
+
+                TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
+                barDataSeries.Add(bar);
+                lastClose = close;
+                startTime = interval.Add(startTime, 1);
+            }
+
+            return barDataSeries;
+        }
     }
 
-    public class InstrumentBarDataSeries : BarDataSeries
+    public class InstrumentDataSeries : BarDataSeries
     {
         public Instrument? Instrument { get; internal set; }
 
     }
 
+
+    internal class DataManager
+    {
+        //handle all data load/save/infoscan/organization/update operations
+        InstrumentDataRecordCollection? _instrumentDataCollection = new InstrumentDataRecordCollection();
+        public InstrumentDataRecordCollection? InstrumentDataCollection { get { return _instrumentDataCollection; } }
+
+        public List<Indicator> _indicatorCache = new List<Indicator>();
+
+        public delegate void DataChangeDelegate(InstrumentDataRecordCollection instrumentRecord);
+        public event DataChangeDelegate? DataChange = null;
+
+
+    }
 }
