@@ -19,8 +19,14 @@ namespace EvolverCore
             if (param is null)
                 return null;
 
+            
+
             var name = param.GetType().FullName!.Replace("ViewModel", "View", StringComparison.Ordinal);
             var type = Type.GetType(name);
+
+            if (param.GetType().Name == "ChartControlViewModel")
+                type = typeof(ChartControl);
+
 
             if (type != null)
             {

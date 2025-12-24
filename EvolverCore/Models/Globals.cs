@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using NP.Ava.UniDock;
+using NP.Ava.UniDock.Factories;
+using NP.DependencyInjection.Interfaces;
+using NP.IoCy;
 
 namespace EvolverCore
 {
@@ -17,6 +15,7 @@ namespace EvolverCore
     {
         private static readonly Globals _instance = new Globals();
         public static Globals Instance { get { return _instance; } }
+
         static Globals()
         {
         }
@@ -47,5 +46,40 @@ namespace EvolverCore
         public InstrumentCollection? InstrumentCollection { get { return _instrumentCollection; } }
 
         internal DataManager? DataManager { get { return _dataManager; } }
+    }
+
+    public static class MyContainer
+    {
+        public static IDependencyInjectionContainer<object?> TheContainer { get; }
+
+        public static DockManager TheDockManager { get; } = new DockManager();
+
+        static MyContainer()
+        {
+            var containerBuilder = new ContainerBuilder();
+
+            containerBuilder.RegisterSingletonType<IFloatingWindowFactory, MyCustomFloatingWindowFactory>();
+            containerBuilder.RegisterSingletonInstance<DockManager>(TheDockManager);
+            //TheContainer.MapSingleton<IUniDockService, DockManager>(TheDockManager, null, true);
+
+            TheContainer = containerBuilder.Build();
+        }
+    }
+
+    public class MyCustomFloatingWindowFactory : IFloatingWindowFactory
+    {
+        public virtual FloatingWindow CreateFloatingWindow()
+        {
+            // create the window
+
+            FloatingWindow dockWindow = new FloatingWindow();
+
+            dockWindow.Classes.Add("PlainFloatingWindow");
+            dockWindow.Classes.Add("MyFloatingWindow");
+
+            dockWindow.TitleClasses = "WindowTitle";
+
+            return dockWindow;
+        }
     }
 }

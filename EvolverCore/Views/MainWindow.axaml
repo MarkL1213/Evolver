@@ -1,19 +1,40 @@
 <Window xmlns="https://github.com/avaloniaui"
-        xmlns:controls="using:Dock.Model.Mvvm.Controls"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="using:EvolverCore"
         xmlns:vm="using:EvolverCore.ViewModels"
-        xmlns:dock="using:Dock.Avalonia.Controls"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:unidock="clr-namespace:NP.Ava.UniDock;assembly=NP.Ava.UniDock"
+        xmlns:np="using:NP.Ava.UniDock"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        np:DockAttachedProperties.DockChildWindowOwner="{Binding RelativeSource={RelativeSource Mode=Self}}"
+        np:DockAttachedProperties.TheDockManager="{x:Static local:MyContainer.TheDockManager}"
         x:Class="EvolverCore.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="{Binding WindowIcon}"
         Title="{Binding WindowTitle}">
+
+
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
+   
+
+<Window.Resources>
+<ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://NP.Ava.Visuals/Themes/Geometries.axaml"/>
+      </ResourceDictionary.MergedDictionaries>
+      <DataTemplate x:Key="ChartControlViewModelTemplate">
+        <local:ChartControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" DataContext="{Binding}"/>
+      </DataTemplate>
+    </ResourceDictionary>
+</Window.Resources>
+                      
+<Window.Styles>
+    <StyleInclude Source="avares://NP.Ava.UniDock/Themes/DockStyles.axaml"/>
+  </Window.Styles>
+
 
     <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <Grid.RowDefinitions>
@@ -32,9 +53,51 @@
             </MenuItem>
         </Menu>
 
-        <dock:DockControl x:Name="DockControl" Layout="{Binding Layout}" Grid.Row="1" Grid.Column="0">
+        <np:RootDockGroup np:DockAttachedProperties.TheDockManager="{x:Static local:MyContainer.TheDockManager}"
+                        Grid.Row="1" Grid.Column="0">
 
-        </dock:DockControl>
+
+            <np:StackDockGroup x:Name="TheStackGroup"
+                         TheOrientation="Horizontal"
+                         IsStableGroup="True"
+                         InitialSizeCoefficients="15* 70* 15*">
+                
+                <np:TabbedDockGroup IsStableGroup="True"
+                            DefaultDockOrderInGroup="1"
+                            DockId="ToolGroup1"
+                            AutoDestroy="False"/>
+                
+                <np:TabbedDockGroup
+                            x:Name="ChartGroup"
+                            IsStableGroup="True"
+                            DefaultDockOrderInGroup="2"
+                            DockId="ChartGroup"
+                            AutoDestroy="False">
+
+                <np:DockItem 
+                     DockId="DefaultChart-0"
+                     DefaultDockGroupId="ChartGroup"
+                     DefaultDockOrderInGroup="1"
+                     Header="DefaultChart-0"
+                     CanFloat="True"
+                     CanClose="True"
+                     FontSize="16"
+                     Margin="1"
+                     ContentTemplateResourceKey="ChartControlViewModelTemplate"
+                     />
+                     
+
+                     </np:TabbedDockGroup>
+                <np:TabbedDockGroup IsStableGroup="True"
+                            DefaultDockOrderInGroup="3"
+                            DockId="ToolGroup2"
+                            AutoDestroy="False"/>
+            
+            </np:StackDockGroup>
+        </np:RootDockGroup>
     </Grid>
+
+
+    
     
 </Window>

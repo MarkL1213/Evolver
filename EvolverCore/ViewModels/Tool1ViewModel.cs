@@ -1,4 +1,4 @@
-﻿using Dock.Model.Mvvm.Controls;
+﻿using NP.Ava.UniDock;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,14 +9,10 @@ using System.Threading.Tasks;
 namespace EvolverCore.ViewModels
 {
 
-    internal partial class Tool1ViewModel : Tool//Document
+    internal partial class Tool1ViewModel : ViewModelBase
     {
         public Tool1ViewModel()
         {
-            Id = "Tool1";
-            Title = "Tool One";
-            CanClose = false;
-            CanFloat = true;
         }
     }
 

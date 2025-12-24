@@ -1,9 +1,6 @@
 <Application xmlns="https://github.com/avaloniaui"
-             xmlns:controls="using:Dock.Model.Mvvm.Controls"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="EvolverCore.App"
-             xmlns:dock="using:Dock.Avalonia.Controls"
-             xmlns:dockThemes="using:Dock.Avalonia.Themes.Fluent"
              xmlns:local="using:EvolverCore"
              xmlns:vm="using:EvolverCore.ViewModels"
              RequestedThemeVariant="Default">
@@ -24,7 +21,6 @@
 </Application.Resources>
   
     <Application.Styles>
-        <dockThemes:DockFluentTheme />
         <FluentTheme />
     </Application.Styles>
 

@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Dock.Model.Mvvm.Controls;
+using NP.Ava.UniDock;
 
 
 namespace EvolverCore.ViewModels
 {
-    internal partial class ChartControlViewModel : Document
+    internal partial class ChartControlViewModel : ViewModelBase
     {
         public ChartXAxisViewModel? SharedXAxis { get; } = new ChartXAxisViewModel()
         {
@@ -31,12 +31,6 @@ namespace EvolverCore.ViewModels
         {
             PrimaryChartPanelViewModel.XAxis = SharedXAxis;
             
-            Id = "MainChart";
-            Title = "Main Chart";
-            CanClose = true;
-            CanFloat = true;
-            //CanDrag = true;
-            //CanDrop = false;
         }
     }
 }

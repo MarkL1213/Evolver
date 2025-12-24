@@ -13,9 +13,6 @@ using CommunityToolkit.Mvvm.Input;
 using EvolverCore.Views;
 using EvolverCore.Views.Components.Indicators;
 using EvolverCore.ViewModels.Indicators;
-using Dock.Model.Mvvm.Controls;
-using Dock.Model.Core;
-using Dock.Avalonia.Controls;
 
 namespace EvolverCore;
 
@@ -26,6 +23,8 @@ internal partial class ChartControl : UserControl
     {
         InitializeComponent();
         AddTestMenu();
+
+        DataContext = new ChartControlViewModel();
     }
 
     #region test cases
@@ -137,9 +136,11 @@ internal partial class ChartControl : UserControl
         SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
 
         //FIXME: temporarily using captured values, should be lookup based
-        ChartPanel volumePanel = _volPanel;
-        Volume volumeIndicator = _volIndicator;
+        ChartPanel? volumePanel = _volPanel;
+        Volume? volumeIndicator = _volIndicator;
         int volumePlotIndex = 0;
+
+        if(volumePanel == null || volumeIndicator == null) return;
 
         SMA vi = new SMA(volumePanel);
         vi.SetDataContext(vivm);
@@ -180,8 +181,8 @@ internal partial class ChartControl : UserControl
         //panel.Panel.UpdateYAxisRange();
     }
 
-    ChartPanel _volPanel;
-    Volume _volIndicator;
+    ChartPanel? _volPanel;
+    Volume? _volIndicator;
 
     private void Test_AddVolumeIndicator()
     {
