@@ -24,7 +24,7 @@ internal partial class ChartControl : UserControl
         InitializeComponent();
         AddTestMenu();
 
-        DataContext = new ChartControlViewModel();
+        //DataContext = new ChartControlViewModel();
     }
 
     #region test cases

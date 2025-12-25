@@ -8,17 +8,7 @@
 
     <Application.DataTemplates>
         <local:ViewLocator/>
-
-    <DataTemplate DataType="{x:Type vm:ChartControlViewModel}">
-        <local:ChartControl />
-    </DataTemplate>
     </Application.DataTemplates>
-
-<Application.Resources>
-        <DataTemplate x:Key="Tool1" DataType="{x:Type vm:Tool1ViewModel}">
-            <TextBlock Text="Hello from Tool 1! Drag me around."/>
-        </DataTemplate>
-</Application.Resources>
   
     <Application.Styles>
         <FluentTheme />

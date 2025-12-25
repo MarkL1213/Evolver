@@ -10,6 +10,7 @@ using NP.Ava.UniDock.Factories;
 using NP.UniDockService;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -23,7 +24,7 @@ namespace EvolverCore.ViewModels
         public WindowIcon? WindowIcon { get; } = new WindowIcon("D:/Evolver/EvolverCore/Assets/avalonia-logo.ico");
 
         private const string LastLayoutKey = "LastLayoutName";
-        private const string LayoutsDir = "Layouts";  
+        private const string LayoutsDir = "Layouts";
 
         [ObservableProperty]
         private List<string> _availableLayouts = new();
@@ -39,7 +40,7 @@ namespace EvolverCore.ViewModels
         private void LoadAvailableLayouts()
         {
             AvailableLayouts = Directory.GetFiles(LayoutsDir, "*.json")
-                .Select<string,string>(Path.GetFileNameWithoutExtension)
+                .Select<string, string>(Path.GetFileNameWithoutExtension)
                 .ToList();
         }
 
@@ -93,7 +94,7 @@ namespace EvolverCore.ViewModels
             // Update last used
             //Preferences.Default.Set(LastLayoutKey, name);
         }
-        
+
         private void LoadLastUsedLayout()
         {
             //string lastName = Preferences.Default.Get(LastLayoutKey, "Default");
@@ -102,34 +103,57 @@ namespace EvolverCore.ViewModels
             //defaultLayout();
         }
 
-        private static int _docCount=1;
+        private static int _docCount = 2;
+
+
+
+        private bool _isCreatingChart = false;
+
         [RelayCommand]
         private void NewChartDocument()
         {
-            var newTabVm = new ChartControlDockItemViewModel()
+            if (_isCreatingChart) return;
+
+            _isCreatingChart = true;
+            try
             {
-                DockId = $"DefaultChart-{_docCount}",
-                DefaultDockGroupId = "ChartGroup",
-                Header = $"DefaultChart-{_docCount++}",
-                DefaultDockOrderInGroup = 1,
-                ContentTemplateResourceKey = "ChartContolViewModelTemplate",
-                TheVM = new ChartControlViewModel(),
-                IsPredefined = false,
-                CanFloat = true,
-                CanClose = true
+                string name = $"DefaultChart-{_docCount}";
+                ChartControlViewModel vm = new ChartControlViewModel()
+                {
+                    Name = name
+                };
 
-            };
+                var newTabVm = new ChartControlDockItemViewModel()
+                {
+                    DockId = name,
+                    DefaultDockGroupId = "ChartTabGroup",
+                    DefaultDockOrderInGroup = _docCount,
+                    Header = name,
+                    //ContentTemplateResourceKey = "ChartContolViewModelTemplate",
+                    HeaderContentTemplateResourceKey = "ChartControlHeaderTemplate",
+                    TheVM = vm,
+                    IsPredefined = false,
+                    CanFloat = true,
+                    CanClose = true
+                };
 
-            MyContainer.TheDockManager.DockItemsViewModels!.Add(newTabVm);
+                MyContainer.TheDockManager.DockItemsViewModels!.Add(newTabVm);
+                _docCount++;
 
-            newTabVm.IsSelected = true;
-
+                newTabVm.IsSelected = true;
+            }
+            finally { _isCreatingChart = false; }
         }
-        
+
         [RelayCommand]
         private void RemoveChartDocument()
         {
+            if (MyContainer.TheDockManager.DockItemsViewModels == null) return;
 
+            DockItemViewModelBase? target = MyContainer.TheDockManager.DockItemsViewModels.FirstOrDefault(x => x.IsSelected);
+            if (target == null) return;
+
+            MyContainer.TheDockManager.DockItemsViewModels.Remove(target);
         }
     }
 

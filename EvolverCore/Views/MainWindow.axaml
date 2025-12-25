@@ -14,7 +14,6 @@
         Icon="{Binding WindowIcon}"
         Title="{Binding WindowTitle}">
 
-
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
@@ -25,8 +24,9 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://NP.Ava.Visuals/Themes/Geometries.axaml"/>
       </ResourceDictionary.MergedDictionaries>
-      <DataTemplate x:Key="ChartControlViewModelTemplate">
-        <local:ChartControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" DataContext="{Binding}"/>
+      <DataTemplate x:Key="ChartControlHeaderTemplate" 
+                    x:DataType="vm:ChartControlViewModel">
+        <TextBlock Name="ChartHeaderText" Text="{Binding Name}" />
       </DataTemplate>
     </ResourceDictionary>
 </Window.Resources>
@@ -59,36 +59,38 @@
 
             <np:StackDockGroup x:Name="TheStackGroup"
                          TheOrientation="Horizontal"
+                         DefaultDockOrderInGroup="1"
+                         DockId="TheStackGroup"
                          IsStableGroup="True"
                          InitialSizeCoefficients="15* 70* 15*">
                 
-                <np:TabbedDockGroup IsStableGroup="True"
+                <np:TabbedDockGroup 
+                            IsStableGroup="True"
                             DefaultDockOrderInGroup="1"
                             DockId="ToolGroup1"
                             AutoDestroy="False"/>
                 
                 <np:TabbedDockGroup
-                            x:Name="ChartGroup"
                             IsStableGroup="True"
                             DefaultDockOrderInGroup="2"
-                            DockId="ChartGroup"
-                            AutoDestroy="False">
-
+                            DockId="ChartTabGroup"
+                            AutoDestroy="False"
+                            />
+                <!--
                 <np:DockItem 
-                     DockId="DefaultChart-0"
-                     DefaultDockGroupId="ChartGroup"
+                     DockId="DefaultChart-1"
+                     Header="DefaultChart-1"
+                     DefaultDockGroupId="TheStackGroup"
                      DefaultDockOrderInGroup="1"
-                     Header="DefaultChart-0"
-                     CanFloat="True"
-                     CanClose="True"
-                     FontSize="16"
-                     Margin="1"
+                     CanFloat="False"
+                     CanClose="False"
                      ContentTemplateResourceKey="ChartControlViewModelTemplate"
                      />
-                     
+                   -->      
 
-                     </np:TabbedDockGroup>
-                <np:TabbedDockGroup IsStableGroup="True"
+                <!-- </np:TabbedDockGroup> -->
+                <np:TabbedDockGroup 
+                            IsStableGroup="True"
                             DefaultDockOrderInGroup="3"
                             DockId="ToolGroup2"
                             AutoDestroy="False"/>

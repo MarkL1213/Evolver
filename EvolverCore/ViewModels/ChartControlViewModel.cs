@@ -24,6 +24,7 @@ namespace EvolverCore.ViewModels
 
         [ObservableProperty] Thickness _mainBorderThickness = new Thickness(3);
         [ObservableProperty] IBrush _mainBorderColor = Brushes.Blue;
+        [ObservableProperty] string _name = string.Empty;
 
         public ObservableCollection<ChartControl.SubPanel> SubPanelViewModels { get; } = new ObservableCollection<ChartControl.SubPanel>();
 
