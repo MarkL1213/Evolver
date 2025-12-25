@@ -11,6 +11,7 @@ using NP.UniDockService;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -39,9 +40,16 @@ namespace EvolverCore.ViewModels
         private const string LayoutFile = "dock_layout.json";
         private void LoadAvailableLayouts()
         {
-            AvailableLayouts = Directory.GetFiles(LayoutsDir, "*.json")
-                .Select<string, string>(Path.GetFileNameWithoutExtension)
-                .ToList();
+            try
+            {
+                AvailableLayouts = Directory.GetFiles(LayoutsDir, "*.json")
+                    .Select<string, string>(Path.GetFileNameWithoutExtension)
+                    .ToList();
+            }
+            catch (Exception)
+            {
+                AvailableLayouts.Clear();
+            }
         }
 
         [RelayCommand]
