@@ -1,5 +1,6 @@
 ﻿using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using EvolverCore.Models;
 using EvolverCore.Views;
 using System;
 using System.Collections.Generic;
@@ -17,10 +18,10 @@ namespace EvolverCore.ViewModels
 
         [ObservableProperty] BarPriceValue _priceField = BarPriceValue.Close;
 
-        [ObservableProperty] IBrush? _plotFillBrush = Brushes.Cyan;
-        [ObservableProperty] IBrush? _plotLineBrush = Brushes.Turquoise;
+        [ObservableProperty] SerializableBrush _plotFillBrush = new SerializableBrush(Brushes.Cyan);
+        [ObservableProperty] SerializableBrush _plotLineBrush = new SerializableBrush(Brushes.Turquoise);
         [ObservableProperty] double _plotLineThickness = 1.5;
-        [ObservableProperty] IDashStyle? _plotLineStyle = null;
+        [ObservableProperty] SerializableDashStyle _plotLineStyle = new SerializableDashStyle();
         [ObservableProperty] PlotStyle _style = PlotStyle.Line;
 
         [ObservableProperty] string _name = string.Empty;

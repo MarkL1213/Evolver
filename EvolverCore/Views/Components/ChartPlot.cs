@@ -61,11 +61,11 @@ namespace EvolverCore.Views
         private void OnPropertiesChanged()
         {
             Style = _properties.Style;
-            PlotFillColor = _properties.PlotFillBrush;
+            PlotFillColor = _properties.PlotFillBrush.Color;
 
-            PlotLineColor = _properties.PlotLineBrush;
+            PlotLineColor = _properties.PlotLineBrush.Color;
             PlotLineThickness = _properties.PlotLineThickness;
-            PlotLineStyle = _properties.PlotLineStyle;
+            PlotLineStyle = _properties.PlotLineStyle.Style;
 
             InvalidatePenCache();
         }
@@ -204,9 +204,9 @@ namespace EvolverCore.Views
                 double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
                 double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
 
-                var fillBrush = Properties.PlotFillBrush;
+                var fillBrush = Properties.PlotFillBrush.Color;
 
-                _cachedPlotLinePen ??= new Pen(Properties.PlotLineBrush, Properties.PlotLineThickness, Properties.PlotLineStyle);
+                _cachedPlotLinePen ??= new Pen(Properties.PlotLineBrush.Color, Properties.PlotLineThickness, Properties.PlotLineStyle.Style);
                 if (fillBrush == null || _cachedPlotLinePen == null) { return; }
 
                 var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);

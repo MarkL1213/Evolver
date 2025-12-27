@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.ViewModels
 {
-    internal partial class ChartXAxisViewModel : ViewModelBase
+    public partial class ChartXAxisViewModel : ViewModelBase
     {
         public static IBrush DefaultLabelColor = Brushes.White;
         public static IBrush DefaultBackgroundColor = Brushes.Black;

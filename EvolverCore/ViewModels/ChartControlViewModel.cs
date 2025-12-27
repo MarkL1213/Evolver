@@ -6,13 +6,17 @@ using System.Text;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Media;
+using EvolverCore.Views.Components;
 using CommunityToolkit.Mvvm.ComponentModel;
 using NP.Ava.UniDock;
+using System.Xml.Serialization;
+using System.ComponentModel;
+using EvolverCore.Models;
 
 
 namespace EvolverCore.ViewModels
 {
-    internal partial class ChartControlViewModel : ViewModelBase
+    public partial class ChartControlViewModel : ViewModelBase
     {
         public ChartXAxisViewModel? SharedXAxis { get; } = new ChartXAxisViewModel()
         {
@@ -23,10 +27,13 @@ namespace EvolverCore.ViewModels
         public ChartPanelViewModel PrimaryChartPanelViewModel { get; } = new ChartPanelViewModel();
 
         [ObservableProperty] Thickness _mainBorderThickness = new Thickness(3);
-        [ObservableProperty] IBrush _mainBorderColor = Brushes.Blue;
+
+        [ObservableProperty]
+        SerializableBrush _mainBorderColor = new SerializableBrush(Brushes.Blue);
+
         [ObservableProperty] string _name = string.Empty;
 
-        public ObservableCollection<ChartControl.SubPanel> SubPanelViewModels { get; } = new ObservableCollection<ChartControl.SubPanel>();
+        public ObservableCollection<SubPanel> SubPanelViewModels { get; } = new ObservableCollection<SubPanel>();
 
         public ChartControlViewModel()
         {

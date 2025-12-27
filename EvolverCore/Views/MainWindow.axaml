@@ -3,11 +3,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="using:EvolverCore"
         xmlns:vm="using:EvolverCore.ViewModels"
+        xmlns:views="using:EvolverCore.Views"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:unidock="clr-namespace:NP.Ava.UniDock;assembly=NP.Ava.UniDock"
         xmlns:np="using:NP.Ava.UniDock"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-        np:DockAttachedProperties.DockChildWindowOwner="{Binding RelativeSource={RelativeSource Mode=Self}}"
+        np:DockAttachedProperties.DockChildWindowOwner="{x:Null}"
         np:DockAttachedProperties.TheDockManager="{x:Static local:MyContainer.TheDockManager}"
         x:Class="EvolverCore.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -18,6 +19,7 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
    
+    <!--  np:DockAttachedProperties.DockChildWindowOwner="{Binding RelativeSource={RelativeSource Mode=Self}}"   -->
 
 <Window.Resources>
 <ResourceDictionary>
@@ -50,6 +52,9 @@
                 <MenuItem Name="NewChartItem" Header="new Chart" />
                 <MenuItem Name="RemoveChartItem" Header="remove Chart" />
                 <MenuItem Name="ExitMenuItem" Header="E_xit" />
+            </MenuItem>
+            <MenuItem Name="LayoutMenuItem" Header="_Layouts">
+                <MenuItem Name="SaveLayoutMenuItem" Header="_Save" />
             </MenuItem>
         </Menu>
 

@@ -2,12 +2,15 @@
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using CommunityToolkit.Mvvm.ComponentModel;
+using EvolverCore.Models;
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Xml.Serialization;
 
 namespace EvolverCore.ViewModels
 {
-    internal partial class ChartPanelViewModel : ViewModelBase
+    public partial class ChartPanelViewModel : ViewModelBase
     {
         
         public static double DefaultScrollSensitivity = .25;
@@ -39,27 +42,29 @@ namespace EvolverCore.ViewModels
         
         internal ObservableCollection<ChartComponentViewModel> ChartComponents { get; } = new ObservableCollection<ChartComponentViewModel>();
 
-                [ObservableProperty] double _scrollSensitivity = DefaultScrollSensitivity;
+        [ObservableProperty] double _scrollSensitivity = DefaultScrollSensitivity;
         [ObservableProperty] double _panSensitivity = DefaultPanSensitivity;
         [ObservableProperty] bool _showGridLines = DefaultShowGridLines;
         [ObservableProperty] bool _showCrosshair = DefaultShowCrosshair;
 
-        [ObservableProperty] IBrush _backgroundColor = DefaultBackgroundColor;
+        [ObservableProperty]
+        SerializableBrush _backgroundColor = new SerializableBrush(DefaultBackgroundColor);
+        
 
-        [ObservableProperty] IBrush _gridLinesColor = DefaultGridLinesColor;
+        [ObservableProperty] SerializableBrush _gridLinesColor = new SerializableBrush(DefaultGridLinesColor);
         [ObservableProperty] double _gridLinesThickness = DefaultGridLinesThickness;
-        [ObservableProperty] IDashStyle? _gridLinesDashStyle = DefaultGridLinesDashStyle;
+        [ObservableProperty] SerializableDashStyle _gridLinesDashStyle = new SerializableDashStyle(DefaultGridLinesDashStyle);
 
-        [ObservableProperty] IBrush _gridLinesBoldColor = DefaultGridLinesBoldColor;
+        [ObservableProperty] SerializableBrush _gridLinesBoldColor = new SerializableBrush(DefaultGridLinesBoldColor);
         [ObservableProperty] double _gridLinesBoldThickness = DefaultGridLinesBoldThickness;
-        [ObservableProperty] IDashStyle? _gridLinesBoldDashStyle = DefaultGridLinesBoldDashStyle;
+        [ObservableProperty] SerializableDashStyle _gridLinesBoldDashStyle = new SerializableDashStyle(DefaultGridLinesBoldDashStyle);
 
-        [ObservableProperty] IBrush _crosshairLineColor = DefaultCrosshairLineColor;
+        [ObservableProperty] SerializableBrush _crosshairLineColor = new SerializableBrush(DefaultCrosshairLineColor);
         [ObservableProperty] double _crosshairLineThickness = DefaultCrosshairLineThickness;
-        [ObservableProperty] IDashStyle? _crosshairLineDashStyle = DefaultCrosshairLineDashStyle;
+        [ObservableProperty] SerializableDashStyle _crosshairLineDashStyle = new SerializableDashStyle(DefaultCrosshairLineDashStyle);
 
-        [ObservableProperty] IBrush _crosshairReadoutForegroundColor = DefaultCrosshairReadoutForegroundColor;
-        [ObservableProperty] IBrush _crosshairReadoutBackgroundColor = DefaultCrosshairReadoutBackgroundColor;
+        [ObservableProperty] SerializableBrush _crosshairReadoutForegroundColor = new SerializableBrush(DefaultCrosshairReadoutForegroundColor);
+        [ObservableProperty] SerializableBrush _crosshairReadoutBackgroundColor = new SerializableBrush(DefaultCrosshairReadoutBackgroundColor);
         [ObservableProperty] int _crosshairReadoutFontSize = DefaultCrosshairReadoutFontSize;
 
         [ObservableProperty] CrosshairSnapMode _crosshairSnapMode = DefaultCrosshaitSnapMode;

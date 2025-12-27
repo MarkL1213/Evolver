@@ -148,7 +148,7 @@ internal partial class ChartControl : UserControl
         vivm.SourceIndicator = volumeIndicator.Properties as IndicatorViewModel;
         vivm.RenderOrder = 1;
         vivm.SourcePlotIndex = volumePlotIndex;
-        vivm.ChartPlots[0].PlotLineBrush = Brushes.Orange;
+        vivm.ChartPlots[0].PlotLineBrush.Color = Brushes.Orange;
         vivm.ChartPlots[0].PlotLineThickness = 3;
 
 
@@ -290,16 +290,6 @@ internal partial class ChartControl : UserControl
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-    }
-
-    internal class SubPanel
-    {
-        internal int Number { set; get; }
-        internal Guid ID { get; set; }
-        internal ChartPanel? Panel { get; set; }
-        internal ChartYAxis? Axis { get; set; }
-        internal GridSplitter? Splitter { get; set; }
-        internal ChartPanelViewModel? ViewModel { get; set; }
     }
 
     
