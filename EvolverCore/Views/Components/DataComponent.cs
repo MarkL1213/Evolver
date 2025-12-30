@@ -16,7 +16,7 @@ namespace EvolverCore.Views
             Properties = new DataViewModel();
         }
 
-        public ChartPlot Plot { get; private set; }
+        public ChartPlot? Plot { get; private set; }
 
         public override double MinY()
         {

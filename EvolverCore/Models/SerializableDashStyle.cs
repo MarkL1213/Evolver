@@ -19,7 +19,7 @@ namespace EvolverCore.Models
         //private IDashStyle? _dashStyle;
 
         public SerializableDashStyle() { }
-        public SerializableDashStyle(IDashStyle style)
+        public SerializableDashStyle(IDashStyle? style)
         {
             Style = style;
         }

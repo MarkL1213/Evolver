@@ -674,7 +674,7 @@ public partial class ChartPanel : Decorator
         if (_vm == null || _vm.XAxis == null) return;
         DataComponent? dataComponent = GetFirstDataComponent();
 
-        if (_vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
+        if (_vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null || dataComponent.Plot == null)
         {
             if (_vm.XAxis != null)
             {

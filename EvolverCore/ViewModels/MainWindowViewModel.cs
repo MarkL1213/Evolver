@@ -63,9 +63,10 @@ namespace EvolverCore.ViewModels
                 }
 
             }
-            catch (Exception e)
+            catch 
             {
-                int i = 0;
+                //FIXME - add logging
+                //Globals.Instance.Log("");
             }
         }
 

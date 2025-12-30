@@ -57,10 +57,6 @@ namespace EvolverCore.Views
             }
         }
 
-        BarDataSeries Bars;
-        TimeDataSeries? Input;
-        ObservableCollection<ChartPlotViewModel> Outputs;
-        IndicatorState State;
         public override void Calculate()
         {
             ////setup state for next OnDataUpdate() call
