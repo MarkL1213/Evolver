@@ -32,6 +32,8 @@ namespace EvolverCore.Models
 
     public class OutputPlot
     {
+        public OutputPlot() { }
+        public OutputPlot(PlotProperties properties) { Properties = properties; }
         public PlotProperties? Properties { get; internal set; } = null;
         public TimeDataSeries? Series { get; internal set; } = null;
     }
@@ -54,6 +56,9 @@ namespace EvolverCore.Models
         public int CurrentBarIndex { get; internal set; } = -1;
 
         public int CurrentBarsIndex { get; internal set; } = -1;
+
+        public virtual void ConfigurePlots()
+        { }
 
         public virtual void OnStateChange()
         { }

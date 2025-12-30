@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Views
 {
-    internal class Drawing : ChartComponentBase
+    internal class DrawingComponent : ChartComponentBase
     {
-        public Drawing(ChartPanel parent) : base(parent)
+        public DrawingComponent(ChartPanel parent) : base(parent)
         {
         }
 

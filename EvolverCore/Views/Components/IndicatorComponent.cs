@@ -14,9 +14,9 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Views
 {
-    public class Indicator : ChartComponentBase
+    public class IndicatorComponent : ChartComponentBase
     {
-        internal Indicator(ChartPanel parent):base(parent) { }
+        internal IndicatorComponent(ChartPanel parent):base(parent) { }
         internal List<ChartPlot> ChartPlots { get; } = new List<ChartPlot>();
 
         internal void AddPlot(ChartPlot plot)
@@ -63,29 +63,29 @@ namespace EvolverCore.Views
         IndicatorState State;
         public override void Calculate()
         {
-            //setup state for next OnDataUpdate() call
-            IndicatorViewModel? oVM = Properties as IndicatorViewModel;
-            if (Properties.Data == null || oVM == null) return;
+            ////setup state for next OnDataUpdate() call
+            //IndicatorViewModel? oVM = Properties as IndicatorViewModel;
+            //if (Properties.Data == null || oVM == null) return;
 
-            Bars = Properties.Data;
-            IndicatorViewModel? iVM = Properties.SourceIndicator as IndicatorViewModel;
-            if (iVM != null && Properties.SourcePlotIndex > 0 && Properties.SourcePlotIndex < iVM.ChartPlots.Count)
-                Input = iVM.ChartPlots[Properties.SourcePlotIndex].PlotSeries;
-            else
-                Input = null;
+            //Bars = Properties.Data;
+            //IndicatorViewModel? iVM = Properties.SourceIndicator as IndicatorViewModel;
+            //if (iVM != null && Properties.SourcePlotIndex > 0 && Properties.SourcePlotIndex < iVM.ChartPlots.Count)
+            //    Input = iVM.ChartPlots[Properties.SourcePlotIndex].PlotSeries;
+            //else
+            //    Input = null;
 
-            Outputs = oVM.ChartPlots;
-            for (int i = 0; i < Outputs.Count; i++) Outputs[i].PlotSeries.Clear();
+            //Outputs = oVM.ChartPlots;
+            //for (int i = 0; i < Outputs.Count; i++) Outputs[i].PlotSeries.Clear();
 
-            State = IndicatorState.Startup;
+            //State = IndicatorState.Startup;
             
             
-            State = IndicatorState.History;
-            for (int i = 0; i < Properties.Data.Count; i++)
-            {
-                //set series current bar such that 0 barsAgo is the value to be calculated aka index=i
-                OnDataUpdate();
-            }
+            //State = IndicatorState.History;
+            //for (int i = 0; i < Properties.Data.Count; i++)
+            //{
+            //    //set series current bar such that 0 barsAgo is the value to be calculated aka index=i
+            //    OnDataUpdate();
+            //}
         }
 
         public virtual void OnDataUpdate()

@@ -14,7 +14,7 @@ namespace EvolverCore.ViewModels
     {
         [ObservableProperty] ChartComponentViewModel? _component;
 
-        [ObservableProperty] TimeDataSeries _plotSeries = new TimeDataSeries();
+        [ObservableProperty] int _plotIndex = -1;
 
         [ObservableProperty] BarPriceValue _priceField = BarPriceValue.Close;
 

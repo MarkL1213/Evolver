@@ -105,7 +105,7 @@ public partial class ChartXAxis : Decorator
     {
         if (_vm == null || _vm.SharedXAxis == null || DataPanel == null) return;
 
-        Data? dataComponent = DataPanel.GetFirstDataComponent();
+        DataComponent? dataComponent = DataPanel.GetFirstDataComponent();
         DataInterval dataInterval;
         if (dataComponent == null || dataComponent.Properties.Data == null)
             dataInterval = new DataInterval(Interval.Hour, 2);

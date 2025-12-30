@@ -87,20 +87,20 @@ namespace EvolverCore.Views.Components
         public virtual double MaxY() { return 100; }
         public virtual void ConfigurePlots() { }
 
-        private List<IDataPoint> _visibleDataPoints = new List<IDataPoint>();
-        public List<IDataPoint> VisibleDataPoints { get { return _visibleDataPoints; } }
+        private List<IDataPoint> _snapPoints = new List<IDataPoint>();
+        public List<IDataPoint> SnapPoints { get { return _snapPoints; } }
 
-        public virtual void CalculateVisibleDataPoints()
+        public virtual void CalculateSnapPoints()
         {
-            VisibleDataPoints.Clear();
+            SnapPoints.Clear();
 
             ChartPanelViewModel? panelVM = Parent.DataContext as ChartPanelViewModel;
             if (Properties == null || panelVM == null || panelVM.XAxis == null) return;
 
-            if (Properties.Data == null || Properties.Data.Count == 0) return;
+            if (Properties.Data == null || Properties.Data.InputElementCount == 0) return;
 
-            IEnumerable<IDataPoint> v = Properties.Data.Where(p => p.X >= panelVM.XAxis.Min && p.X <= panelVM.XAxis.Max);
-            VisibleDataPoints.AddRange(v.ToList());
+            IEnumerable<IDataPoint> v = Properties.Data.SelectInputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max);
+            SnapPoints.AddRange(v.ToList());
         }
 
         public virtual void UpdateVisualRange(DateTime rangeMin, DateTime rangeMax) { }

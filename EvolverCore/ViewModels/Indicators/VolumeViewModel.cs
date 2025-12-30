@@ -9,7 +9,7 @@ namespace EvolverCore.ViewModels.Indicators
         [ObservableProperty] IBrush _bullBrush = Brushes.DodgerBlue;
         [ObservableProperty] IBrush _bearBrush = Brushes.Red;
 
-        public VolumeViewModel(BarDataSeries barSeries)
+        public VolumeViewModel(IndicatorDataSlice barSeries)
         {
             Name = "Volume";
             Data = barSeries;

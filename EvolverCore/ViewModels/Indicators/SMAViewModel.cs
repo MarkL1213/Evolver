@@ -12,22 +12,11 @@ namespace EvolverCore.ViewModels.Indicators
     {
         [ObservableProperty] int _period = 14;
 
-        public SMAViewModel(IndicatorViewModel source, int period, int sourcePlotIndex)
+        public SMAViewModel(IndicatorDataSlice source, int period)
         {
             Name = "SMA";
-            Source = CalculationSource.IndicatorPlot;
-            SourcePlotIndex = sourcePlotIndex;
             _period = period;
-            SourceIndicator = source;
-        }
-
-        public SMAViewModel(BarDataSeries barSeries, int period)
-        {
-            Name = "SMA";
-            Source = CalculationSource.BarData;
-            SourcePlotIndex = -1;
-            _period = period;
-            Data = barSeries;
+            Data = source;
         }
     }
 }

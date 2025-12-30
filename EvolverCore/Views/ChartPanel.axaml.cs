@@ -123,19 +123,19 @@ public partial class ChartPanel : Decorator
 
     private void ComponentCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
-        foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
+        foreach (ChartComponentBase component in _attachedComponents) component.CalculateSnapPoints();
         //UpdateVisibleRange();
     }
 
     private void PanelSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
+        foreach (ChartComponentBase component in _attachedComponents) component.CalculateSnapPoints();
         //UpdateVisibleRange();
     }
 
     private void AxisPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        foreach (ChartComponentBase component in _attachedComponents) component.CalculateVisibleDataPoints();
+        foreach (ChartComponentBase component in _attachedComponents) component.CalculateSnapPoints();
         InvalidateVisual();
     }
     
@@ -221,7 +221,7 @@ public partial class ChartPanel : Decorator
 
             if (_vm.YAxis != null)
             {
-                Data? dataComponent = GetFirstDataComponent();
+                DataComponent? dataComponent = GetFirstDataComponent();
 
                 if (CrosshairSnapMode == CrosshairSnapMode.Free || _vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
                 {
@@ -239,15 +239,15 @@ public partial class ChartPanel : Decorator
                     TimeSpan totalSpan = _vm.XAxis.Max - _vm.XAxis.Min;
                     DateTime mouseTime = _vm.XAxis.Min + TimeSpan.FromTicks((long)(xFraction * totalSpan.Ticks));
 
-                    if (dataComponent.VisibleDataPoints.Count == 0)
-                        dataComponent.CalculateVisibleDataPoints();
-                    if (dataComponent.VisibleDataPoints.Count == 0)
+                    if (dataComponent.SnapPoints.Count == 0)
+                        dataComponent.CalculateSnapPoints();
+                    if (dataComponent.SnapPoints.Count == 0)
                     {
                         //FIXME : no visible data fall back to free mode
                         return;
                     }
 
-                        TimeDataBar? nearestBar = dataComponent.VisibleDataPoints
+                        TimeDataBar? nearestBar = dataComponent.SnapPoints
                         .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
                         .First() as TimeDataBar;
 
@@ -661,18 +661,18 @@ public partial class ChartPanel : Decorator
         InvalidateVisual();
     }
 
-    internal Data? GetFirstDataComponent()
+    internal DataComponent? GetFirstDataComponent()
     {
         if (_vm == null || _attachedComponents.Count == 0) return null;
 
-        Data? dataComponent = _attachedComponents.FirstOrDefault(p => p is Data) as Data;
+        DataComponent? dataComponent = _attachedComponents.FirstOrDefault(p => p is DataComponent) as DataComponent;
         return dataComponent;
     }
 
     internal void UpdateXAxisRange()
     {
         if (_vm == null || _vm.XAxis == null) return;
-        Data? dataComponent = GetFirstDataComponent();
+        DataComponent? dataComponent = GetFirstDataComponent();
 
         if (_vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
         {
@@ -691,14 +691,8 @@ public partial class ChartPanel : Decorator
         int maxVisible = (int)(Bounds.Width / preferredWidth);
         maxVisible = Math.Max(maxVisible, 50);  // Minimum to avoid too-narrow views
 
-        IEnumerable<TimeDataBar> visibleBars;
-        if (dataComponent.Properties.Data.Count <= maxVisible)
-            visibleBars = dataComponent.Properties.Data.Tolist();
-        else
-            visibleBars = dataComponent.Properties.Data.TakeLast(maxVisible);  // Last N bars (most recent)
-
-        var minTime = visibleBars.Min(b => b.Time);
-        var maxTime = visibleBars.Max(b => b.Time);
+        var minTime = dataComponent.Properties.Data.MinTime(maxVisible);
+        var maxTime = dataComponent.Properties.Data.MaxTime(maxVisible);
         var timeRange = maxTime - minTime;
         var timePadding = timeRange * 0.05;  // 5% padding
 
@@ -774,7 +768,7 @@ public partial class ChartPanel : Decorator
         _cachedGridLinesPen ??= new Pen(GridLinesColor, GridLinesThickness, GridLinesDashStyle);
         _cachedGridLinesBoldPen ??= new Pen(GridLinesBoldColor, GridLinesBoldThickness, GridLinesBoldDashStyle);
 
-        Data? dataComponent = GetFirstDataComponent();
+        DataComponent? dataComponent = GetFirstDataComponent();
         DataInterval dataInterval;
         if (dataComponent == null || dataComponent.Properties.Data == null)
             dataInterval = new DataInterval(Interval.Hour, 2);

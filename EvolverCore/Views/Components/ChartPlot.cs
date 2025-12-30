@@ -4,6 +4,7 @@ using Avalonia.Media;
 using EvolverCore.ViewModels;
 using EvolverCore.Views.Components;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -141,11 +142,9 @@ namespace EvolverCore.Views
             ChartComponentViewModel? vm = Properties.Component;
             if (vm == null || vm.Data == null) return 100;
 
-            List<TimeDataBar> vBars = vm.Data.
-                Where(p => p.X >= rangeMin && p.X <= rangeMax)
-                .ToList();
+            IEnumerable<IDataPoint> vBars = vm.Data.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
 
-            return vBars.Count > 0 ? vBars.Max(p => new BarPricePoint(p, Properties.PriceField).Y) : 100;
+            return vBars.Count() > 0 ? vBars.Max(p => new BarPricePoint(p as TimeDataBar, Properties.PriceField).Y) : 100;
         }
 
         public void Render(DrawingContext context)
@@ -162,28 +161,26 @@ namespace EvolverCore.Views
             ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
             ChartComponentViewModel cm = Parent.Properties;
             
-            if (vm == null || vm.XAxis == null || Properties.PlotSeries.Count ==0) { return; }
+
+            if (vm == null || vm.XAxis == null || cm.Data == null || cm.Data.OutputElementCount(Properties.PlotIndex) == 0) { return; }
             Rect bounds = Parent.Parent.Bounds;
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
 
-            List<Point> visiblePoints;
-                visiblePoints = Properties.PlotSeries
-                    .SkipWhile(p => p.Y is double.NaN)
-                    .Where(p => p.X >= vm.XAxis.Min && p.X <= vm.XAxis.Max)
-                    .Select<IDataPoint, Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds)))
-                    .ToList();
+            IEnumerable<IDataPoint> visibleDataPoints = cm.Data.SelectOutputPointsInRange(vm.XAxis.Min, vm.XAxis.Max, Properties.PlotIndex, true);
+            IEnumerable<Point> visibleScreenPoints = visibleDataPoints.Select<IDataPoint, Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds)));
 
-            if (visiblePoints.Count < 2) return;
+            if (visibleScreenPoints.Count() < 2) return;
 
-            var geometry = new PolylineGeometry(visiblePoints, false);
+            var geometry = new PolylineGeometry(visibleScreenPoints, false);
             context.DrawGeometry(null, _cachedPlotLinePen, geometry);
         }
 
         private void DrawHistogram(DrawingContext context)
         {
             ChartPlotViewModel plotVM = Properties;
-            if (plotVM.PlotSeries == null || plotVM.PlotSeries.Count == 0) return;
+            ChartComponentViewModel cm = Parent.Properties;
+            if (cm.Data == null || cm.Data.OutputElementCount(Properties.PlotIndex) == 0) return;
 
             ChartPanelViewModel? panelVM = Parent.Parent.DataContext as ChartPanelViewModel;
             if (panelVM == null || panelVM.XAxis == null) return;
@@ -194,11 +191,13 @@ namespace EvolverCore.Views
             if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
             double pixelsPerTick = bounds.Width / xSpan.Ticks;
 
-            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * TimeDataSeries.IntervalTicks(plotVM.PlotSeries) / 2)); // auto-scale width
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * cm.Data.Interval.Ticks / 2)); // auto-scale width
 
-            foreach (var dataPoint in plotVM.PlotSeries)
+            IEnumerable<IDataPoint> visiblePoints = cm.Data.SelectOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max,plotVM.PlotIndex);
+
+            foreach (var dataPoint in visiblePoints)
             {
-                if (dataPoint == null || dataPoint.X < panelVM.XAxis.Min || dataPoint.X > panelVM.XAxis.Max) continue;
+                if (dataPoint == null) continue;
 
                 double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
                 double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
@@ -222,7 +221,7 @@ namespace EvolverCore.Views
             if (plotVM == null) return;
 
             ChartComponentViewModel? componentVM = plotVM.Component;
-            if (componentVM == null || componentVM.Data == null || componentVM.Data.Count == 0) return;
+            if (componentVM == null || componentVM.Data == null || componentVM.Data.InputElementCount == 0) return;
 
             ChartPanelViewModel? panelVM = Parent.Parent.DataContext as ChartPanelViewModel;
             if (panelVM == null) return;
@@ -237,9 +236,11 @@ namespace EvolverCore.Views
 
             ChartPanel panel = Parent.Parent;
 
-            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * BarDataSeries.IntervalTicks(componentVM.Data) / 2)); // auto-scale width
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * componentVM.Data.Interval.Ticks / 2)); // auto-scale width
 
-            foreach (var dataPoint in Parent.VisibleDataPoints)
+            IEnumerable<IDataPoint> visiblePoints = componentVM.Data.SelectInputPointsInRange(xAxis.Min, xAxis.Max);
+
+            foreach (var dataPoint in visiblePoints)
             {
                 TimeDataBar? bar = dataPoint as TimeDataBar;
                 if (bar == null) continue;

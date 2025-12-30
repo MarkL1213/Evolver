@@ -16,6 +16,171 @@ using Microsoft.VisualBasic;
 
 namespace EvolverCore
 {
+    [Serializable]
+    public class InstrumentDataSlice
+    {
+        //only serialize the record. re-resolve the data referenec on de-serialization
+        public InstrumentDataSliceRecord Record { get; internal set; } = new InstrumentDataSliceRecord();
+
+        int _startDateOffset = -1;
+        int _endDateOffset = -1;
+        InstrumentDataSeries? _series = null;
+
+        public int Count
+        {
+            get
+            {
+                if (_startDateOffset == -1 || _endDateOffset == -1 || _series == null) return 0;
+                return _endDateOffset - _startDateOffset;
+            }
+        }
+
+        public TimeDataBar GetValueAt(int index)
+        {
+            throw new EvolverException("TBI");
+        }
+
+        //async task to request load of underlying data
+        //set min/max index offsets during load
+
+        //hide data reference
+        //add element access that offsets by the slice's min/max
+    }
+
+    [Serializable]
+    public class InstrumentDataSliceRecord
+    {
+        public InstrumentDataSliceRecord() { }
+        public Instrument Instrument {get;internal set;} = new Instrument();
+
+        public DataInterval Interval { get; internal set; } = new DataInterval() { Type = global::EvolverCore.Interval.Minute, Value = 1 };
+
+        public DateTime StartDate { get; internal set; }
+
+        public DateTime EndDate { get; internal set; }
+    }
+
+
+    [Serializable]
+    public class IndicatorDataSlice
+    {
+        //only serialize the record. re-resolve the data reference on de-serialization
+        public IndicatorDataSliceRecord Record { get; internal set; } = new IndicatorDataSliceRecord();
+
+        int _startDateOffset = -1;
+        int _endDateOffset = -1;
+        TimeDataSeries? _plot0 = null;
+        List<List<double>> _plots = new List<List<double>>();
+
+        InstrumentDataSlice? _inputSeries = null;
+        IndicatorDataSlice? _inputIndicator = null;
+
+        public DataInterval Interval
+        {
+            get
+            {
+                if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
+                    return _inputSeries.Record.Interval;
+                else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
+                    return _inputIndicator.Interval;
+                return new DataInterval(EvolverCore.Interval.Hour, 1);
+            }
+        }
+
+        public int InputElementCount
+        {
+            get
+            {
+                if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
+                { return _inputSeries.Count; }
+                else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
+                {
+                    return _inputIndicator.InputElementCount;
+                }
+                return 0;
+            }
+        }
+
+        public int OutputElementCount(int plotIndex)
+        {
+            if (plotIndex < 0) return 0;
+            if (plotIndex == 0) return _plot0 != null ? _plot0.Count : 0;
+            if (_plots != null && _plots.Count >= plotIndex) return _plots[plotIndex - 1].Count;
+            return 0;
+        }
+
+        public IEnumerable<IDataPoint> SelectInputPointsInRange(DateTime min, DateTime max)
+        {
+            return new List<TimeDataPoint>();
+        }
+        public IEnumerable<IDataPoint> SelectOutputPointsInRange(DateTime min, DateTime max, int plotIndex, bool skipLeadingNaN = false)
+        {
+            return new List<TimeDataPoint>();
+        }
+
+        public DateTime MinTime(int lastCount)
+        {
+            DateTime result = DateTime.MaxValue;
+            if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
+            {
+                int n = 1;
+                for (int i = _endDateOffset; i >= _startDateOffset; i--)
+                {
+                    if (n++ > lastCount) return result;
+                    if (_inputSeries.GetValueAt(i).Time < result) result = _inputSeries.GetValueAt(i).Time;
+                }
+            }
+            else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
+                return _inputIndicator.MinTime(lastCount);
+            return DateTime.MinValue;
+        }
+
+        public DateTime MaxTime(int lastCount)
+        {
+            DateTime result = DateTime.MinValue;
+            if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
+            {
+                int n = 1;
+                for (int i = _endDateOffset; i >= _startDateOffset; i--)
+                {
+                    if (n++ > lastCount) return result;
+                    if (_inputSeries.GetValueAt(i).Time > result) result = _inputSeries.GetValueAt(i).Time;
+                }
+            }
+            else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
+                return _inputIndicator.MinTime(lastCount);
+            return DateTime.MaxValue;
+        }
+
+        //async task to request load of underlying data
+        //set min/max index offsets during load
+
+        //hide data reference
+        //add element access that offsets by the slice's min/max
+
+    }
+
+    public enum CalculationSource
+    {
+        BarData,
+        IndicatorPlot
+    }
+
+    [Serializable]
+    public class IndicatorDataSliceRecord
+    {
+        public CalculationSource SourceType { get; internal set; } = CalculationSource.BarData;
+
+        public IndicatorDataSliceRecord? SourceIndicator { get; internal set; }
+        public int SourcePlotIndex { get; internal set; } = -1;
+
+        public InstrumentDataSliceRecord? SourceBarData { get; internal set; } = null;
+
+        public DateTime StartDate { get; internal set; }
+
+        public DateTime EndDate { get; internal set; }
+    }
+
     public enum Interval
     {
         Second,
@@ -63,9 +228,16 @@ namespace EvolverCore
                 default:
                     throw new EvolverException($"Unknown interval type in interval.Add() : type={Type}");
             }
+        }
 
-
-            return dateTime;
+        public long Ticks
+        {
+            get
+            {
+                DateTime now = DateTime.Now;
+                DateTime then = Add(now,1);
+                return (now - then).Ticks;
+            }
         }
     }
 

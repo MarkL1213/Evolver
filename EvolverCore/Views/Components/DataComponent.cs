@@ -9,9 +9,9 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Views
 {
-    internal class Data : ChartComponentBase
+    internal class DataComponent : ChartComponentBase
     {
-        public Data(ChartPanel panel):base(panel)
+        public DataComponent(ChartPanel panel):base(panel)
         {
             Properties = new DataViewModel();
         }
@@ -20,21 +20,17 @@ namespace EvolverCore.Views
 
         public override double MinY()
         {
-            if (VisibleDataPoints.Count == 0)
-                CalculateVisibleDataPoints();
-            if (VisibleDataPoints.Count == 0)
-                return 0;
+            if (SnapPoints.Count == 0) CalculateSnapPoints();
+            if (SnapPoints.Count == 0) return 0;
 
-            return VisibleDataPoints.Min(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.Low; else return 0; });
+            return SnapPoints.Min(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.Low; else return 0; });
         }
         public override double MaxY()
         {
-            if (VisibleDataPoints.Count == 0)
-                CalculateVisibleDataPoints();
-            if (VisibleDataPoints.Count == 0)
-                return 100;
+            if (SnapPoints.Count == 0) CalculateSnapPoints();
+            if (SnapPoints.Count == 0) return 100;
 
-            return VisibleDataPoints.Max(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.High; else return 100; });
+            return SnapPoints.Max(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.High; else return 100; });
         }
 
         internal void AddPlot(ChartPlot plot)

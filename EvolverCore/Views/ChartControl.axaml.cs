@@ -11,8 +11,8 @@ using EvolverCore.Views.Components;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 using EvolverCore.Views;
-using EvolverCore.Views.Components.Indicators;
 using EvolverCore.ViewModels.Indicators;
+using EvolverCore.Models.Indicators;
 
 namespace EvolverCore;
 
@@ -105,10 +105,10 @@ internal partial class ChartControl : UserControl
         testMenu.Items.Add(testAddSMAToV);
         ChartMenu.Items.Add(testMenu);
     }
-    private void AddDataPlotToPrimary(BarDataSeries barDataSeries)
+    private void AddDataPlotToPrimary(IndicatorDataSlice barDataSeries)
     {
         PrimaryChartPanel.DetachAllChartComponents();
-        Data dataComponent = new Data(PrimaryChartPanel);
+        DataComponent dataComponent = new DataComponent(PrimaryChartPanel);
         dataComponent.ChartPanelNumber = 0;
         dataComponent.Properties.Data = barDataSeries;
         dataComponent.Properties.RenderOrder = 0;
@@ -127,56 +127,56 @@ internal partial class ChartControl : UserControl
 
     private void Test_AddSMAToVolume()
     {
-        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
+        //ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        //if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
 
-        Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
-        if (dataComponent == null || dataComponent.Properties.Data == null) return;
+        //Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        //if (dataComponent == null || dataComponent.Properties.Data == null) return;
 
-        SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
+        //SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
 
-        //FIXME: temporarily using captured values, should be lookup based
-        ChartPanel? volumePanel = _volPanel;
-        Volume? volumeIndicator = _volIndicator;
-        int volumePlotIndex = 0;
+        ////FIXME: temporarily using captured values, should be lookup based
+        //ChartPanel? volumePanel = _volPanel;
+        //Volume? volumeIndicator = _volIndicator;
+        //int volumePlotIndex = 0;
 
-        if(volumePanel == null || volumeIndicator == null) return;
+        //if(volumePanel == null || volumeIndicator == null) return;
 
-        SMA vi = new SMA(volumePanel);
-        vi.SetDataContext(vivm);
-        vivm.Source = CalculationSource.IndicatorPlot;
-        vivm.SourceIndicator = volumeIndicator.Properties as IndicatorViewModel;
-        vivm.RenderOrder = 1;
-        vivm.SourcePlotIndex = volumePlotIndex;
-        vivm.ChartPlots[0].PlotLineBrush.Color = Brushes.Orange;
-        vivm.ChartPlots[0].PlotLineThickness = 3;
+        //SMA vi = new SMA(volumePanel);
+        //vi.SetDataContext(vivm);
+        //vivm.Source = CalculationSource.IndicatorPlot;
+        //vivm.SourceIndicator = volumeIndicator.Properties as IndicatorViewModel;
+        //vivm.RenderOrder = 1;
+        //vivm.SourcePlotIndex = volumePlotIndex;
+        //vivm.ChartPlots[0].PlotLineBrush.Color = Brushes.Orange;
+        //vivm.ChartPlots[0].PlotLineThickness = 3;
 
 
-        vi.Calculate();
+        //vi.Calculate();
         
         
         
-        volumePanel.AttachChartComponent(vi);
+        //volumePanel.AttachChartComponent(vi);
 
         //panel.Panel.UpdateYAxisRange();
     }
 
     private void Test_AddSMAToPrice()
     {
-        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
+        //ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        //if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
 
-        Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
-        if (dataComponent == null || dataComponent.Properties.Data == null) return;
+        //Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        //if (dataComponent == null || dataComponent.Properties.Data == null) return;
 
-        SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
+        //SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
 
-        SMA vi = new SMA(PrimaryChartPanel);
-        vi.SetDataContext(vivm);
-        vivm.ChartPlots[0].PriceField = BarPriceValue.HLC;
+        //SMA vi = new SMA(PrimaryChartPanel);
+        //vi.SetDataContext(vivm);
+        //vivm.ChartPlots[0].PriceField = BarPriceValue.HLC;
         
-        vi.Calculate();
-        PrimaryChartPanel.AttachChartComponent(vi);
+        //vi.Calculate();
+        //PrimaryChartPanel.AttachChartComponent(vi);
 
         //panel.Panel.UpdateYAxisRange();
     }
@@ -189,7 +189,7 @@ internal partial class ChartControl : UserControl
         ChartControlViewModel? vm = DataContext as ChartControlViewModel;
         if (vm == null|| vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
 
-        Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        DataComponent? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
         if(dataComponent == null || dataComponent.Properties.Data == null) return;
 
         VolumeViewModel vivm = new VolumeViewModel(dataComponent.Properties.Data);
@@ -228,7 +228,7 @@ internal partial class ChartControl : UserControl
 
         if (barDataSeries != null)
         {
-            AddDataPlotToPrimary(barDataSeries);
+            //AddDataPlotToPrimary(barDataSeries);
         }
     }
         private void Test_AddDataSeconds(int size)
@@ -238,7 +238,7 @@ internal partial class ChartControl : UserControl
 
         if (barDataSeries != null)
         {
-            AddDataPlotToPrimary(barDataSeries);
+            //AddDataPlotToPrimary(barDataSeries);
         }
     }
 
@@ -249,7 +249,7 @@ internal partial class ChartControl : UserControl
 
         if (barDataSeries != null)
         {
-            AddDataPlotToPrimary(barDataSeries);
+            //AddDataPlotToPrimary(barDataSeries);
         }
     }
 
@@ -260,7 +260,7 @@ internal partial class ChartControl : UserControl
 
         if (barDataSeries != null)
         {
-            AddDataPlotToPrimary(barDataSeries);
+            //AddDataPlotToPrimary(barDataSeries);
         }
     }
     #endregion

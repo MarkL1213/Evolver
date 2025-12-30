@@ -15,26 +15,13 @@ namespace EvolverCore.ViewModels.Indicators
         [ObservableProperty] int _slow = 26;
         [ObservableProperty] int _smoothing = 9;
 
-        public MACDViewModel(IndicatorViewModel source, int fast, int slow, int smoothing, int sourcePlotIndex)
+        public MACDViewModel(IndicatorDataSlice source, int fast, int slow, int smoothing)
         {
             Name = "MACD";
-            Source = CalculationSource.IndicatorPlot;
-            SourcePlotIndex = sourcePlotIndex;
             _fast = fast;
             _slow = slow;
             _smoothing = smoothing;
-            SourceIndicator = source;
-        }
-
-        public MACDViewModel(BarDataSeries barSeries, int fast, int slow, int smoothing)
-        {
-            Name = "MACD";
-            Source = CalculationSource.BarData;
-            SourcePlotIndex = -1;
-            _fast = fast;
-            _slow = slow;
-            _smoothing = smoothing;
-            Data = barSeries;
+            Data = source;
         }
 
     }
