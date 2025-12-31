@@ -4,3 +4,6 @@ EvolverCore/bin/
 Samples/
 *.tmp
 *.user
+Evolver.log
+todo.txt
+Layouts/
