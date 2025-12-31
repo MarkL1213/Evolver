@@ -28,9 +28,11 @@ namespace EvolverCore.Views
 
         private void OnClosing(object? sender, WindowClosingEventArgs e)
         {
-            
-
             Globals.Instance.SaveProperties();
+
+            if (DataContext == null || !(DataContext is MainWindowViewModel)) return;
+
+            ((MainWindowViewModel)DataContext).SaveLayoutCommand.Execute(new Layout() { Name = "Autosave" });
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -125,11 +127,5 @@ namespace EvolverCore.Views
             if (layout != null) vm.LoadLayout(layout);
         }
 
-        protected override void OnClosing(WindowClosingEventArgs e)
-        {
-            base.OnClosing(e);
-            if (DataContext == null || !(DataContext is MainWindowViewModel)) return;
-            ((MainWindowViewModel)DataContext).SaveLayoutCommand.Execute("Autosave");
-        }
     }
 }

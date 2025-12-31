@@ -63,10 +63,9 @@ namespace EvolverCore.ViewModels
                 }
 
             }
-            catch 
+            catch (Exception e)
             {
-                //FIXME - add logging
-                //Globals.Instance.Log("");
+                Globals.Instance.Log.LogMessage("Failed to load available layout. " + e.Message, LogLevel.Error);
             }
         }
 
@@ -76,6 +75,9 @@ namespace EvolverCore.ViewModels
         internal void SaveLayout(Layout layout)
         {
             if (string.IsNullOrWhiteSpace(layout.Name)) return;
+
+            if (!layout.DirectoryExists) layout.CreateDirectory();
+
             DockManager dockManager = MyContainer.TheDockManager;
 
             dockManager.SaveToFile(layout.SerializationFileName);

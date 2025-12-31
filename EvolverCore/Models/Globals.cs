@@ -1,4 +1,5 @@
-﻿using NP.Ava.UniDock;
+﻿using EvolverCore.Models;
+using NP.Ava.UniDock;
 using NP.Ava.UniDock.Factories;
 using NP.DependencyInjection.Interfaces;
 using NP.IoCy;
@@ -49,7 +50,9 @@ namespace EvolverCore
         SessionHoursCollection? _sessionHoursCollection;
         InstrumentCollection? _instrumentCollection;
         DataManager? _dataManager;
+        Log _log = new Log();
 
+        public string LogFileName { get; } = "D:\\Evolver\\Evolver.log";
         public string PropertiesFileName { get; } = "D:\\Evolver\\EvolverProperties.xml";
         public string LayoutDirectory { get; } = "D:\\Evolver\\Layouts";
         public EvolverProperties Properties = new EvolverProperties();
@@ -59,6 +62,8 @@ namespace EvolverCore
         public InstrumentCollection? InstrumentCollection { get { return _instrumentCollection; } }
 
         internal DataManager? DataManager { get { return _dataManager; } }
+
+        internal Log Log { get { return _log; } }
 
         public void SaveProperties()
         {//serialize the EvolverProperties
