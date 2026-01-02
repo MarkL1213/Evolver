@@ -20,7 +20,7 @@ namespace EvolverCore.Models.Indicators
         public override void ConfigurePlots()
         {
             ChartPlotViewModel plotProperties = new ChartPlotViewModel();
-            plotProperties.Component = Properties;
+            plotProperties.Indicator = Properties as IndicatorViewModel;
             plotProperties.PriceField = BarPriceValue.Volume;
             plotProperties.Style = PlotStyle.Bar;
             plotProperties.Name = "Volume";

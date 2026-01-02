@@ -13,6 +13,7 @@ using CommunityToolkit.Mvvm.Input;
 using EvolverCore.Views;
 using EvolverCore.ViewModels.Indicators;
 using EvolverCore.Models.Indicators;
+using EvolverCore.Models;
 
 namespace EvolverCore;
 
@@ -105,16 +106,21 @@ internal partial class ChartControl : UserControl
         testMenu.Items.Add(testAddSMAToV);
         ChartMenu.Items.Add(testMenu);
     }
-    private void AddDataPlotToPrimary(IndicatorDataSlice barDataSeries)
+    private void AddDataPlotToPrimary(Indicator indicator)
     {
         PrimaryChartPanel.DetachAllChartComponents();
         DataComponent dataComponent = new DataComponent(PrimaryChartPanel);
         dataComponent.ChartPanelNumber = 0;
-        dataComponent.Properties.Data = barDataSeries;
-        dataComponent.Properties.RenderOrder = 0;
+        IndicatorViewModel? ivm = dataComponent.Properties as IndicatorViewModel;
+        if (ivm == null)
+        {
+            throw new EvolverException("New DataComponent does not have an IndicatorViewModel");
+        }
+        ivm.Indicator = indicator;
+        ivm.RenderOrder = 0;
 
         DataPlotViewModel dataProperties = new DataPlotViewModel();
-        dataProperties.Component = dataComponent.Properties;
+        dataProperties.Indicator = ivm;
         dataProperties.Style = PlotStyle.Candlestick;
 
         ChartPlot dataPlot = new ChartPlot(dataComponent);
@@ -186,29 +192,30 @@ internal partial class ChartControl : UserControl
 
     private void Test_AddVolumeIndicator()
     {
-        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        if (vm == null|| vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
+        //ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        //if (vm == null|| vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
 
-        DataComponent? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
-        if(dataComponent == null || dataComponent.Properties.Data == null) return;
+        //DataComponent? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        //IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
+        //if (dataComponent == null || ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0) return;
 
-        VolumeViewModel vivm = new VolumeViewModel(dataComponent.Properties.Data);
+        //VolumeViewModel vivm = new VolumeViewModel(ivm.Indicator);
 
-        SubPanel? panel = AddNewSubPanel();
-        if (panel == null) return;
-        if (panel.Panel == null || panel.Panel.DataContext == null) { RemoveSubPanel(panel.ID); return; }
-        ChartPanelViewModel? panelVM = panel.Panel.DataContext as ChartPanelViewModel;
-        if (panelVM == null) { RemoveSubPanel(panel.ID); return; }
+        //SubPanel? panel = AddNewSubPanel();
+        //if (panel == null) return;
+        //if (panel.Panel == null || panel.Panel.DataContext == null) { RemoveSubPanel(panel.ID); return; }
+        //ChartPanelViewModel? panelVM = panel.Panel.DataContext as ChartPanelViewModel;
+        //if (panelVM == null) { RemoveSubPanel(panel.ID); return; }
 
-        Volume vi = new Volume(panel.Panel);
-        vi.SetDataContext(vivm);
+        //Volume vi = new Volume(panel.Panel);
+        //vi.SetDataContext(vivm);
 
-        vi.Calculate();
-        panel.Panel.AttachChartComponent(vi);
-        panel.Panel.UpdateYAxisRange();
+        //vi.Calculate();
+        //panel.Panel.AttachChartComponent(vi);
+        //panel.Panel.UpdateYAxisRange();
 
-        _volPanel = panel.Panel;
-        _volIndicator = vi;
+        //_volPanel = panel.Panel;
+        //_volIndicator = vi;
     }
 
     private void Test_RemoveVolumeIndicator()
@@ -223,45 +230,58 @@ internal partial class ChartControl : UserControl
 
     private void Test_AddDataHourly(int size)
     {
-        ///Load some random primary data
-        BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Hour, 1), size);
-
-        if (barDataSeries != null)
+        Instrument? instrument = Globals.Instance.InstrumentCollection.Lookup("Random");
+        if (instrument == null)
         {
-            //AddDataPlotToPrimary(barDataSeries);
+            Globals.Instance.Log.LogMessage("Unable to locate the Random instrument.",LogLevel.Error);
+            return;
         }
+
+        DataInterval interval = new DataInterval(Interval.Hour, 1);
+        DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
+        DateTime endTime = interval.Add(startTime, size);
+
+        IndicatorDataSlice? slice = Globals.Instance.DataManager.CreateDataSlice(instrument, interval, startTime, endTime);
+        if (slice == null)
+        {
+            Globals.Instance.Log.LogMessage("Unable to generate the random data slice.", LogLevel.Error);
+            return;
+        }
+
+
+
     }
-        private void Test_AddDataSeconds(int size)
+    private void Test_AddDataSeconds(int size)
     {
         ///Load some random primary data
-        BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Second, 1), size);
+        //BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0), new DataInterval(Interval.Second, 1), size);
 
-        if (barDataSeries != null)
-        {
-            //AddDataPlotToPrimary(barDataSeries);
-        }
+        //if (barDataSeries != null)
+        //{
+        //    //AddDataPlotToPrimary(barDataSeries);
+        //}
     }
 
     private void Test_AddDataDaily(int size)
     {
         ///Load some random primary data
-        BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Day, 1), size);
+        //BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Day, 1), size);
 
-        if (barDataSeries != null)
-        {
-            //AddDataPlotToPrimary(barDataSeries);
-        }
+        //if (barDataSeries != null)
+        //{
+        //    //AddDataPlotToPrimary(barDataSeries);
+        //}
     }
 
     private void Test_AddDataMonthly(int size)
     {
         ///Load some random primary data
-        BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Month, 1), size);
+        //BarDataSeries? barDataSeries = BarDataSeries.RandomSeries(new DateTime(2020, 1, 1, 8, 0, 0),new DataInterval(Interval.Month, 1), size);
 
-        if (barDataSeries != null)
-        {
-            //AddDataPlotToPrimary(barDataSeries);
-        }
+        //if (barDataSeries != null)
+        //{
+        //    //AddDataPlotToPrimary(barDataSeries);
+        //}
     }
     #endregion
 

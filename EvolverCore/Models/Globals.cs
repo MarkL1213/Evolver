@@ -35,33 +35,35 @@ namespace EvolverCore
             _sessionHoursCollection = new SessionHoursCollection();
             _instrumentCollection = new InstrumentCollection();
             _dataManager = new DataManager();
+            _log = new Log();
         }
 
         internal void Load()
         {
+            LoadProperties();
+
             //_sessionHoursCollection.Load();
 
-            //_instrumentCollection.Load();
-
-            //_dataManager.Load();
+            _instrumentCollection.LoadRandomInstrument();
+            _dataManager.LoadRandomInstrumentRecords();
         }
 
 
-        SessionHoursCollection? _sessionHoursCollection;
-        InstrumentCollection? _instrumentCollection;
-        DataManager? _dataManager;
-        Log _log = new Log();
+        SessionHoursCollection _sessionHoursCollection;
+        InstrumentCollection _instrumentCollection;
+        DataManager _dataManager;
+        Log _log;
 
         public string LogFileName { get; } = "D:\\Evolver\\Evolver.log";
         public string PropertiesFileName { get; } = "D:\\Evolver\\EvolverProperties.xml";
         public string LayoutDirectory { get; } = "D:\\Evolver\\Layouts";
         public EvolverProperties Properties = new EvolverProperties();
 
-        public SessionHoursCollection? SessionHoursCollection { get { return _sessionHoursCollection; } }
+        public SessionHoursCollection SessionHoursCollection { get { return _sessionHoursCollection; } }
 
-        public InstrumentCollection? InstrumentCollection { get { return _instrumentCollection; } }
+        public InstrumentCollection InstrumentCollection { get { return _instrumentCollection; } }
 
-        internal DataManager? DataManager { get { return _dataManager; } }
+        internal DataManager DataManager { get { return _dataManager; } }
 
         internal Log Log { get { return _log; } }
 

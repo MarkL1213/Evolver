@@ -12,7 +12,7 @@ namespace EvolverCore.ViewModels
 {
     internal partial class ChartPlotViewModel : ViewModelBase
     {
-        [ObservableProperty] ChartComponentViewModel? _component;
+        [ObservableProperty] IndicatorViewModel? _indicator;
 
         [ObservableProperty] int _plotIndex = -1;
 

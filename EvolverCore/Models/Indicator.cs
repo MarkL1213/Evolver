@@ -57,6 +57,50 @@ namespace EvolverCore.Models
 
         public int CurrentBarsIndex { get; internal set; } = -1;
 
+        IndicatorDataSlice? _slice;
+
+        internal void SetData(IndicatorDataSlice slice)
+        { }
+
+        internal IEnumerable<IDataPoint> SelectInputPointsInRange(DateTime min, DateTime max)
+        {
+            return new List<TimeDataPoint>();
+        }
+        internal IEnumerable<IDataPoint> SelectOutputPointsInRange(DateTime min, DateTime max, int plotIndex, bool skipLeadingNaN = false)
+        {
+            return new List<TimeDataPoint>();
+        }
+
+        public DateTime MinTime(int lastCount)
+        {
+            return _slice != null ? _slice.MinTime(lastCount) : DateTime.Now;
+        }
+        public DateTime MaxTime(int lastCount)
+        {
+            return _slice != null ? _slice.MaxTime(lastCount) : DateTime.Now;
+        }
+
+        public int InputElementCount()
+        {
+            if (Inputs.Count > 0) return Inputs[0].Count;
+            return 0;
+        }
+        public int OutputElementCount(int plotIndex)
+        {
+            if (plotIndex < 0 || plotIndex >= Outputs.Count || Outputs[plotIndex].Series == null) return 0;
+            return Outputs[plotIndex].Series.Count;
+        }
+
+        public DataInterval Interval
+        {
+            get
+            {
+                if(Inputs.Count > 0) return Inputs[0].Interval;
+                return new DataInterval(EvolverCore.Interval.Hour,1);
+            }
+        }
+
+
         public virtual void ConfigurePlots()
         { }
 

@@ -12,12 +12,12 @@ namespace EvolverCore.ViewModels.Indicators
         [ObservableProperty] int _period = 14;
         [ObservableProperty] int _smoothing = 2;
 
-        public EMAViewModel(IndicatorDataSlice source, int period, int smoothing)
+        public EMAViewModel(IndicatorDataSliceRecord source, int period, int smoothing)
         {
             Name = "EMA";
             _period = period;
             _smoothing = smoothing;
-            Data = source;
+            DataRecord = source;
         }
 
 

@@ -223,7 +223,7 @@ public partial class ChartPanel : Decorator
             {
                 DataComponent? dataComponent = GetFirstDataComponent();
 
-                if (CrosshairSnapMode == CrosshairSnapMode.Free || _vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null)
+                if (CrosshairSnapMode == CrosshairSnapMode.Free || _vm.ChartComponents.Count == 0 || dataComponent == null)
                 {
                     double xFraction = currentPos.X / Bounds.Width;
                     TimeSpan span = _vm.XAxis.Max - _vm.XAxis.Min;
@@ -672,9 +672,16 @@ public partial class ChartPanel : Decorator
     internal void UpdateXAxisRange()
     {
         if (_vm == null || _vm.XAxis == null) return;
+        bool useDefaults = false;
         DataComponent? dataComponent = GetFirstDataComponent();
+        if (_vm.ChartComponents.Count == 0 || dataComponent == null) useDefaults = true;
+        IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
+        if(ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0 || ivm.ChartPlots.Count == 0) useDefaults = true;
 
-        if (_vm.ChartComponents.Count == 0 || dataComponent == null || dataComponent.Properties.Data == null || dataComponent.Plot == null)
+        DataPlotViewModel? plot = ivm?.ChartPlots[0] as DataPlotViewModel;
+        if (plot == null) useDefaults = true;
+
+        if (useDefaults)
         {
             if (_vm.XAxis != null)
             {
@@ -685,14 +692,15 @@ public partial class ChartPanel : Decorator
             return;
         }
 
-        DataPlotViewModel? dataPlotVM = dataComponent.Plot.Properties as DataPlotViewModel;
-        double preferredWidth = dataPlotVM == null ? 3 : dataPlotVM.PreferredCandleWidth;
+        
+
+        double preferredWidth = plot.PreferredCandleWidth;
 
         int maxVisible = (int)(Bounds.Width / preferredWidth);
         maxVisible = Math.Max(maxVisible, 50);  // Minimum to avoid too-narrow views
 
-        var minTime = dataComponent.Properties.Data.MinTime(maxVisible);
-        var maxTime = dataComponent.Properties.Data.MaxTime(maxVisible);
+        var minTime = ivm.Indicator.MinTime(maxVisible);
+        var maxTime = ivm.Indicator.MaxTime(maxVisible);
         var timeRange = maxTime - minTime;
         var timePadding = timeRange * 0.05;  // 5% padding
 
@@ -769,11 +777,12 @@ public partial class ChartPanel : Decorator
         _cachedGridLinesBoldPen ??= new Pen(GridLinesBoldColor, GridLinesBoldThickness, GridLinesBoldDashStyle);
 
         DataComponent? dataComponent = GetFirstDataComponent();
+        IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
         DataInterval dataInterval;
-        if (dataComponent == null || dataComponent.Properties.Data == null)
+        if (dataComponent == null || ivm==null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0)
             dataInterval = new DataInterval(Interval.Hour, 2);
         else
-            dataInterval = dataComponent.Properties.Data.Interval;
+            dataInterval = ivm.Indicator.Interval;
 
         var xTicks = ComputeDateTimeTicks(_vm.XAxis.Min, _vm.XAxis.Max, Bounds, dataInterval);
         foreach (var tick in xTicks)

@@ -25,7 +25,7 @@ namespace EvolverCore
                 // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
                 DisableAvaloniaDataAnnotationValidation();
 
-                Globals.Instance.LoadProperties();
+                Globals.Instance.Load();
 
 
                  MainWindow mainWindow = new MainWindow

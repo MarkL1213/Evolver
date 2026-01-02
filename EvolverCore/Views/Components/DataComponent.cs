@@ -9,14 +9,12 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Views
 {
-    internal class DataComponent : ChartComponentBase
+    internal class DataComponent : IndicatorComponent
     {
         public DataComponent(ChartPanel panel):base(panel)
         {
-            Properties = new DataViewModel();
+            Properties = new IndicatorViewModel();
         }
-
-        public ChartPlot? Plot { get; private set; }
 
         public override double MinY()
         {
@@ -31,19 +29,6 @@ namespace EvolverCore.Views
             if (SnapPoints.Count == 0) return 100;
 
             return SnapPoints.Max(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.High; else return 100; });
-        }
-
-        internal void AddPlot(ChartPlot plot)
-        {
-            DataViewModel? vm = Properties as DataViewModel;
-            if (vm == null) return;
-            Plot = plot;
-            vm.DataPlot =plot.Properties as DataPlotViewModel;
-        }
-
-        public override void Render(DrawingContext context)
-        {
-            if(Plot!=null) Plot.Render(context);
         }
     }
 }

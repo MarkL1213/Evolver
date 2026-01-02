@@ -13,6 +13,7 @@ namespace EvolverCore.ViewModels
     internal partial class IndicatorViewModel : ChartComponentViewModel
     {
         [ObservableProperty] Indicator? _indicator;
+        [ObservableProperty] IndicatorDataSliceRecord? _dataRecord;
         internal ObservableCollection<ChartPlotViewModel> ChartPlots { get; } = new ObservableCollection<ChartPlotViewModel>();
     }
 }

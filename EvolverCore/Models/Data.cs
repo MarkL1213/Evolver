@@ -1,4 +1,8 @@
-﻿using System;
+﻿using EvolverCore.Models;
+using MessagePack;
+using Microsoft.VisualBasic;
+using NP.Utilities;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -10,12 +14,12 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
-using EvolverCore.Models;
-using MessagePack;
-using Microsoft.VisualBasic;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace EvolverCore
 {
+    public enum DataLoadState { NotLoaded,Loading, Loaded, Error };
+
     [Serializable]
     public class InstrumentDataSlice
     {
@@ -25,6 +29,9 @@ namespace EvolverCore
         int _startDateOffset = -1;
         int _endDateOffset = -1;
         InstrumentDataSeries? _series = null;
+        DataLoadState _loadState = DataLoadState.NotLoaded;
+
+        public DataLoadState LoadState { get; internal set; }
 
         public int Count
         {
@@ -39,6 +46,76 @@ namespace EvolverCore
         {
             throw new EvolverException("TBI");
         }
+
+        internal void SetData(InstrumentDataRecord dataRecord)
+        {
+            if (dataRecord.Data == null)
+            {
+                _loadState = _loadState == DataLoadState.Error ? DataLoadState.Error : DataLoadState.NotLoaded;
+                _series = null;
+                _startDateOffset = -1;
+                _endDateOffset = -1;
+                return;
+            }
+
+            //calculate offsets...
+            int startOffset = dataRecord.Data.GetNearestIndexOfTime(Record.StartDate);
+
+            int endOffset = dataRecord.Data.GetNearestIndexOfTime(Record.EndDate, startOffset);
+
+            if (startOffset == -1 || endOffset == -1)
+            {
+                _loadState = DataLoadState.Error;
+                _series = null;
+                _startDateOffset = -1;
+                _endDateOffset = -1;
+                return;
+            }
+
+            _series = dataRecord.Data;
+            _startDateOffset = startOffset;
+            _endDateOffset = endOffset;
+            _loadState = DataLoadState.Loaded;
+        }
+
+
+        public void OnDataLoadFailed(object? sender, Exception e)
+        {
+            if (sender == null)
+                throw new ArgumentNullException(nameof(sender));
+
+            InstrumentDataRecord? dataRecord = sender as InstrumentDataRecord;
+            if (dataRecord == null)
+                throw new ArgumentNullException(nameof(sender));
+
+            dataRecord.DataLoadFailed -= OnDataLoadFailed;
+            dataRecord.DataLoadCompleted -= OnDataLoadCompleted;
+
+            Globals.Instance.Log.LogException(e);
+            _loadState = DataLoadState.Error;
+        }
+
+        public void OnDataLoadCompleted(object? sender, InstrumentDataSlice dataSlice)
+        {
+            if(sender == null)
+                throw new ArgumentNullException(nameof(sender));
+
+            InstrumentDataRecord? dataRecord = sender as InstrumentDataRecord;
+            if (dataRecord == null)
+                throw new ArgumentNullException(nameof(sender));
+
+            dataRecord.DataLoadFailed -= OnDataLoadFailed;
+            dataRecord.DataLoadCompleted -= OnDataLoadCompleted;
+
+            //FIXME : BE CAREFULL!! This is likely called from a worker thread.
+            SetData(dataRecord);
+            
+
+            //if(DataLoaded != null) DataLoaded(this);
+        }
+
+
+
 
         //async task to request load of underlying data
         //set min/max index offsets during load
@@ -99,23 +176,6 @@ namespace EvolverCore
                 }
                 return 0;
             }
-        }
-
-        public int OutputElementCount(int plotIndex)
-        {
-            if (plotIndex < 0) return 0;
-            if (plotIndex == 0) return _plot0 != null ? _plot0.Count : 0;
-            if (_plots != null && _plots.Count >= plotIndex) return _plots[plotIndex - 1].Count;
-            return 0;
-        }
-
-        public IEnumerable<IDataPoint> SelectInputPointsInRange(DateTime min, DateTime max)
-        {
-            return new List<TimeDataPoint>();
-        }
-        public IEnumerable<IDataPoint> SelectOutputPointsInRange(DateTime min, DateTime max, int plotIndex, bool skipLeadingNaN = false)
-        {
-            return new List<TimeDataPoint>();
         }
 
         public DateTime MinTime(int lastCount)
@@ -214,6 +274,22 @@ namespace EvolverCore
 
         public DataInterval(Interval type, int value) { Type = type; Value = value; }
 
+        public TimeSpan GetTimeSpan()
+        {
+            switch (Type)
+            {
+                case Interval.Second: return new TimeSpan(0, 0, Value);
+                case Interval.Minute: return new TimeSpan(0, Value, 0);
+                case Interval.Hour: return new TimeSpan(Value, 0, 0);
+                case Interval.Day: return new TimeSpan(Value, 0, 0, 0);
+                case Interval.Week: return new TimeSpan(Value * 7, 0, 0, 0);
+                //case Interval.Month: return dateTime.AddMonths(Value * n);
+                //case Interval.Year: return new TimeSpan(Value, 0, 0, 0); ;
+                default:
+                    throw new EvolverException($"Unknown interval type in interval.Add() : type={Type}");
+            }
+        }
+
         public DateTime Add(DateTime dateTime,int n)
         {
             switch (Type)
@@ -238,6 +314,36 @@ namespace EvolverCore
                 DateTime then = Add(now,1);
                 return (now - then).Ticks;
             }
+        }
+
+        public static int operator /(TimeSpan span, DataInterval interval)
+        {
+            double n = span / interval.GetTimeSpan();
+
+            return (int)Math.Ceiling(n);
+        }
+
+        public static bool operator !=(DataInterval a, DataInterval b)
+        {
+            return !(a == b);
+        }
+        
+        public static bool operator ==(DataInterval a, DataInterval b)
+        {
+            return (a.Type == b.Type && a.Value == b.Value);
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj == null || !(obj is DataInterval)) return false;
+            DataInterval b = (DataInterval)obj;
+            return this == b;
+        }
+
+        public override int GetHashCode()
+        {
+            string s = Type.ToString() + Value.ToString();
+            return s.GetHashCode();
         }
     }
 
@@ -566,20 +672,239 @@ namespace EvolverCore
     {
         public Instrument? Instrument { get; internal set; }
 
+        public int GetNearestIndexOfTime(DateTime time, int startIndex = 0)
+        {
+            int iStart = startIndex >= 0 ? startIndex : 0;
+
+            for (int i = iStart; i < Count; i++)
+            {
+                TimeDataBar iBar = GetValueAt(i);
+                if (iBar.Time >= time)
+                {
+                    if(i==0 || iBar.Time == time) return i;
+
+                    TimeDataBar prev = GetValueAt(i - 1);
+                    TimeSpan prevSpan = time - prev.Time;
+                    TimeSpan iSpan = iBar.Time - time;
+
+                    if (prevSpan < iSpan) return i - 1;
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        public static InstrumentDataSeries? RandomSeries(Instrument instrument,DateTime startTime, DataInterval interval, int size)
+        {
+            InstrumentDataSeries barDataSeries = new InstrumentDataSeries();
+            barDataSeries.Instrument = instrument;
+            barDataSeries.Interval = interval;
+            Random r = new Random(DateTime.Now.Second);
+
+            int lastClose = -1;
+            for (int i = 0; i < size; i++)
+            {
+                int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
+                int close = r.Next(10, 100);
+                int volume = r.Next(100, 1000);
+                int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
+                int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
+
+                TimeDataBar bar = new TimeDataBar(startTime, open, high, low, close, volume, 0, 0);
+                barDataSeries.Add(bar);
+                lastClose = close;
+                startTime = interval.Add(startTime, 1);
+            }
+
+            return barDataSeries;
+        }
     }
 
 
     internal class DataManager
     {
-        //handle all data load/save/infoscan/organization/update operations
-        InstrumentDataRecordCollection? _instrumentDataCollection = new InstrumentDataRecordCollection();
-        public InstrumentDataRecordCollection? InstrumentDataCollection { get { return _instrumentDataCollection; } }
-
-        public List<Indicator> _indicatorCache = new List<Indicator>();
-
-        public delegate void DataChangeDelegate(InstrumentDataRecordCollection instrumentRecord);
+        List<InstrumentDataRecord> _instrumentCache = new List<InstrumentDataRecord>();
+        List<Indicator> _indicatorCache = new List<Indicator>();
+        
+        public delegate void DataChangeDelegate(InstrumentDataRecord instrumentRecord);
         public event DataChangeDelegate? DataChange = null;
 
+
+        internal void LoadRandomInstrumentRecords()
+        {
+            InstrumentDataRecord record = new InstrumentDataRecord()
+            {
+                InstrumentName = "Random",
+                Interval = new DataInterval(Interval.Second, 1),
+                StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
+                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+            };
+            _instrumentCache.Add(record);
+
+            record = new InstrumentDataRecord()
+            {
+                InstrumentName = "Random",
+                Interval = new DataInterval(Interval.Minute, 1),
+                StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
+                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+            };
+            _instrumentCache.Add(record);
+
+            record = new InstrumentDataRecord()
+            {
+                InstrumentName = "Random",
+                Interval = new DataInterval(Interval.Hour, 1),
+                StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
+                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+            };
+            _instrumentCache.Add(record);
+
+            record = new InstrumentDataRecord()
+            {
+                InstrumentName = "Random",
+                Interval = new DataInterval(Interval.Day, 1),
+                StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
+                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+            };
+            _instrumentCache.Add(record);
+
+            record = new InstrumentDataRecord()
+            {
+                InstrumentName = "Random",
+                Interval = new DataInterval(Interval.Week, 1),
+                StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
+                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+            };
+            _instrumentCache.Add(record);
+
+            record = new InstrumentDataRecord()
+            {
+                InstrumentName = "Random",
+                Interval = new DataInterval(Interval.Month, 1),
+                StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
+                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+            };
+            _instrumentCache.Add(record);
+
+            record = new InstrumentDataRecord()
+            {
+                InstrumentName = "Random",
+                Interval = new DataInterval(Interval.Year, 1),
+                StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
+                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+            };
+            _instrumentCache.Add(record);
+        }
+
+        public IndicatorDataSlice? CreateDataSlice(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        {
+            InstrumentDataSliceRecord sliceRecord = new InstrumentDataSliceRecord()
+            {
+                Instrument = instrument,
+                Interval = interval,
+                StartDate = start,
+                EndDate = end
+            };
+
+            InstrumentDataSlice? slice = MakeInstrumentSlice(sliceRecord);
+
+            IndicatorDataSliceRecord iSliceRecord = new IndicatorDataSliceRecord()
+            {
+                SourceBarData = slice.Record,
+                SourceType = CalculationSource.BarData,
+                StartDate = start,
+                EndDate = end
+            };
+
+            return MakeIndicatorSlice(iSliceRecord);
+        }
+
+        public Indicator? CreateDataIndicator(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        {
+            return null;
+        }
+
+        public IndicatorDataSlice? MakeIndicatorSlice(IndicatorDataSliceRecord sliceRecord)
+        {
+
+
+            return null;
+        }
+
+        public InstrumentDataSlice? MakeInstrumentSlice(InstrumentDataSliceRecord sliceRecord)
+        {
+            foreach (InstrumentDataRecord dataRecord in _instrumentCache)
+            {
+                if (dataRecord.LoadState == DataLoadState.Error) continue;
+
+                if (dataRecord.InstrumentName == sliceRecord.Instrument.Name &&
+                    dataRecord.Interval == sliceRecord.Interval)
+                {
+                    if (dataRecord.StartTime <= sliceRecord.StartDate && dataRecord.EndTime >= sliceRecord.EndDate)
+                    {
+                        InstrumentDataSlice slice = new InstrumentDataSlice() { Record = sliceRecord };
+                        if (dataRecord.Data != null)
+                        {
+                            slice.SetData(dataRecord);
+                            slice.LoadState = DataLoadState.Loaded;
+                            return slice;
+                        }
+
+                        dataRecord.DataLoadCompleted += slice.OnDataLoadCompleted;
+                        dataRecord.DataLoadFailed += slice.OnDataLoadFailed;
+                        slice.LoadState = DataLoadState.Loading;
+                        dataRecord.LoadState = DataLoadState.Loading;
+                        Globals.Instance.DataManager.LoadDataAsync(dataRecord).ContinueWith(task =>
+                        {
+                            if (task.IsFaulted)
+                                dataRecord.FireDataLoadFailed(task.Exception);
+                            else
+                                dataRecord.FireDataLoadCompleted(slice);
+                        }
+                        );
+                        return slice;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        internal async Task<InstrumentDataRecord> LoadDataAsync(InstrumentDataRecord dataRecord)
+        {
+            if (dataRecord.InstrumentName == "Random")
+            {//special handling here...
+                Instrument? instrument = Globals.Instance.InstrumentCollection.Lookup("Random");
+                if (instrument == null)
+                    throw new EvolverException($"Unknown Instrument: Random");
+
+                TimeSpan span = dataRecord.EndTime - dataRecord.StartTime;
+
+
+                int n = 0;
+                if (dataRecord.Interval.Type == Interval.Year)
+                {
+                    n = dataRecord.EndTime.Year - dataRecord.StartTime.Year;
+                }
+                else if (dataRecord.Interval.Type == Interval.Month)
+                {
+                    n = ((dataRecord.EndTime.Year - dataRecord.StartTime.Year) * 12) +
+                        dataRecord.EndTime.Month - dataRecord.StartTime.Month;
+                }
+                else
+                    n = span / dataRecord.Interval;
+
+                InstrumentDataSeries? series = InstrumentDataSeries.RandomSeries(instrument, dataRecord.StartTime, dataRecord.Interval, n);
+                if (series == null)
+                    throw new EvolverException($"Unable to generate random data.");
+
+
+                dataRecord.Data = series;
+            }
+
+            return dataRecord;
+        }
 
     }
 }

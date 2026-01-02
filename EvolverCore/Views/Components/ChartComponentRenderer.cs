@@ -95,11 +95,12 @@ namespace EvolverCore.Views.Components
             SnapPoints.Clear();
 
             ChartPanelViewModel? panelVM = Parent.DataContext as ChartPanelViewModel;
-            if (Properties == null || panelVM == null || panelVM.XAxis == null) return;
+            if (panelVM == null || panelVM.XAxis == null) return;
 
-            if (Properties.Data == null || Properties.Data.InputElementCount == 0) return;
+            IndicatorViewModel? ivm = Properties as IndicatorViewModel;
+            if (ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0) return;
 
-            IEnumerable<IDataPoint> v = Properties.Data.SelectInputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max);
+            IEnumerable<IDataPoint> v = ivm.Indicator.SelectInputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max);
             SnapPoints.AddRange(v.ToList());
         }
 

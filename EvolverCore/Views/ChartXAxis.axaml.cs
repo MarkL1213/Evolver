@@ -106,11 +106,12 @@ public partial class ChartXAxis : Decorator
         if (_vm == null || _vm.SharedXAxis == null || DataPanel == null) return;
 
         DataComponent? dataComponent = DataPanel.GetFirstDataComponent();
+        IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
         DataInterval dataInterval;
-        if (dataComponent == null || dataComponent.Properties.Data == null)
+        if (dataComponent == null || ivm==null || ivm.Indicator == null)
             dataInterval = new DataInterval(Interval.Hour, 2);
         else
-            dataInterval = dataComponent.Properties.Data.Interval;
+            dataInterval = ivm.Indicator.Interval;
 
         List<DateTime> ticks = ChartPanel.ComputeDateTimeTicks(_vm.SharedXAxis.Min, _vm.SharedXAxis.Max, Bounds, dataInterval);
 
