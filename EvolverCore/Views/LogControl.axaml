@@ -1,0 +1,61 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:EvolverCore.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:DataType="vm:LogControlViewModel"
+             x:Class="EvolverCore.LogControl">
+    <Design.DataContext>
+        <vm:LogControlViewModel/>
+    </Design.DataContext>
+
+    <Grid>
+        <Border BorderThickness="4" BorderBrush="Purple" Margin="0">
+
+            <ListBox x:Name="LogListBox"
+                     ItemsSource="{Binding LogLines}"
+                     Background="White"
+                     Foreground="Black"
+                     FontFamily="Consolas, Courier New, Monospace"
+                     FontSize="12"
+                     Margin="0"
+                     Padding="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+
+                <!-- Switch to non-virtualizing StackPanel for reliable vertical stretch -->
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel VerticalAlignment="Stretch"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBox Text="{Binding}"
+                                 TextWrapping="Wrap"
+                                 IsReadOnly="True"
+                                 VerticalAlignment="Stretch"
+                                 BorderThickness="0"
+                                 BorderBrush="Transparent"
+                                 />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background" Value="Transparent" />
+                    </Style>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="0" />
+                    </Style>
+                    <Style Selector="TextBox:focus /template/ Border">
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                    </Style>
+                </ListBox.Styles>
+            </ListBox>
+        </Border>
+    </Grid>
+</UserControl>

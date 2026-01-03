@@ -10,6 +10,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Security.Cryptography.X509Certificates;
 using System.Linq;
+using AvaloniaUI.DiagnosticsSupport;
 
 namespace EvolverCore.Views
 {
@@ -45,6 +46,7 @@ namespace EvolverCore.Views
             }
 
             ExitMenuItem.Command = new RelayCommand(ExitMenuItemCommand);
+            NewLogWindow.Command = vm == null ? null : vm.NewLogDocumentCommand;
             NewChartItem.Command = vm == null ? null : vm.NewChartDocumentCommand;
             RemoveChartItem.Command = vm == null ? null : vm.RemoveChartDocumentCommand;
             SaveLayoutMenuItem.Command = new RelayCommand(SaveCurrentLayoutMenuCommand);
@@ -107,6 +109,11 @@ namespace EvolverCore.Views
 
             vm.LoadLayout(layout);
             vm.CurrentLayout = layout;
+        }
+
+        private void NewLogWindowMenuItemCommand()
+        {
+
         }
 
         private void ExitMenuItemCommand()

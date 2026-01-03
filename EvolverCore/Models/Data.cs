@@ -738,7 +738,7 @@ namespace EvolverCore
                 InstrumentName = "Random",
                 Interval = new DataInterval(Interval.Second, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
-                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+                EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
             _instrumentCache.Add(record);
 
@@ -747,7 +747,7 @@ namespace EvolverCore
                 InstrumentName = "Random",
                 Interval = new DataInterval(Interval.Minute, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
-                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+                EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
             _instrumentCache.Add(record);
 
@@ -756,7 +756,7 @@ namespace EvolverCore
                 InstrumentName = "Random",
                 Interval = new DataInterval(Interval.Hour, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
-                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+                EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
             _instrumentCache.Add(record);
 
@@ -765,7 +765,7 @@ namespace EvolverCore
                 InstrumentName = "Random",
                 Interval = new DataInterval(Interval.Day, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
-                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+                EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
             _instrumentCache.Add(record);
 
@@ -774,7 +774,7 @@ namespace EvolverCore
                 InstrumentName = "Random",
                 Interval = new DataInterval(Interval.Week, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
-                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+                EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
             _instrumentCache.Add(record);
 
@@ -783,7 +783,7 @@ namespace EvolverCore
                 InstrumentName = "Random",
                 Interval = new DataInterval(Interval.Month, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
-                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+                EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
             _instrumentCache.Add(record);
 
@@ -792,12 +792,12 @@ namespace EvolverCore
                 InstrumentName = "Random",
                 Interval = new DataInterval(Interval.Year, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
-                EndTime = new DateTime(2020, 1, 1, 0, 0, 0)
+                EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
             _instrumentCache.Add(record);
         }
 
-        public IndicatorDataSlice? CreateDataSlice(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        public Indicator? CreateDataIndicator(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
             InstrumentDataSliceRecord sliceRecord = new InstrumentDataSliceRecord()
             {
@@ -808,6 +808,7 @@ namespace EvolverCore
             };
 
             InstrumentDataSlice? slice = MakeInstrumentSlice(sliceRecord);
+            if (slice == null) return null;
 
             IndicatorDataSliceRecord iSliceRecord = new IndicatorDataSliceRecord()
             {
@@ -817,22 +818,33 @@ namespace EvolverCore
                 EndDate = end
             };
 
-            return MakeIndicatorSlice(iSliceRecord);
+            IndicatorDataSlice? iSlice=MakeIndicatorSlice(iSliceRecord);
+            if (iSlice == null) return null;
+
+
+            Indicator indicator = new Indicator();
+            indicator.SetData(iSlice);
+            _indicatorCache.Add(indicator);
+            return indicator;
         }
 
-        public Indicator? CreateDataIndicator(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+
+        private IndicatorDataSlice? MakeIndicatorSlice(IndicatorDataSliceRecord sliceRecord)
         {
+            foreach (Indicator indicator in _indicatorCache)
+            {
+                if(indicator.Slice == null) continue;
+                if (indicator.Slice.Record == sliceRecord)
+                {
+                    return indicator.Slice;
+                }
+
+            }
+
             return null;
         }
 
-        public IndicatorDataSlice? MakeIndicatorSlice(IndicatorDataSliceRecord sliceRecord)
-        {
-
-
-            return null;
-        }
-
-        public InstrumentDataSlice? MakeInstrumentSlice(InstrumentDataSliceRecord sliceRecord)
+        private InstrumentDataSlice? MakeInstrumentSlice(InstrumentDataSliceRecord sliceRecord)
         {
             foreach (InstrumentDataRecord dataRecord in _instrumentCache)
             {
@@ -879,8 +891,9 @@ namespace EvolverCore
                 if (instrument == null)
                     throw new EvolverException($"Unknown Instrument: Random");
 
-                TimeSpan span = dataRecord.EndTime - dataRecord.StartTime;
 
+                ///////////////////////////
+                TimeSpan span = dataRecord.EndTime - dataRecord.StartTime;
 
                 int n = 0;
                 if (dataRecord.Interval.Type == Interval.Year)
@@ -898,6 +911,7 @@ namespace EvolverCore
                 InstrumentDataSeries? series = InstrumentDataSeries.RandomSeries(instrument, dataRecord.StartTime, dataRecord.Interval, n);
                 if (series == null)
                     throw new EvolverException($"Unable to generate random data.");
+                ///////////////////////////
 
 
                 dataRecord.Data = series;

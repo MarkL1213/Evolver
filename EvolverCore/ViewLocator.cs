@@ -27,6 +27,9 @@ namespace EvolverCore
             if (param.GetType().Name == "ChartControlViewModel")
                 type = typeof(ChartControl);
 
+            if (param.GetType().Name == "LogControlViewModel")
+                type = typeof(LogControl);
+
 
             if (type != null)
             {

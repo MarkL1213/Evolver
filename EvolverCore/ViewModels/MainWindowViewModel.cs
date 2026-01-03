@@ -48,8 +48,8 @@ namespace EvolverCore.ViewModels
                     Directory.CreateDirectory(Globals.Instance.LayoutDirectory);
                 }
 
-                string[] dirs=Directory.GetDirectories(Globals.Instance.LayoutDirectory);
-                
+                string[] dirs = Directory.GetDirectories(Globals.Instance.LayoutDirectory);
+
                 foreach (string dir in dirs)
                 {
                     Layout newLayout = new Layout();
@@ -58,7 +58,7 @@ namespace EvolverCore.ViewModels
                     if (path == null) continue;
 
                     newLayout.Name = path;
-                    if(newLayout.SerializationFileExists && newLayout.VMSerializationFileExists)
+                    if (newLayout.SerializationFileExists && newLayout.VMSerializationFileExists)
                         AvailableLayouts.Add(newLayout);
                 }
 
@@ -149,9 +149,39 @@ namespace EvolverCore.ViewModels
 
             MyContainer.TheDockManager.DockItemsViewModels.Remove(target);
         }
+
+        [RelayCommand]
+        private void NewLogDocument()
+        {
+            string name = $"Log";
+            LogControlViewModel vm = new LogControlViewModel();
+
+            var newTabVm = new LogControlDockItemViewModel()
+            {
+                DockId = name,
+                DefaultDockGroupId = "ChartTabGroup",
+                DefaultDockOrderInGroup = _docCount,
+                Header = name,
+                //ContentTemplateResourceKey = "ChartContolViewModelTemplate",
+                HeaderContentTemplateResourceKey = "LogControlHeaderTemplate",
+                TheVM = vm,
+                IsPredefined = false,
+                CanFloat = true,
+                CanClose = true
+            };
+
+            MyContainer.TheDockManager.DockItemsViewModels!.Add(newTabVm);
+            _docCount++;
+
+            newTabVm.IsSelected = true;
+        }
     }
 
     public class ChartControlDockItemViewModel : DockItemViewModel<ChartControlViewModel>
+    {
+    }
+
+    public class LogControlDockItemViewModel : DockItemViewModel<LogControlViewModel>
     {
     }
 }

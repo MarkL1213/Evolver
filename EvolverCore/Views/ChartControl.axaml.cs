@@ -241,15 +241,14 @@ internal partial class ChartControl : UserControl
         DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
         DateTime endTime = interval.Add(startTime, size);
 
-        IndicatorDataSlice? slice = Globals.Instance.DataManager.CreateDataSlice(instrument, interval, startTime, endTime);
-        if (slice == null)
+        Indicator? indicator = Globals.Instance.DataManager.CreateDataIndicator(instrument, interval, startTime, endTime);
+        if (indicator == null)
         {
-            Globals.Instance.Log.LogMessage("Unable to generate the random data slice.", LogLevel.Error);
+            Globals.Instance.Log.LogMessage("Unable to create data indicator.", LogLevel.Error);
             return;
         }
 
-
-
+        AddDataPlotToPrimary(indicator);
     }
     private void Test_AddDataSeconds(int size)
     {

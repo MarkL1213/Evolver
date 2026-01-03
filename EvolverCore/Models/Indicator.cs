@@ -47,20 +47,27 @@ namespace EvolverCore.Models
 
         public IndicatorState State { get; internal set; } = IndicatorState.New;
 
-        public List<BarDataSeries> Bars { get; internal set; } = new List<BarDataSeries>();
 
-        public List<TimeDataSeries> Inputs { get; internal set; } = new List<TimeDataSeries>();
-
-        public List<OutputPlot> Outputs { get; internal set; } = new List<OutputPlot>();
 
         public int CurrentBarIndex { get; internal set; } = -1;
 
         public int CurrentBarsIndex { get; internal set; } = -1;
 
         IndicatorDataSlice? _slice;
+        internal IndicatorDataSlice? Slice { get { return _slice; } }
 
+        ////////////////
+        // these should all map into the slice (maybe even be slice properties that are just wrapped here)
+        public List<BarDataSeries> Bars { get; internal set; } = new List<BarDataSeries>();
+        public List<TimeDataSeries> Inputs { get; internal set; } = new List<TimeDataSeries>();
+        public List<OutputPlot> Outputs { get; internal set; } = new List<OutputPlot>();
+        //////////////////
         internal void SetData(IndicatorDataSlice slice)
-        { }
+        {
+            _slice = slice;
+        }
+
+
 
         internal IEnumerable<IDataPoint> SelectInputPointsInRange(DateTime min, DateTime max)
         {

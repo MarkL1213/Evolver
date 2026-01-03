@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Avalonia.Data;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,12 +31,14 @@ namespace EvolverCore.Models
     public class Log : IDisposable
     {
         object _queueLock = new object();
+        object _logControlsLock = new object();
         Queue<LogMessage> _messages = new Queue<LogMessage>();
         volatile bool _wantExit = false;
         volatile bool _isSleeping = false;
         bool _disposedValue;
         Thread _logThread;
         StreamWriter? _logStream;
+        List<LogControl> _logControls = new List<LogControl> ();
 
 
         public Log()
@@ -44,6 +47,24 @@ namespace EvolverCore.Models
             _logThread.Name = "Evolver Logging";
             _logThread.Start();
         }
+
+        internal void RegisterLogControl(LogControl control)
+        {
+            lock (_logControlsLock)
+            {
+                _logControls.Add(control);
+            }
+        }
+        
+        internal void UnRegisterLogControl(LogControl control)
+        {
+            lock (_logControlsLock)
+            {
+                _logControls.Remove(control);
+            }
+        }
+
+
 
         public void LogMessage(string message, LogLevel level)
         {
@@ -104,11 +125,17 @@ namespace EvolverCore.Models
                     }
                     else
                     {
+                        #region Log to File
                         try
                         {
                             if (_logStream == null)
                             {
-                                _logStream = new StreamWriter(Globals.Instance.LogFileName, true);
+                                FileStreamOptions options = new FileStreamOptions();
+                                options.Share = FileShare.ReadWrite;
+                                options.Mode = FileMode.Append;
+                                options.Access = FileAccess.Write;
+
+                                _logStream = new StreamWriter(Globals.Instance.LogFileName, options);
                             }
                         }
                         catch (ThreadAbortException) { break; }
@@ -128,6 +155,17 @@ namespace EvolverCore.Models
                         {
                             throw new EvolverException($"Logger failed.", e);
                         }
+                        #endregion
+
+                        #region Log to Control
+                        lock (_logControlsLock)
+                        {
+                            foreach (LogControl control in _logControls)
+                            {
+                                control.AppendText(message.ToString());
+                            }
+                        }
+                        #endregion
                     }
                 }
                 catch (ThreadInterruptedException)

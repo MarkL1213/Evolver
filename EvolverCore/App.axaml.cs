@@ -14,6 +14,10 @@ namespace EvolverCore
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
+
+#if DEBUG
+            this.AttachDeveloperTools();
+#endif
         }
 
 
