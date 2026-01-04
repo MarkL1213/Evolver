@@ -49,6 +49,7 @@ namespace EvolverCore.Views
             NewLogWindow.Command = vm == null ? null : vm.NewLogDocumentCommand;
             NewChartItem.Command = vm == null ? null : vm.NewChartDocumentCommand;
             RemoveChartItem.Command = vm == null ? null : vm.RemoveChartDocumentCommand;
+            ToggleDarkTheme.Command = vm == null ? null : vm.ToggleDarkModeCommand;
             SaveLayoutMenuItem.Command = new RelayCommand(SaveCurrentLayoutMenuCommand);
             if (vm != null)
             {

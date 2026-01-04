@@ -12,7 +12,7 @@ namespace EvolverCore.ViewModels.Indicators
     {
         [ObservableProperty] int _period = 14;
 
-        public SMAViewModel(IndicatorDataSliceRecord source, int period)
+        public SMAViewModel(IndicatorDataSourceRecord source, int period)
         {
             Name = "SMA";
             _period = period;

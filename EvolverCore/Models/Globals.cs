@@ -69,8 +69,9 @@ namespace EvolverCore
 
         public void SaveProperties()
         {//serialize the EvolverProperties
+            if(!File.Exists(PropertiesFileName)) File.Create(PropertiesFileName);
 
-            using (FileStream fs = File.OpenWrite(PropertiesFileName))
+            using (FileStream fs = new FileStream(PropertiesFileName,FileMode.Truncate))
             {
                 XmlSerializer serializer = new XmlSerializer(typeof(EvolverProperties));
                 serializer.Serialize(fs, Properties);

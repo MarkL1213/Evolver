@@ -181,8 +181,8 @@ namespace EvolverCore.Models
 
             if (_logStream != null)
             {
-                _logStream.Close();
-                _logStream.Dispose();
+                _logStream?.Close();
+                _logStream?.Dispose();
                 _logStream = null;
             }
         }
@@ -191,11 +191,12 @@ namespace EvolverCore.Models
         {
             _wantExit = true;
             if (_isSleeping) _logThread.Interrupt();
-
+            _logThread.Join();
+            
             if (_logStream != null)
             {
-                _logStream.Close();
-                _logStream.Dispose();
+                _logStream?.Close();
+                _logStream?.Dispose();
                 _logStream = null;
             }
         }

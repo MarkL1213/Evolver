@@ -44,7 +44,8 @@ namespace EvolverCore
 
         public TimeDataBar GetValueAt(int index)
         {
-            throw new EvolverException("TBI");
+            if(_series == null || index < 0 || _startDateOffset + index > _endDateOffset) throw new EvolverException("GetValueAt() index out of range.");
+            return _series[_startDateOffset + index];
         }
 
         internal void SetData(InstrumentDataRecord dataRecord)
@@ -79,7 +80,9 @@ namespace EvolverCore
         }
 
 
-        public void OnDataLoadFailed(object? sender, Exception e)
+        public event EventHandler? DataLoaded;
+
+        public void OnRawDataLoaded(object? sender, InstrumentDataLoadedEventArgs args)
         {
             if (sender == null)
                 throw new ArgumentNullException(nameof(sender));
@@ -88,34 +91,56 @@ namespace EvolverCore
             if (dataRecord == null)
                 throw new ArgumentNullException(nameof(sender));
 
-            dataRecord.DataLoadFailed -= OnDataLoadFailed;
-            dataRecord.DataLoadCompleted -= OnDataLoadCompleted;
+            dataRecord.DataLoaded -= OnRawDataLoaded;
 
-            Globals.Instance.Log.LogException(e);
-            _loadState = DataLoadState.Error;
+            if (args.Exception != null)
+            {
+                Globals.Instance.Log.LogException(args.Exception);
+                _loadState = DataLoadState.Error;
+            }
+            else
+            {
+                //FIXME : BE CAREFULL!! This is likely called from a worker thread.
+                SetData(dataRecord);
+            }
+
+            if (DataLoaded != null) DataLoaded(this, new EventArgs());
         }
 
-        public void OnDataLoadCompleted(object? sender, InstrumentDataSlice dataSlice)
+        public DateTime MinTime(int lastCount)
         {
-            if(sender == null)
-                throw new ArgumentNullException(nameof(sender));
+            if (_series == null) return DateTime.MinValue;
 
-            InstrumentDataRecord? dataRecord = sender as InstrumentDataRecord;
-            if (dataRecord == null)
-                throw new ArgumentNullException(nameof(sender));
+            DateTime result = DateTime.MaxValue;
+            int n = 1;
+            for (int i = _endDateOffset; i >= _startDateOffset; i--)
+            {
+                if (n++ > lastCount) return result;
+                if (_series.GetValueAt(i).Time < result) result = _series.GetValueAt(i).Time;
+            }
 
-            dataRecord.DataLoadFailed -= OnDataLoadFailed;
-            dataRecord.DataLoadCompleted -= OnDataLoadCompleted;
+            return result;
+        }
+        public DateTime MaxTime(int lastCount)
+        {
+            if (_series == null) return DateTime.MaxValue;
 
-            //FIXME : BE CAREFULL!! This is likely called from a worker thread.
-            SetData(dataRecord);
-            
+            DateTime result = DateTime.MinValue;
+            int n = 1;
+            for (int i = _endDateOffset; i >= _startDateOffset; i--)
+            {
+                if (n++ > lastCount) return result;
+                if (_series.GetValueAt(i).Time > result) result = _series.GetValueAt(i).Time;
+            }
 
-            //if(DataLoaded != null) DataLoaded(this);
+            return result;
         }
 
-
-
+        public IEnumerable<TimeDataBar> Where(Func<TimeDataBar, bool> predicate)
+        {
+            if(_series == null) return Enumerable.Empty<TimeDataBar>();
+            return _series.GetRange(_startDateOffset, _endDateOffset - _startDateOffset).Where(predicate);
+        }
 
         //async task to request load of underlying data
         //set min/max index offsets during load
@@ -138,87 +163,69 @@ namespace EvolverCore
     }
 
 
-    [Serializable]
-    public class IndicatorDataSlice
-    {
-        //only serialize the record. re-resolve the data reference on de-serialization
-        public IndicatorDataSliceRecord Record { get; internal set; } = new IndicatorDataSliceRecord();
+    //[Serializable]
+    //public class IndicatorDataSlice
+    //{
+    //    //only serialize the record. re-resolve the data reference on de-serialization
+    //    public IndicatorDataSliceRecord Record { get; internal set; } = new IndicatorDataSliceRecord();
 
-        int _startDateOffset = -1;
-        int _endDateOffset = -1;
-        TimeDataSeries? _plot0 = null;
-        List<List<double>> _plots = new List<List<double>>();
+    //    int _startDateOffset = -1;
+    //    int _endDateOffset = -1;
+    //    TimeDataSeries? _plot0 = null;
+    //    List<List<double>> _plots = new List<List<double>>();
 
-        InstrumentDataSlice? _inputSeries = null;
-        IndicatorDataSlice? _inputIndicator = null;
+    //    InstrumentDataSlice? _inputSeries = null;
+    //    IndicatorDataSlice? _inputIndicator = null;
 
-        public DataInterval Interval
-        {
-            get
-            {
-                if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
-                    return _inputSeries.Record.Interval;
-                else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
-                    return _inputIndicator.Interval;
-                return new DataInterval(EvolverCore.Interval.Hour, 1);
-            }
-        }
+    //    public event EventHandler? DataLoaded;
 
-        public int InputElementCount
-        {
-            get
-            {
-                if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
-                { return _inputSeries.Count; }
-                else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
-                {
-                    return _inputIndicator.InputElementCount;
-                }
-                return 0;
-            }
-        }
+    //    public void OnSourceDataLoaded(object? source, EventArgs args)
+    //    {
+    //        if (source is InstrumentDataSlice)
+    //        {
+    //            InstrumentDataSlice? sourceSlice = source as InstrumentDataSlice;
+    //            if(sourceSlice!=null)
+    //                sourceSlice.DataLoaded -= OnSourceDataLoaded;
+    //        }
 
-        public DateTime MinTime(int lastCount)
-        {
-            DateTime result = DateTime.MaxValue;
-            if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
-            {
-                int n = 1;
-                for (int i = _endDateOffset; i >= _startDateOffset; i--)
-                {
-                    if (n++ > lastCount) return result;
-                    if (_inputSeries.GetValueAt(i).Time < result) result = _inputSeries.GetValueAt(i).Time;
-                }
-            }
-            else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
-                return _inputIndicator.MinTime(lastCount);
-            return DateTime.MinValue;
-        }
+    //        if(DataLoaded != null) DataLoaded(this, EventArgs.Empty);
+    //    }
 
-        public DateTime MaxTime(int lastCount)
-        {
-            DateTime result = DateTime.MinValue;
-            if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
-            {
-                int n = 1;
-                for (int i = _endDateOffset; i >= _startDateOffset; i--)
-                {
-                    if (n++ > lastCount) return result;
-                    if (_inputSeries.GetValueAt(i).Time > result) result = _inputSeries.GetValueAt(i).Time;
-                }
-            }
-            else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
-                return _inputIndicator.MinTime(lastCount);
-            return DateTime.MaxValue;
-        }
+    //    public DataInterval Interval
+    //    {
+    //        get
+    //        {
+    //            if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
+    //                return _inputSeries.Record.Interval;
+    //            else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
+    //                return _inputIndicator.Interval;
+    //            return new DataInterval(EvolverCore.Interval.Hour, 1);
+    //        }
+    //    }
 
-        //async task to request load of underlying data
-        //set min/max index offsets during load
+    //    public int InputElementCount
+    //    {
+    //        get
+    //        {
+    //            if (Record.SourceType == CalculationSource.BarData && _inputSeries != null)
+    //            { return _inputSeries.Count; }
+    //            else if (Record.SourceType == CalculationSource.IndicatorPlot && _inputIndicator != null)
+    //            {
+    //                return _inputIndicator.InputElementCount;
+    //            }
+    //            return 0;
+    //        }
+    //    }
 
-        //hide data reference
-        //add element access that offsets by the slice's min/max
 
-    }
+
+    //    //async task to request load of underlying data
+    //    //set min/max index offsets during load
+
+    //    //hide data reference
+    //    //add element access that offsets by the slice's min/max
+
+    //}
 
     public enum CalculationSource
     {
@@ -227,14 +234,14 @@ namespace EvolverCore
     }
 
     [Serializable]
-    public class IndicatorDataSliceRecord
+    public class IndicatorDataSourceRecord
     {
         public CalculationSource SourceType { get; internal set; } = CalculationSource.BarData;
 
-        public IndicatorDataSliceRecord? SourceIndicator { get; internal set; }
+        public Indicator? SourceIndicator { get; internal set; }
         public int SourcePlotIndex { get; internal set; } = -1;
 
-        public InstrumentDataSliceRecord? SourceBarData { get; internal set; } = null;
+        public InstrumentDataSlice? SourceBarData { get; internal set; } = null;
 
         public DateTime StartDate { get; internal set; }
 
@@ -455,6 +462,11 @@ namespace EvolverCore
         public IEnumerable<T> Select(Func<T, int, T> selector)
         {
             return _values.Select(selector);
+        }
+
+        public IEnumerable<T> GetRange(int start, int count)
+        {
+            return _values.GetRange(start, count);
         }
 
         public DateTime Min(Func<T, DateTime> selector)
@@ -810,38 +822,32 @@ namespace EvolverCore
             InstrumentDataSlice? slice = MakeInstrumentSlice(sliceRecord);
             if (slice == null) return null;
 
-            IndicatorDataSliceRecord iSliceRecord = new IndicatorDataSliceRecord()
+            IndicatorDataSourceRecord iSliceRecord = new IndicatorDataSourceRecord()
             {
-                SourceBarData = slice.Record,
+                SourceBarData = slice,
                 SourceType = CalculationSource.BarData,
                 StartDate = start,
                 EndDate = end
             };
 
-            IndicatorDataSlice? iSlice=MakeIndicatorSlice(iSliceRecord);
-            if (iSlice == null) return null;
-
-
-            Indicator indicator = new Indicator();
-            indicator.SetData(iSlice);
-            _indicatorCache.Add(indicator);
-            return indicator;
-        }
-
-
-        private IndicatorDataSlice? MakeIndicatorSlice(IndicatorDataSliceRecord sliceRecord)
-        {
-            foreach (Indicator indicator in _indicatorCache)
+            foreach (Indicator cachedIndicator in _indicatorCache)
             {
-                if(indicator.Slice == null) continue;
-                if (indicator.Slice.Record == sliceRecord)
+                if (cachedIndicator.SourceRecord == null) continue;
+                if (cachedIndicator.SourceRecord == iSliceRecord)
                 {
-                    return indicator.Slice;
+                    return cachedIndicator;
                 }
-
             }
 
-            return null;
+            Indicator indicator = new Indicator();
+            indicator.SetData(iSliceRecord);
+            if (slice.LoadState != DataLoadState.Loaded)
+            {
+                slice.DataLoaded += indicator.OnSourceDataLoaded;
+            }
+
+            _indicatorCache.Add(indicator);
+            return indicator;
         }
 
         private InstrumentDataSlice? MakeInstrumentSlice(InstrumentDataSliceRecord sliceRecord)
@@ -863,8 +869,8 @@ namespace EvolverCore
                             return slice;
                         }
 
-                        dataRecord.DataLoadCompleted += slice.OnDataLoadCompleted;
-                        dataRecord.DataLoadFailed += slice.OnDataLoadFailed;
+                        dataRecord.DataLoaded += slice.OnRawDataLoaded;
+
                         slice.LoadState = DataLoadState.Loading;
                         dataRecord.LoadState = DataLoadState.Loading;
                         Globals.Instance.DataManager.LoadDataAsync(dataRecord).ContinueWith(task =>

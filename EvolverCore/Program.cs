@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Avalonia;
+using Avalonia.Styling;
+using System;
 using System.Collections.Generic;
-using Avalonia;
 
 namespace EvolverCore
 {
@@ -36,5 +37,35 @@ namespace EvolverCore
                 .With(new MacOSPlatformOptions {  ShowInDock = true })
                 .WithInterFont()
                 .LogToTrace();
+    }
+
+    public static class ThemeService
+    {
+        private static ThemeVariant? _currentTheme;
+
+        public static void ToggleTheme()
+        {
+            var app = Application.Current!;
+            var newTheme = _currentTheme == ThemeVariant.Dark
+                ? ThemeVariant.Light
+                : ThemeVariant.Dark;
+
+            app.RequestedThemeVariant = newTheme;
+            _currentTheme = newTheme;
+        }
+
+        public static void SetTheme(bool isDark)
+        {
+            var app = Application.Current!;
+            var theme = isDark ? ThemeVariant.Dark : ThemeVariant.Light;
+
+            if (_currentTheme != theme)
+            {
+                app.RequestedThemeVariant = theme;
+                _currentTheme = theme;
+            }
+        }
+
+        public static bool IsDark => _currentTheme == ThemeVariant.Dark;
     }
 }

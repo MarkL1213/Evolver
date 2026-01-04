@@ -28,6 +28,11 @@ namespace EvolverCore.ViewModels
 
         [ObservableProperty] ObservableCollection<Layout> _availableLayouts = new();
         [ObservableProperty] Layout? _currentLayout = null;
+        public bool IsDarkMode
+        {
+            get => ThemeService.IsDark;
+            set => ThemeService.SetTheme(value);
+        }
 
         internal ChartControlViewModel DefaultChartViewModel { get; } = new();
 
@@ -69,6 +74,11 @@ namespace EvolverCore.ViewModels
             }
         }
 
+        [RelayCommand]
+        internal void ToggleDarkMode()
+        {
+            ThemeService.ToggleTheme();
+        }
 
 
         [RelayCommand]

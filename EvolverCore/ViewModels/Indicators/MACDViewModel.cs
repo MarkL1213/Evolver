@@ -15,7 +15,7 @@ namespace EvolverCore.ViewModels.Indicators
         [ObservableProperty] int _slow = 26;
         [ObservableProperty] int _smoothing = 9;
 
-        public MACDViewModel(IndicatorDataSliceRecord source, int fast, int slow, int smoothing)
+        public MACDViewModel(IndicatorDataSourceRecord source, int fast, int slow, int smoothing)
         {
             Name = "MACD";
             _fast = fast;

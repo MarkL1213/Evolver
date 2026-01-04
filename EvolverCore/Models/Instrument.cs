@@ -59,6 +59,15 @@ namespace EvolverCore
 
     }
 
+
+    public class InstrumentDataLoadedEventArgs
+    {
+        public InstrumentDataLoadedEventArgs(InstrumentDataSlice slice) { Exception = null; Slice = slice; }
+        public InstrumentDataLoadedEventArgs(Exception? e = null) { Exception = e; Slice = null; }
+        public Exception? Exception { private set; get; }
+        public InstrumentDataSlice? Slice { private set; get; }
+    }
+
     public class InstrumentDataRecord
     {
         public string InstrumentName { get; internal set; } = string.Empty;
@@ -69,18 +78,17 @@ namespace EvolverCore
 
         public DataLoadState LoadState { get; internal set; } = DataLoadState.NotLoaded;
 
-        public event EventHandler<InstrumentDataSlice>? DataLoadCompleted;
-        public event EventHandler<Exception>? DataLoadFailed;
+        public event EventHandler<InstrumentDataLoadedEventArgs>? DataLoaded;
 
         internal void FireDataLoadFailed(Exception e)
         {
             LoadState = DataLoadState.Error;
-            if (DataLoadFailed != null) DataLoadFailed(this, e);
+            if (DataLoaded != null) DataLoaded(this, new InstrumentDataLoadedEventArgs(e));
         }
         internal void FireDataLoadCompleted(InstrumentDataSlice slice)
         {
             LoadState = DataLoadState.Loaded;
-            if (DataLoadCompleted != null) DataLoadCompleted(this, slice);
+            if (DataLoaded != null) DataLoaded(this, new InstrumentDataLoadedEventArgs(slice));
         }
 
         public string FileName { get;internal set; } = string.Empty;

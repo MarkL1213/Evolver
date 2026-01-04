@@ -49,7 +49,4 @@
     </EmbeddedResource>
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Views\Components\Indicators\" />
-  </ItemGroup>
 </Project>

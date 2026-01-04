@@ -12,9 +12,12 @@
   
     <Application.Styles>
         <FluentTheme />
-		<StyleInclude Source="avares://NP.Ava.Visuals/Themes/TextStyles.axaml"/>
-		<StyleInclude Source="avares://NP.Ava.Visuals/Themes/CustomWindowStyles.axaml"/>
-		<StyleInclude Source="avares://NP.Ava.UniDock/Themes/DockStyles.axaml"/>
+        <!--
+		
+        <StyleInclude Source="avares://NP.Ava.Visuals/Themes/TextStyles.axaml"/>
+        -->
+        <StyleInclude Source="avares://NP.Ava.Visuals/Themes/CustomWindowStyles.axaml"/>
+        <StyleInclude Source="avares://EvolverCore/Themes/UniDockStyles.axaml"/>
 
     </Application.Styles>
 
