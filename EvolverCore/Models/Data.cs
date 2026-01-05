@@ -21,7 +21,7 @@ namespace EvolverCore
     public enum DataLoadState { NotLoaded,Loading, Loaded, Error };
 
     [Serializable]
-    public class InstrumentDataSlice
+    public class InstrumentDataSlice : IEnumerable<TimeDataBar>
     {
         //only serialize the record. re-resolve the data referenec on de-serialization
         public InstrumentDataSliceRecord Record { get; internal set; } = new InstrumentDataSliceRecord();
@@ -30,6 +30,9 @@ namespace EvolverCore
         int _endDateOffset = -1;
         InstrumentDataSeries? _series = null;
         DataLoadState _loadState = DataLoadState.NotLoaded;
+
+        internal int StartOffset { get { return _startDateOffset; } }
+        internal int EndOffset { get { return _endDateOffset; } }
 
         public DataLoadState LoadState { get; internal set; }
 
@@ -44,10 +47,15 @@ namespace EvolverCore
 
         public TimeDataBar GetValueAt(int index)
         {
-            if(_series == null || index < 0 || _startDateOffset + index > _endDateOffset) throw new EvolverException("GetValueAt() index out of range.");
+            if (_series == null || index < 0 || _startDateOffset + index > _endDateOffset) throw new EvolverException("GetValueAt() index out of range.");
             return _series[_startDateOffset + index];
         }
 
+        public void SetValueAt(TimeDataBar bar, int index)
+        {
+            if (_series == null || index < 0 || _startDateOffset + index > _endDateOffset) throw new EvolverException("GetValueAt() index out of range.");
+            _series[_startDateOffset + index] = bar;
+        }
         internal void SetData(InstrumentDataRecord dataRecord)
         {
             if (dataRecord.Data == null)
@@ -138,8 +146,27 @@ namespace EvolverCore
 
         public IEnumerable<TimeDataBar> Where(Func<TimeDataBar, bool> predicate)
         {
-            if(_series == null) return Enumerable.Empty<TimeDataBar>();
+            if (_series == null) return Enumerable.Empty<TimeDataBar>();
             return _series.GetRange(_startDateOffset, _endDateOffset - _startDateOffset).Where(predicate);
+        }
+
+        IEnumerator<TimeDataBar> IEnumerable<TimeDataBar>.GetEnumerator()
+        {
+            if (_series == null) return Enumerable.Empty<TimeDataBar>().GetEnumerator();
+            return _series.GetRange(_startDateOffset, _endDateOffset - _startDateOffset).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            if (_series == null) return Enumerable.Empty<TimeDataBar>().GetEnumerator();
+            return _series.GetRange(_startDateOffset, _endDateOffset - _startDateOffset).GetEnumerator();
+
+        }
+
+        public TimeDataBar this[int barsAgo]
+        {
+            get { return null; }//FIXME
+            set { }
         }
 
         //async task to request load of underlying data
@@ -840,13 +867,18 @@ namespace EvolverCore
             }
 
             Indicator indicator = new Indicator();
-            indicator.SetData(iSliceRecord);
-            if (slice.LoadState != DataLoadState.Loaded)
-            {
+            indicator.Name = instrument.Name;
+            indicator.IsDataOnly = true;
+            indicator.SetSourceData(iSliceRecord);
+            if (indicator.WaitingForDataLoad)
                 slice.DataLoaded += indicator.OnSourceDataLoaded;
-            }
 
+            indicator.Startup();
             _indicatorCache.Add(indicator);
+
+            if (!indicator.WaitingForDataLoad)
+                Globals.Instance.DataManager.IndicatorReadyToRun(indicator);
+
             return indicator;
         }
 
@@ -889,6 +921,11 @@ namespace EvolverCore
             return null;
         }
 
+        internal void IndicatorReadyToRun(Indicator indicator)
+        {
+            //FIXME - enqueue indicator in history runner thread
+        }
+
         internal async Task<InstrumentDataRecord> LoadDataAsync(InstrumentDataRecord dataRecord)
         {
             if (dataRecord.InstrumentName == "Random")
@@ -897,6 +934,7 @@ namespace EvolverCore
                 if (instrument == null)
                     throw new EvolverException($"Unknown Instrument: Random");
 
+                await Task.Delay(5000);//<-- fake 5 sec delay for testing 
 
                 ///////////////////////////
                 TimeSpan span = dataRecord.EndTime - dataRecord.StartTime;

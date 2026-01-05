@@ -12,6 +12,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using EvolverCore.Views;
+using EvolverCore.Models;
 using System.Runtime.InteropServices;
 
 
@@ -119,6 +120,12 @@ public partial class ChartPanel : Decorator
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged += AxisPropertyChanged;
             _vm.YAxis.PropertyChanged += AxisPropertyChanged;
         }
+    }
+
+    internal void OnDataUpdate()
+    {
+        foreach (ChartComponentBase component in _attachedComponents) component.CalculateSnapPoints();
+        InvalidateVisual();
     }
 
     private void ComponentCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -242,12 +249,17 @@ public partial class ChartPanel : Decorator
                     if (dataComponent.SnapPoints.Count == 0)
                         dataComponent.CalculateSnapPoints();
                     if (dataComponent.SnapPoints.Count == 0)
-                    {
-                        //FIXME : no visible data fall back to free mode
+                    {//No visible data, fallback to free mode
+                        _vm.CrosshairTime = _vm.XAxis.Min + TimeSpan.FromTicks((long)(xFraction * totalSpan.Ticks));
+
+                        double yFraction = 1.0 - (currentPos.Y / Bounds.Height); // Invert Y
+                        double range = _vm.YAxis.Max - _vm.YAxis.Min;
+                        _vm.CrosshairPrice = _vm.YAxis.Min + yFraction * range;
+                        InvalidateVisual();
                         return;
                     }
 
-                        TimeDataBar? nearestBar = dataComponent.SnapPoints
+                    TimeDataBar? nearestBar = dataComponent.SnapPoints
                         .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
                         .First() as TimeDataBar;
 
@@ -659,6 +671,21 @@ public partial class ChartPanel : Decorator
         _attachedComponents.Clear();
         if (_vm != null) _vm.ChartComponents.Clear();
         InvalidateVisual();
+    }
+
+    internal bool ContainsIndicator(Indicator indicator)
+    {
+        foreach (ChartComponentBase component in _attachedComponents)
+        {
+            if (component is IndicatorComponent)
+            {
+                IndicatorComponent? indicatorComponent =  component as IndicatorComponent;
+                if (indicatorComponent == null) continue;
+                if (indicatorComponent.ContainsIndicator(indicator)) return true;
+            }
+        }
+
+        return false;
     }
 
     internal DataComponent? GetFirstDataComponent()

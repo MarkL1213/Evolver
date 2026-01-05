@@ -14,6 +14,7 @@ using EvolverCore.Views;
 using EvolverCore.ViewModels.Indicators;
 using EvolverCore.Models.Indicators;
 using EvolverCore.Models;
+using Avalonia.Threading;
 
 namespace EvolverCore;
 
@@ -24,8 +25,43 @@ internal partial class ChartControl : UserControl
     {
         InitializeComponent();
         AddTestMenu();
+    }
 
-        //DataContext = new ChartControlViewModel();
+    internal bool AxisPositionTrackingData { set; get; } = true;
+
+    public void OnDataChanged(object? sender, EventArgs args)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Invoke(new Action(() => { OnDataChanged(sender, args); }));
+            return;
+        }
+
+        Indicator? indicator = sender as Indicator;
+        if (indicator == null) return;
+
+
+        if (PrimaryChartPanel.ContainsIndicator(indicator))
+        {
+            if(indicator.IsDataOnly && AxisPositionTrackingData)
+                PrimaryChartPanel.UpdateXAxisRange();
+            
+            PrimaryChartPanel.OnDataUpdate();
+        }
+        else
+        {
+            ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+            if (vm == null) return;
+            foreach (SubPanel panel in vm.SubPanelViewModels)
+            {
+                if (panel.Panel != null && panel.Panel.ContainsIndicator(indicator))
+                {
+                    panel.Panel.OnDataUpdate();
+                    break;
+                }
+            }
+        }
+
     }
 
     #region test cases
@@ -108,10 +144,13 @@ internal partial class ChartControl : UserControl
     }
     private void AddDataPlotToPrimary(Indicator indicator)
     {
+        indicator.DataChanged += OnDataChanged;
+
         PrimaryChartPanel.DetachAllChartComponents();
         DataComponent dataComponent = new DataComponent(PrimaryChartPanel);
         dataComponent.ChartPanelNumber = 0;
-        IndicatorViewModel? ivm = dataComponent.Properties as IndicatorViewModel;
+
+        IndicatorViewModel ? ivm = dataComponent.Properties as IndicatorViewModel;
         if (ivm == null)
         {
             throw new EvolverException("New DataComponent does not have an IndicatorViewModel");

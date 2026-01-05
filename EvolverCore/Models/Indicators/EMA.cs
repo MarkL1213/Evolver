@@ -14,7 +14,7 @@ namespace EvolverCore.Models.Indicators
     {
         public EMA() { }
 
-        public override void ConfigurePlots()
+        public void ConfigurePlots()
         {
             PlotProperties plotProperties = new PlotProperties();
             plotProperties.Style = PlotStyle.Line;

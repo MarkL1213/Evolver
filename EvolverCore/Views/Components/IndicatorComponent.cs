@@ -84,8 +84,14 @@ namespace EvolverCore.Views
             //}
         }
 
-        public virtual void OnDataUpdate()
-        { }
+        internal bool ContainsIndicator(Indicator indicator)
+        {
+            IndicatorViewModel? vm = Properties as IndicatorViewModel;
+            if (vm == null) return false;
+
+            return (vm.Indicator == indicator);
+        }
+
 
         public override void Render(DrawingContext context)
         {

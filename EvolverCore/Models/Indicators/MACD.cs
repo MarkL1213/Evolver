@@ -13,7 +13,7 @@ namespace EvolverCore.Models.Indicators
     {
         public MACD(){ }
 
-        public override void ConfigurePlots()
+        public void ConfigurePlots()
         {
             PlotProperties plotProperties = new PlotProperties();
             plotProperties.Style = PlotStyle.Line;

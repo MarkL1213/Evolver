@@ -11,38 +11,38 @@ using static EvolverCore.ChartControl;
 
 namespace EvolverCore.Models.Indicators
 {
-    public class Volume : IndicatorComponent
+    public class Volume : Indicator
     {
-        public Volume(ChartPanel panel) : base(panel)
+        public Volume()
         {
+            Name = "Volume";
         }
 
-        public override void ConfigurePlots()
+        public override void Configure()
         {
-            ChartPlotViewModel plotProperties = new ChartPlotViewModel();
-            plotProperties.Indicator = Properties as IndicatorViewModel;
-            plotProperties.PriceField = BarPriceValue.Volume;
+            PlotProperties plotProperties = new PlotProperties();
             plotProperties.Style = PlotStyle.Bar;
-            plotProperties.Name = "Volume";
-
-            ChartPlot plot = new ChartPlot(this) { Properties = plotProperties };
-            AddPlot(plot);
+            OutputPlot oplot = new OutputPlot(plotProperties);
+            Outputs.Add(oplot);
         }
 
-        //public override void Calculate()
-        //{
-        //    VolumeViewModel? viVM = Properties as VolumeViewModel;
-        //    if (viVM == null) return;
+        public void Calculate()
+        {
+            if (Bars.Count <= 0) return;
+            OutputPlot oPLot = Outputs[0];
+            if (oPLot.Series == null) return;
 
-        //    BarDataSeries? inputSeries = viVM.Data;
-        //    if (inputSeries == null) return;
+            for (int i = 0; i < Bars[0].Count; i++)
+            {
+                TimeDataBar bar = Bars[0].GetValueAt(i);
+                oPLot.Series.Add(new TimeDataPoint(bar.Time, bar.Volume));
+            }
+        }
 
-        //    TimeDataSeries outputSeries = viVM.ChartPlots[0].PlotSeries;
-        //    foreach (TimeDataBar bar in inputSeries)
-        //    {
-        //        outputSeries.Add(new TimeDataPoint(bar.Time, bar.Volume));
-        //    }
-        //}
+        public override void OnDataUpdate()
+        {
+            Outputs[0][0] = Bars[0][0].Volume;
+        }
 
     }
 }

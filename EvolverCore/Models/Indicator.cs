@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using EvolverCore.Views;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -36,6 +37,24 @@ namespace EvolverCore.Models
         public OutputPlot(PlotProperties properties) { Properties = properties; }
         public PlotProperties? Properties { get; internal set; } = null;
         public TimeDataSeries? Series { get; internal set; } = null;
+
+        public double this[int barsAgo]
+        {
+            get
+            {
+                if (Series == null || barsAgo > Series.Count)
+                    throw new EvolverException("OutputPlot get[barsAgo] out of range.");
+
+                return Series[barsAgo].Value;
+            }
+            set
+            {
+                if (Series == null || barsAgo > Series.Count)
+                    throw new EvolverException("OutputPlot set[barsAgo] out of range.");
+
+                Series[barsAgo].Value = value;
+            }
+        }
     }
 
     public class InputIndicator
@@ -46,10 +65,49 @@ namespace EvolverCore.Models
         public int PlotIndex { get; internal set; } = -1;
     }
 
+    public class BarsPointer
+    {
+        public BarsPointer(InstrumentDataSlice slice) { Slice = slice;CurrentBar = 0; }
+        public InstrumentDataSlice Slice { get; internal set; }
+        public int CurrentBar { get; internal set; }
+
+        public InstrumentDataSliceRecord Record { get { return Slice.Record; } }
+        public int Count { get { return Slice.Count; } }
+        public DataLoadState LoadState { get { return Slice.LoadState; } }
+        public DateTime MinTime(int lastCount) { return Slice.MinTime(lastCount); }
+        public DateTime MaxTime(int lastCount) { return Slice.MaxTime(lastCount); }
+
+        public IEnumerable<TimeDataBar> Where(Func<TimeDataBar,bool> predicate)
+        {
+            return Slice.Where(predicate);
+        }
+
+        public TimeDataBar GetValueAt(int i)
+        {
+            return Slice.GetValueAt(i);
+        }
+
+        public TimeDataBar this[int barsAgo]
+        {
+            get
+            {
+                int n = Slice.StartOffset + CurrentBar - barsAgo;
+                return Slice.GetValueAt(n);
+            }
+            set
+            {
+
+                int n = Slice.StartOffset + CurrentBar - barsAgo;
+                Slice.SetValueAt(value,n);
+            }
+        }
+    }
+
     public class Indicator
     {
         public Indicator() { }
 
+        internal event EventHandler? DataChanged;
         public string Name { get; set; } = string.Empty;
 
 
@@ -64,19 +122,39 @@ namespace EvolverCore.Models
         IndicatorDataSourceRecord? _sourceRecord;
         internal IndicatorDataSourceRecord? SourceRecord { get { return _sourceRecord; } }
 
+        internal bool IsDataOnly { get; set; } = false;
 
 
         ////////////////
         // these should all map into the slice (maybe even be slice properties that are just wrapped here)
-        public List<InstrumentDataSlice> Bars { get; internal set; } = new List<InstrumentDataSlice>();
+        public List<BarsPointer> Bars { get; internal set; } = new List<BarsPointer>();
         public List<InputIndicator> Inputs { get; internal set; } = new List<InputIndicator>();
         public List<OutputPlot> Outputs { get; internal set; } = new List<OutputPlot>();
         //////////////////
-        internal void SetData(IndicatorDataSourceRecord sourceRecord)
+        internal void SetSourceData(IndicatorDataSourceRecord sourceRecord)
         {
             _sourceRecord = sourceRecord;
-            if (_sourceRecord.SourceBarData != null) { Bars.Add(_sourceRecord.SourceBarData); }
-            if (_sourceRecord.SourceIndicator != null) { Inputs.Add(new InputIndicator(_sourceRecord.SourceIndicator,_sourceRecord.SourcePlotIndex)); }
+            if (_sourceRecord.SourceBarData != null)
+            {
+                Bars.Add(new BarsPointer(_sourceRecord.SourceBarData));
+                if (DataChanged != null) DataChanged(this, EventArgs.Empty);
+            }
+            if (_sourceRecord.SourceIndicator != null)
+            {
+                Inputs.Add(new InputIndicator(_sourceRecord.SourceIndicator,_sourceRecord.SourcePlotIndex));
+                if (DataChanged != null) DataChanged(this, EventArgs.Empty);
+            }
+
+        }
+
+        internal void OnInputDataLoaded(object? sender, EventArgs e)
+        {
+            //FIXME -- an input added during configure() has been loaded, set it up
+
+            if (!WaitingForDataLoad)
+            {
+                Globals.Instance.DataManager.IndicatorReadyToRun(this);
+            }
         }
 
         internal void OnSourceDataLoaded(object? sender, EventArgs e)
@@ -86,9 +164,16 @@ namespace EvolverCore.Models
             InstrumentDataSlice? sourceInstrumentSlice = sender as InstrumentDataSlice;
             if (sourceInstrumentSlice != null) sourceInstrumentSlice.DataLoaded -= OnSourceDataLoaded;
 
-            if (_sourceRecord.SourceBarData != null) { Bars.Add(_sourceRecord.SourceBarData); }
+            if (_sourceRecord.SourceBarData != null)
+            {
+                Bars.Add(new BarsPointer(_sourceRecord.SourceBarData));
+                if (DataChanged != null) DataChanged(this, EventArgs.Empty);
+            }
 
-            Globals.Instance.Log.LogMessage("Indicator data loaded", LogLevel.Info);
+            if (!WaitingForDataLoad)
+            {
+                Globals.Instance.DataManager.IndicatorReadyToRun(this);
+            }
         }
 
         internal IEnumerable<IDataPoint> SelectInputPointsInRange(DateTime min, DateTime max)
@@ -168,8 +253,40 @@ namespace EvolverCore.Models
             }
         }
 
+        public bool WaitingForDataLoad
+        {
+            get
+            {
+                foreach (BarsPointer bars in Bars)
+                {
+                    if (bars.LoadState != DataLoadState.Loaded) return true;
+                }
+                foreach (InputIndicator input in Inputs)
+                {
+                    if(input.Indicator.WaitingForDataLoad) return true;
+                }
 
-        public virtual void ConfigurePlots()
+                return false;
+            }
+        }
+
+        internal void DataUpdate()
+        {
+            //setup the next value in the output plots
+            //set the correct current indexes
+
+            OnDataUpdate();
+        }
+
+        internal void Startup()
+        {
+            State = IndicatorState.Startup;
+
+            Configure();
+        }
+
+
+        public virtual void Configure()
         { }
 
         public virtual void OnStateChange()
