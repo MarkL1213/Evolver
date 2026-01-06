@@ -22,7 +22,8 @@ namespace EvolverCore.Models.Indicators
         {
             PlotProperties plotProperties = new PlotProperties();
             plotProperties.Style = PlotStyle.Bar;
-            OutputPlot oplot = new OutputPlot(plotProperties);
+            
+            OutputPlot oplot = new OutputPlot("Volume", plotProperties);
             Outputs.Add(oplot);
         }
 

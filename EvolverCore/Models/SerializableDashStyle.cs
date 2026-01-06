@@ -57,5 +57,13 @@ namespace EvolverCore.Models
             set { _offset = value; }
         }
 
+
+        public static IDashStyle? CopyStyle(IDashStyle? source)
+        {
+            if (source == null) return null;
+
+            SerializableDashStyle sourceSerialized = new SerializableDashStyle(source);
+            return sourceSerialized.Style;
+        }
     }
 }

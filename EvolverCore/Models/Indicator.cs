@@ -1,4 +1,5 @@
 ﻿using Avalonia.Media;
+using Avalonia.Media.TextFormatting.Unicode;
 using CommunityToolkit.Mvvm.ComponentModel;
 using EvolverCore.Views;
 using System;
@@ -20,6 +21,7 @@ namespace EvolverCore.Models
         ShutDown
     }
 
+
     public class PlotProperties
     {
         public BarPriceValue PriceField { get; set; } = BarPriceValue.Close;
@@ -29,14 +31,39 @@ namespace EvolverCore.Models
         public IDashStyle? PlotLineStyle { get; set; } = null;
         public PlotStyle Style { get; set; } = PlotStyle.Line;
         public string Name { get; set; } = string.Empty;
+
+        public PlotProperties() { }
+        public PlotProperties(PlotProperties source)
+        {
+            PriceField = source.PriceField;
+            PlotLineThickness = source.PlotLineThickness;
+            Style = source.Style;
+            Name = source.Name;
+            PlotFillBrush = SerializableBrush.CopyBrush(source.PlotFillBrush);
+            PlotLineBrush = SerializableBrush.CopyBrush(source.PlotLineBrush);
+            PlotLineStyle = SerializableDashStyle.CopyStyle(source.PlotLineStyle);
+        }
     }
 
     public class OutputPlot
     {
-        public OutputPlot() { }
-        public OutputPlot(PlotProperties properties) { Properties = properties; }
-        public PlotProperties? Properties { get; internal set; } = null;
+        public OutputPlot() { DefaultProperties = new PlotProperties(); }
+        public OutputPlot(string name,PlotProperties defaultProperties) { Name = name; DefaultProperties = defaultProperties; }
+
+        public string Name { get; internal set; } = string.Empty;
+        public List<PlotProperties> Properties { get; } = new List<PlotProperties>();
         public TimeDataSeries? Series { get; internal set; } = null;
+
+        internal PlotProperties DefaultProperties { get; set; }
+        public int CurrentBarIndex { get; internal set; } = -1;
+
+        public TimeDataPoint GetValueAt(int index)
+        {
+            if (Series == null || index >= Series.Count || index < 0)
+                throw new EvolverException("OutputPlot GetValueAt() index out of range.");
+
+            return Series.GetValueAt(index);
+        }
 
         public double this[int barsAgo]
         {
@@ -63,19 +90,34 @@ namespace EvolverCore.Models
 
         public Indicator Indicator { get; internal set; }
         public int PlotIndex { get; internal set; } = -1;
+
+        public int CurrentBarIndex { get; internal set; } = -1;
+
+        public bool CurrentIsEnd()
+        {
+            OutputPlot oPlot = Indicator.Outputs[PlotIndex];
+            if (oPlot.Series == null) return false;
+
+            return CurrentBarIndex == oPlot.Series.Count - 1;
+        }
     }
 
     public class BarsPointer
     {
-        public BarsPointer(InstrumentDataSlice slice) { Slice = slice;CurrentBar = 0; }
+        public BarsPointer(InstrumentDataSlice slice) { Slice = slice; }
         public InstrumentDataSlice Slice { get; internal set; }
-        public int CurrentBar { get; internal set; }
+        public int CurrentBarIndex { get; internal set; } = -1;
 
         public InstrumentDataSliceRecord Record { get { return Slice.Record; } }
         public int Count { get { return Slice.Count; } }
         public DataLoadState LoadState { get { return Slice.LoadState; } }
         public DateTime MinTime(int lastCount) { return Slice.MinTime(lastCount); }
         public DateTime MaxTime(int lastCount) { return Slice.MaxTime(lastCount); }
+
+        public bool CurrentIsEnd()
+        {
+            return CurrentBarIndex == Slice.Count - 1;
+        }
 
         public IEnumerable<TimeDataBar> Where(Func<TimeDataBar,bool> predicate)
         {
@@ -91,13 +133,13 @@ namespace EvolverCore.Models
         {
             get
             {
-                int n = Slice.StartOffset + CurrentBar - barsAgo;
+                int n = Slice.StartOffset + CurrentBarIndex - barsAgo;
                 return Slice.GetValueAt(n);
             }
             set
             {
 
-                int n = Slice.StartOffset + CurrentBar - barsAgo;
+                int n = Slice.StartOffset + CurrentBarIndex - barsAgo;
                 Slice.SetValueAt(value,n);
             }
         }
@@ -115,15 +157,16 @@ namespace EvolverCore.Models
 
 
 
+        public int CurrentInputIndex { get; internal set; } = -1;
         public int CurrentBarIndex { get; internal set; } = -1;
 
         public int CurrentBarsIndex { get; internal set; } = -1;
+        public int CurrentInputsIndex { get; internal set; } = -1;
 
         IndicatorDataSourceRecord? _sourceRecord;
         internal IndicatorDataSourceRecord? SourceRecord { get { return _sourceRecord; } }
 
         internal bool IsDataOnly { get; set; } = false;
-
 
         ////////////////
         // these should all map into the slice (maybe even be slice properties that are just wrapped here)
@@ -270,20 +313,131 @@ namespace EvolverCore.Models
             }
         }
 
-        internal void DataUpdate()
+        private void resetCurrentBars()
         {
-            //setup the next value in the output plots
-            //set the correct current indexes
-
-            OnDataUpdate();
+            CurrentBarIndex = -1;
+            CurrentBarsIndex = -1;
+            foreach (BarsPointer bars in Bars)
+            {
+                bars.CurrentBarIndex = -1;
+            }
+            foreach (InputIndicator input in Inputs)
+            {
+                input.CurrentBarIndex = -1;
+            }
+            foreach (OutputPlot output in Outputs)
+            {
+                output.CurrentBarIndex = -1;
+            }
         }
 
         internal void Startup()
         {
             State = IndicatorState.Startup;
-
             Configure();
         }
+
+        internal void RunHistory()
+        {
+            State = IndicatorState.History;
+            resetCurrentBars();
+
+            if (IsDataOnly) return;
+
+            while (true)
+            {
+                bool moreHistory = false;
+                foreach (BarsPointer bars in Bars)
+                {
+                    if (!bars.CurrentIsEnd()) { moreHistory = true; break; }
+                }
+                if (!moreHistory)
+                {
+                    foreach (InputIndicator input in Inputs)
+                    {
+                        if (input.CurrentIsEnd()) { moreHistory = true; break; }
+                    }
+                }
+
+                if (moreHistory)
+                    runHistoryNextData();
+                else
+                    break;
+            }
+        }
+
+        private void runHistoryNextData()
+        {
+            if (_sourceRecord == null)
+                throw new EvolverException("Attempting to run a sourceless indicator.");
+
+            //next input:
+            int inputIndex = -1;
+            int barsIndex = -1;
+            DateTime nextDataTime = DateTime.MaxValue;
+            for (int i = 0; i < Bars.Count; i++)
+            {
+                if (Bars[i].GetValueAt(Bars[i].CurrentBarIndex + 1).Time < nextDataTime)
+                {
+                    barsIndex = i;
+                    nextDataTime = DateTime.MaxValue;
+                }
+            }
+            for (int i = 0; i < Inputs.Count; i++)
+            {
+                if (Inputs[i].Indicator.Outputs[Inputs[i].PlotIndex].GetValueAt(Inputs[i].CurrentBarIndex + 1).Time < nextDataTime)
+                {
+                    inputIndex = i;
+                    barsIndex = -1;
+                    nextDataTime = DateTime.MaxValue;
+                }
+            }
+
+            if (inputIndex >= 0)
+            {
+                Inputs[inputIndex].CurrentBarIndex++;
+                CurrentBarIndex = -1;
+                CurrentBarsIndex = -1;
+                CurrentInputsIndex = inputIndex;
+                CurrentInputIndex = Inputs[inputIndex].CurrentBarIndex;
+                if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && inputIndex == 0)
+                {
+                    foreach (OutputPlot outputPlot in Outputs)
+                    {
+                        if (outputPlot.Series == null) continue;
+
+                        outputPlot.CurrentBarIndex++;
+                        outputPlot.Series.Add(new TimeDataPoint(nextDataTime, double.NaN));
+                        outputPlot.Properties.Add(new PlotProperties(outputPlot.DefaultProperties));
+                    }
+                }
+            }
+            else if (barsIndex >= 0)
+            {
+                Bars[barsIndex].CurrentBarIndex++;
+                CurrentBarsIndex = barsIndex;
+                CurrentBarIndex = Bars[barsIndex].CurrentBarIndex;
+                CurrentInputsIndex = -1;
+                CurrentInputIndex = -1;
+
+                if (_sourceRecord.SourceType == CalculationSource.BarData && barsIndex == 0)
+                {
+                    foreach (OutputPlot outputPlot in Outputs)
+                    {
+                        if (outputPlot.Series == null) continue;
+
+                        outputPlot.CurrentBarIndex++;
+                        outputPlot.Series.Add(new TimeDataPoint(nextDataTime, double.NaN));
+                        outputPlot.Properties.Add(new PlotProperties(outputPlot.DefaultProperties));
+                    }
+                }
+            }
+
+            OnDataUpdate();
+        }
+
+
+
 
 
         public virtual void Configure()

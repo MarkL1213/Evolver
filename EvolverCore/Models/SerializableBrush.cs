@@ -42,5 +42,17 @@ namespace EvolverCore.Models
                 return string.IsNullOrEmpty(res) ? string.Empty : res;
             }
         }
+
+        public static IBrush? CopyBrush(IBrush? source)
+        {
+            if (source == null) return null;
+
+            SerializableBrush sourceSerialized = new SerializableBrush(source);
+
+            SerializableBrush destinationSerialized = new SerializableBrush();
+            destinationSerialized.ColorSerializable = sourceSerialized.ColorSerializable;
+
+            return destinationSerialized.Color;
+        }
     }
 }

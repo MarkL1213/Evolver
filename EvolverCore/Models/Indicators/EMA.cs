@@ -20,7 +20,7 @@ namespace EvolverCore.Models.Indicators
             plotProperties.Style = PlotStyle.Line;
             plotProperties.Name = "EMA";
 
-            Outputs.Add(new OutputPlot(plotProperties));
+            Outputs.Add(new OutputPlot("EMA", plotProperties));
         }
 
         public override void OnDataUpdate()

@@ -19,7 +19,7 @@ namespace EvolverCore.Models.Indicators
             plotProperties.Style = PlotStyle.Line;
             plotProperties.Name = "SMA";
 
-            Outputs.Add(new OutputPlot(plotProperties));
+            Outputs.Add(new OutputPlot("SMA",plotProperties));
         }
 
         //public override void Calculate()

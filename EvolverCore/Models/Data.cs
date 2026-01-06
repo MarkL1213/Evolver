@@ -12,8 +12,10 @@ using System.Net.Http.Headers;
 using System.Reflection.Emit;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
+using Tmds.DBus.Protocol;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace EvolverCore
@@ -761,13 +763,20 @@ namespace EvolverCore
     }
 
 
-    internal class DataManager
+    internal class DataManager : IDisposable
     {
         List<InstrumentDataRecord> _instrumentCache = new List<InstrumentDataRecord>();
         List<Indicator> _indicatorCache = new List<Indicator>();
         
         public delegate void DataChangeDelegate(InstrumentDataRecord instrumentRecord);
         public event DataChangeDelegate? DataChange = null;
+
+        internal DataManager()
+        {
+            _indicatorWorker = new Thread(indicatorWorker);
+            _indicatorWorker.Name = "DataManager Indicator Runner";
+            _indicatorWorker.Start();
+        }
 
 
         internal void LoadRandomInstrumentRecords()
@@ -921,9 +930,70 @@ namespace EvolverCore
             return null;
         }
 
+        object _indicatorReadyToRunQueueLock = new object();
+        Queue<Indicator> _indicatorReadyToRunQueue = new Queue<Indicator>();
+        Thread _indicatorWorker;
+        bool _wantExit = false;
+        bool _isSleeping = false;
+
+        private bool disposedValue;
+
         internal void IndicatorReadyToRun(Indicator indicator)
         {
-            //FIXME - enqueue indicator in history runner thread
+            lock (_indicatorReadyToRunQueueLock)
+            {
+                _indicatorReadyToRunQueue.Enqueue(indicator);
+            }
+
+            if (_isSleeping) _indicatorWorker.Interrupt();
+        }
+
+        private void indicatorWorker()
+        {
+            while (true)
+            {
+                if (_wantExit) break;
+
+                try
+                {
+                    int queueCount = 0;
+                    Indicator? indicator = null;
+                    lock (_indicatorReadyToRunQueueLock)
+                    {
+                        queueCount = _indicatorReadyToRunQueue.Count;
+                        if (queueCount > 0)
+                            indicator = _indicatorReadyToRunQueue.Dequeue();
+                    }
+
+                    if (queueCount == 0)
+                    {
+                        _isSleeping = true;
+                        Thread.Sleep(Timeout.Infinite);
+                    }
+                    else if (indicator != null)
+                    {
+                        if (indicator.State != IndicatorState.Startup || indicator.WaitingForDataLoad)
+                        {
+                            //error
+                            Globals.Instance.Log.LogMessage($"Indicator {indicator.Name} trying to run when not ready", LogLevel.Error);
+                            continue;
+                        }
+
+                        indicator.RunHistory();
+
+                       //FIXME place the indicator into the live tick dependency graph (leave in history mode until 1st live tick arrives)
+                    }
+                }
+                catch (ThreadInterruptedException)
+                {
+                    _isSleeping = false;
+                    //Console.WriteLine($"Thread '{Thread.CurrentThread.Name}' awoken.");
+                }
+                catch (ThreadAbortException)
+                {
+                    break;
+                }
+            }
         }
 
         internal async Task<InstrumentDataRecord> LoadDataAsync(InstrumentDataRecord dataRecord)
@@ -964,5 +1034,33 @@ namespace EvolverCore
             return dataRecord;
         }
 
+
+        internal void Shutdown()
+        {
+            _wantExit = true;
+            if (_isSleeping) _indicatorWorker.Interrupt();
+            _indicatorWorker.Join();
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    _wantExit = true;
+                    if (_isSleeping) { _indicatorWorker.Interrupt(); }
+                    _indicatorWorker.Join();
+                }
+                disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 }

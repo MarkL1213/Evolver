@@ -23,6 +23,17 @@ namespace EvolverCore
                 Globals.Instance.Log.LogMessage("***** Evolver Exception *****", Models.LogLevel.Error);
                 Globals.Instance.Log.LogException(ex);
             }
+
+            try
+            {
+                Globals.Instance.DataManager.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                Globals.Instance.Log.LogMessage("***** Evolver Exception *****", Models.LogLevel.Error);
+                Globals.Instance.Log.LogException(ex);
+            }
+
             Globals.Instance.Log.LogMessage("===== Evolver Stopped =====", Models.LogLevel.Info);
             Globals.Instance.Log.Shutdown();
         }
