@@ -1,5 +1,5 @@
-﻿using EvolverCore.ViewModels;
-using EvolverCore.ViewModels.Indicators;
+﻿using Avalonia.Media;
+using EvolverCore.ViewModels;
 using EvolverCore.Views;
 using System;
 using System.Collections.Generic;
@@ -9,93 +9,55 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Models.Indicators
 {
+    [Serializable]
+    public class SMAProperties : IndicatorProperties
+    {
+        public SMAProperties() { }
+        public int Period { set; get; } = 14;
+        public BarPriceValue PriceField { get; set; } = BarPriceValue.Close;
+    }
+
     public class SMA : Indicator
     {
         public SMA(IndicatorProperties properties) : base(properties) { }
 
-        public void ConfigurePlots()
+        public new SMAProperties Properties { get { return  (SMAProperties)base.Properties; } }
+
+        public override void Configure()
         {
             PlotProperties plotProperties = new PlotProperties();
             plotProperties.Name = "SMA";
+            plotProperties.PlotLineBrush = Brushes.Red;
 
             Outputs.Add(new OutputPlot("SMA",plotProperties, PlotStyle.Line));
         }
 
-        //public override void Calculate()
-        //{
-        //    if (Properties.Source == CalculationSource.BarData)
-        //        calculateFromBarData();
-        //    else if (Properties.Source == CalculationSource.IndicatorPlot)
-        //        calculateFromIndicator();
-        //}   
+        double _sum = 0;
 
-        //private void calculateFromBarData()
-        //{
-        //    SMAViewModel? smaVM = Properties as SMAViewModel;
-        //    if (smaVM == null || smaVM.Period < 1) return;
+        public override void OnDataUpdate()
+        {
+            if (SourceRecord!.SourceType == CalculationSource.BarData)
+            {
+                BarPricePoint p = new BarPricePoint(Bars[0][0], Properties.PriceField);
+                _sum += p.Y;
 
-        //    BarDataSeries? inputSeries = smaVM.Data;
-        //    if (inputSeries == null) return;
+                if (CurrentBarIndex >= Properties.Period)
+                {
+                    BarPricePoint oldP = new BarPricePoint(Bars[0][Properties.Period], Properties.PriceField);
+                    _sum -= oldP.Y;
 
-        //    TimeDataSeries outputSeries = smaVM.ChartPlots[0].PlotSeries;
-
-        //    BarPriceValue priceType = smaVM.ChartPlots[0].PriceField;
-
-        //    outputSeries.Clear();
-        //    Queue<double> values = new Queue<double>();
-        //    for (int i = 0; i < inputSeries.Count; i++)
-        //    {
-        //        BarPricePoint outputPoint = new BarPricePoint(inputSeries.GetValueAt(i), priceType);
-        //        values.Enqueue(outputPoint.Y);
-
-        //        if (i + 1 < smaVM.Period)
-        //        {
-        //            outputSeries.Add(new TimeDataPoint(outputPoint.X, double.NaN));
-        //        }
-        //        else
-        //        {
-        //            if (values.Count > smaVM.Period) values.Dequeue();
-        //            double avg = values.Sum() / smaVM.Period;
-        //            outputSeries.Add(new TimeDataPoint(outputPoint.X, avg));
-        //        }
-        //    }
-        //}
-
-        //private void calculateFromIndicator()
-        //{
-        //    SMAViewModel? smaVM = Properties as SMAViewModel;
-        //    if (smaVM == null || smaVM.Period < 1) return;
-
-        //    IndicatorViewModel? sourceIndicatorVM = smaVM.SourceIndicator;
-        //    if (sourceIndicatorVM == null) return;
-
-        //    if (smaVM.SourcePlotIndex >= sourceIndicatorVM.ChartPlots.Count || smaVM.SourcePlotIndex < 0)
-        //        return;
-
-        //    TimeDataSeries inputSeries = sourceIndicatorVM.ChartPlots[smaVM.SourcePlotIndex].PlotSeries;
-        //    TimeDataSeries outputSeries = smaVM.ChartPlots[0].PlotSeries;
-
-        //    outputSeries.Clear();
-        //    Queue<double> values = new Queue<double>();
-        //    for (int i = 0; i < inputSeries.Count; i++)
-        //    {
-        //        TimeDataPoint inputPoint = inputSeries.GetValueAt(i);
-
-        //        if (i + 1 < smaVM.Period)
-        //        {
-        //            outputSeries.Add(new TimeDataPoint(inputPoint.Time, double.NaN));
-        //            values.Enqueue(inputPoint.Value);
-        //        }
-        //        else
-        //        {
-        //            values.Enqueue(inputPoint.Value);
-        //            if(values.Count > smaVM.Period) values.Dequeue();
-        //            double avg = values.Sum() / smaVM.Period;
-        //            outputSeries.Add(new TimeDataPoint(inputPoint.Time, avg));
-        //        }
-        //    }
-        //}
-
-
+                    Outputs[0][0] = _sum / Properties.Period;
+                }
+            }
+            else if (SourceRecord!.SourceType == CalculationSource.IndicatorPlot)
+            {
+                _sum += Inputs[0][0];
+                if (CurrentInputIndex >= Properties.Period)
+                {
+                    _sum -= Inputs[0][Properties.Period];
+                    Outputs[0][0] = _sum / Properties.Period;
+                }
+            }
+        }
     }
 }

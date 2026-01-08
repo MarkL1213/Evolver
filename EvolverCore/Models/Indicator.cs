@@ -243,6 +243,41 @@ namespace EvolverCore.Models
 
             return CurrentBarIndex == oPlot.Series.Count - 1;
         }
+        public TimeDataPoint GetValueAt(int index)
+        {
+            TimeDataSeries series = Indicator.Outputs[PlotIndex].Series;
+
+            if (index >= series.Count || index < 0)
+                throw new EvolverException("InputIndicator GetValueAt() index out of range.");
+
+            return series.GetValueAt(index);
+        }
+
+        public double this[int barsAgo]
+        {
+            get
+            {
+                TimeDataSeries series = Indicator.Outputs[PlotIndex].Series;
+                int n = CurrentBarIndex - barsAgo;
+
+                if (n > series.Count || n < 0)
+                    throw new EvolverException("InputIndicator get[barsAgo] out of range.");
+
+                return series[n].Value;
+            }
+            set
+            {
+                TimeDataSeries series = Indicator.Outputs[PlotIndex].Series;
+                int n = CurrentBarIndex - barsAgo;
+
+                if (n > series.Count || n < 0)
+                    throw new EvolverException("InputIndicator set[barsAgo] out of range.");
+
+                series[n].Value = value;
+            }
+        }
+
+
     }
 
     public class BarsPointer
@@ -517,7 +552,7 @@ namespace EvolverCore.Models
                 {
                     foreach (InputIndicator input in Inputs)
                     {
-                        if (input.CurrentIsEnd()) { moreHistory = true; break; }
+                        if (!input.CurrentIsEnd()) { moreHistory = true; break; }
                     }
                 }
 
@@ -602,9 +637,6 @@ namespace EvolverCore.Models
 
             OnDataUpdate();
         }
-
-
-
 
 
         public virtual void Configure()

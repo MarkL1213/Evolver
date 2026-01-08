@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
-using EvolverCore.ViewModels.Indicators;
 using EvolverCore.Views;
 using System;
 using System.Collections.Generic;
@@ -23,19 +22,6 @@ namespace EvolverCore.Models.Indicators
             PlotProperties plotProperties = new PlotProperties();
             OutputPlot oplot = new OutputPlot("Volume", plotProperties, PlotStyle.Bar);
             Outputs.Add(oplot);
-        }
-
-        public void Calculate()
-        {
-            if (Bars.Count <= 0) return;
-            OutputPlot oPLot = Outputs[0];
-            if (oPLot.Series == null) return;
-
-            for (int i = 0; i < Bars[0].Count; i++)
-            {
-                TimeDataBar bar = Bars[0].GetValueAt(i);
-                oPLot.Series.Add(new TimeDataPoint(bar.Time, bar.Volume));
-            }
         }
 
         public override void OnDataUpdate()

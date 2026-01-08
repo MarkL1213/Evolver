@@ -1,5 +1,4 @@
 ﻿using EvolverCore.ViewModels;
-using EvolverCore.ViewModels.Indicators;
 using EvolverCore.Views;
 using System;
 using System.Collections.Generic;

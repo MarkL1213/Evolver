@@ -11,7 +11,6 @@ using EvolverCore.Views.Components;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 using EvolverCore.Views;
-using EvolverCore.ViewModels.Indicators;
 using EvolverCore.Models.Indicators;
 using EvolverCore.Models;
 using Avalonia.Threading;
@@ -172,58 +171,85 @@ internal partial class ChartControl : UserControl
 
     private void Test_AddSMAToVolume()
     {
-        //ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        //if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
+        if (_volPanel == null || _volIndicator == null) return;
 
-        //Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
-        //if (dataComponent == null || dataComponent.Properties.Data == null) return;
+        SMAProperties smaProperties = new SMAProperties();
+        smaProperties.PriceField = BarPriceValue.Close;
+        smaProperties.Period = 14;
 
-        //SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
+        SMA? vi = Globals.Instance.DataManager.CreateIndicator(typeof(SMA), smaProperties, _volIndicator, CalculationSource.IndicatorPlot, 0) as SMA;
+        if (vi == null)
+        {
+            Globals.Instance.Log.LogMessage("Failed to create indicator: SMA", LogLevel.Error);
+            return;
+        }
+        vi.DataChanged += OnDataChanged;
 
-        ////FIXME: temporarily using captured values, should be lookup based
-        //ChartPanel? volumePanel = _volPanel;
-        //Volume? volumeIndicator = _volIndicator;
-        //int volumePlotIndex = 0;
+        IndicatorViewModel vivm = new IndicatorViewModel();
+        vivm.Indicator = vi;
 
-        //if(volumePanel == null || volumeIndicator == null) return;
+        IndicatorComponent component = new IndicatorComponent(_volPanel);
+        component.SetDataContext(vivm);
 
-        //SMA vi = new SMA(volumePanel);
-        //vi.SetDataContext(vivm);
-        //vivm.Source = CalculationSource.IndicatorPlot;
-        //vivm.SourceIndicator = volumeIndicator.Properties as IndicatorViewModel;
-        //vivm.RenderOrder = 1;
-        //vivm.SourcePlotIndex = volumePlotIndex;
-        //vivm.ChartPlots[0].PlotLineBrush.Color = Brushes.Orange;
-        //vivm.ChartPlots[0].PlotLineThickness = 3;
+        for (int i = 0; i < vi.Outputs.Count; i++)
+        {
+            OutputPlot oPlot = vi.Outputs[i];
+            ChartPlotViewModel plotVM = new ChartPlotViewModel();
+            plotVM.PlotIndex = i;
+            plotVM.Indicator = vivm;
+            plotVM.Style = oPlot.Style;
 
+            ChartPlot plot = new ChartPlot(component);
+            plot.Properties = plotVM;
+            component.AddPlot(plot);
+        }
 
-        //vi.Calculate();
-        
-        
-        
-        //volumePanel.AttachChartComponent(vi);
-
-        //panel.Panel.UpdateYAxisRange();
+        _volPanel.AttachChartComponent(component);
+        _volPanel.UpdateYAxisRange();
     }
 
     private void Test_AddSMAToPrice()
     {
-        //ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        //if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
 
-        //Data? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
-        //if (dataComponent == null || dataComponent.Properties.Data == null) return;
+        DataComponent? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
+        if (dataComponent == null || ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0) return;
 
-        //SMAViewModel vivm = new SMAViewModel(dataComponent.Properties.Data, 30);
+        SMAProperties smaProperties = new SMAProperties();
+        smaProperties.PriceField = BarPriceValue.Close;
+        smaProperties.Period = 14;
 
-        //SMA vi = new SMA(PrimaryChartPanel);
-        //vi.SetDataContext(vivm);
-        //vivm.ChartPlots[0].PriceField = BarPriceValue.HLC;
-        
-        //vi.Calculate();
-        //PrimaryChartPanel.AttachChartComponent(vi);
+        SMA? vi = Globals.Instance.DataManager.CreateIndicator(typeof(SMA), smaProperties, ivm.Indicator, CalculationSource.BarData) as SMA;
+        if (vi == null)
+        {
+            Globals.Instance.Log.LogMessage("Failed to create indicator: SMA", LogLevel.Error);
+            return;
+        }
+        vi.DataChanged += OnDataChanged;
 
-        //panel.Panel.UpdateYAxisRange();
+        IndicatorViewModel vivm = new IndicatorViewModel();
+        vivm.Indicator = vi;
+
+        IndicatorComponent component = new IndicatorComponent(PrimaryChartPanel);
+        component.SetDataContext(vivm);
+
+        for (int i = 0; i < vi.Outputs.Count; i++)
+        {
+            OutputPlot oPlot = vi.Outputs[i];
+            ChartPlotViewModel plotVM = new ChartPlotViewModel();
+            plotVM.PlotIndex = i;
+            plotVM.Indicator = vivm;
+            plotVM.Style = oPlot.Style;
+
+            ChartPlot plot = new ChartPlot(component);
+            plot.Properties = plotVM;
+            component.AddPlot(plot);
+        }
+
+        PrimaryChartPanel.AttachChartComponent(component);
+        PrimaryChartPanel.UpdateYAxisRange();
     }
 
     ChartPanel? _volPanel;
@@ -255,7 +281,7 @@ internal partial class ChartControl : UserControl
         }
         vi.DataChanged += OnDataChanged;
 
-        VolumeViewModel vivm = new VolumeViewModel(ivm.Indicator);
+        IndicatorViewModel vivm = new IndicatorViewModel();
         vivm.Indicator = vi;
 
         IndicatorComponent component = new IndicatorComponent(panel.Panel);
@@ -273,8 +299,6 @@ internal partial class ChartControl : UserControl
             plot.Properties = plotVM;
             component.AddPlot(plot);
         }
-
-        
 
         panel.Panel.AttachChartComponent(component);
         panel.Panel.UpdateYAxisRange();
