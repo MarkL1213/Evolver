@@ -29,7 +29,8 @@ namespace EvolverCore.Models
         public IBrush? PlotLineBrush { get; set; } = Brushes.Turquoise;
         public double PlotLineThickness { get; set; } = 1.5;
         public IDashStyle? PlotLineStyle { get; set; } = null;
-        public PlotStyle Style { get; set; } = PlotStyle.Line;
+
+        
         public string Name { get; set; } = string.Empty;
 
         public PlotProperties() { }
@@ -37,7 +38,6 @@ namespace EvolverCore.Models
         {
             PriceField = source.PriceField;
             PlotLineThickness = source.PlotLineThickness;
-            Style = source.Style;
             Name = source.Name;
             PlotFillBrush = SerializableBrush.CopyBrush(source.PlotFillBrush);
             PlotLineBrush = SerializableBrush.CopyBrush(source.PlotLineBrush);
@@ -48,12 +48,13 @@ namespace EvolverCore.Models
     public class OutputPlot
     {
         public OutputPlot() { DefaultProperties = new PlotProperties(); }
-        public OutputPlot(string name,PlotProperties defaultProperties) { Name = name; DefaultProperties = defaultProperties; }
+        public OutputPlot(string name,PlotProperties defaultProperties, PlotStyle style) { Name = name; DefaultProperties = defaultProperties; Style = style; }
 
         public string Name { get; internal set; } = string.Empty;
         public List<PlotProperties> Properties { get; } = new List<PlotProperties>();
-        public TimeDataSeries? Series { get; internal set; } = null;
+        public TimeDataSeries Series { get; internal set; } = new TimeDataSeries();
 
+        public PlotStyle Style { get; set; } = PlotStyle.Line;
         internal PlotProperties DefaultProperties { get; set; }
         public int CurrentBarIndex { get; internal set; } = -1;
 
@@ -69,17 +70,21 @@ namespace EvolverCore.Models
         {
             get
             {
-                if (Series == null || barsAgo > Series.Count)
+                int n = CurrentBarIndex - barsAgo;
+
+                if (n > Series.Count || n < 0)
                     throw new EvolverException("OutputPlot get[barsAgo] out of range.");
 
-                return Series[barsAgo].Value;
+                return Series[n].Value;
             }
             set
             {
-                if (Series == null || barsAgo > Series.Count)
+                int n = CurrentBarIndex - barsAgo;
+
+                if (n > Series.Count || n < 0)
                     throw new EvolverException("OutputPlot set[barsAgo] out of range.");
 
-                Series[barsAgo].Value = value;
+                Series[n].Value = value;
             }
         }
     }
@@ -133,25 +138,32 @@ namespace EvolverCore.Models
         {
             get
             {
-                int n = Slice.StartOffset + CurrentBarIndex - barsAgo;
+                int n = CurrentBarIndex - barsAgo;
                 return Slice.GetValueAt(n);
             }
             set
             {
 
-                int n = Slice.StartOffset + CurrentBarIndex - barsAgo;
+                int n = CurrentBarIndex - barsAgo;
                 Slice.SetValueAt(value,n);
             }
         }
     }
 
+    [Serializable]
+    public class IndicatorProperties
+    {
+        
+    }
+
     public class Indicator
     {
-        public Indicator() { }
+        public Indicator(IndicatorProperties properties) { Properties = properties; }
 
         internal event EventHandler? DataChanged;
         public string Name { get; set; } = string.Empty;
 
+        public IndicatorProperties Properties { get; internal set; }
 
         public IndicatorState State { get; internal set; } = IndicatorState.New;
 
@@ -177,17 +189,16 @@ namespace EvolverCore.Models
         internal void SetSourceData(IndicatorDataSourceRecord sourceRecord)
         {
             _sourceRecord = sourceRecord;
-            if (_sourceRecord.SourceBarData != null)
+            if (_sourceRecord.SourceBarData != null && _sourceRecord.SourceType == CalculationSource.BarData)
             {
                 Bars.Add(new BarsPointer(_sourceRecord.SourceBarData));
                 if (DataChanged != null) DataChanged(this, EventArgs.Empty);
             }
-            if (_sourceRecord.SourceIndicator != null)
+            if (_sourceRecord.SourceIndicator != null && _sourceRecord.SourceType == CalculationSource.IndicatorPlot)
             {
                 Inputs.Add(new InputIndicator(_sourceRecord.SourceIndicator,_sourceRecord.SourcePlotIndex));
                 if (DataChanged != null) DataChanged(this, EventArgs.Empty);
             }
-
         }
 
         internal void OnInputDataLoaded(object? sender, EventArgs e)
@@ -226,17 +237,19 @@ namespace EvolverCore.Models
                 if (_sourceRecord.SourceType == CalculationSource.BarData && Bars.Count > 0)
                     return Bars[0].Where(p => p.Time >= min && p.Time <= max);
                 else if(_sourceRecord.SourceType == CalculationSource.IndicatorPlot && Inputs.Count > 0)
-                    return Inputs[0].Indicator.SelectOutputPointsInRange(min, max, Inputs[0].PlotIndex);
+                    return Inputs[0].Indicator.SelectOutputPointsInRange(min, max, Inputs[0].PlotIndex).Select(tuple => tuple.Item1);
             }
 
             return Enumerable.Empty<IDataPoint>();
         }
-        internal IEnumerable<IDataPoint> SelectOutputPointsInRange(DateTime min, DateTime max, int plotIndex, bool skipLeadingNaN = false)
+        internal IEnumerable<(IDataPoint, int)> SelectOutputPointsInRange(DateTime min, DateTime max, int plotIndex, bool skipLeadingNaN = false)
         {
-            if(plotIndex <0 ||  plotIndex >= Outputs.Count) return Enumerable.Empty<IDataPoint>();
-            OutputPlot oPLot = Outputs[plotIndex];
-            if(oPLot.Series == null) return Enumerable.Empty<IDataPoint>();
-            return oPLot.Series.Where(p => p.Time >= min && p.Time <= max);
+            if (plotIndex < 0 || plotIndex >= Outputs.Count) return Enumerable.Empty<(IDataPoint, int)>();
+
+            return Outputs[plotIndex].Series
+                    .Select((item, index) => (item!, index))
+                    .Where(tuple => tuple.Item1.X >= min && tuple.Item1.X <= max)
+                    .Select(t => ((IDataPoint)t.Item1, t.Item2));
         }
 
         public DateTime MinTime(int lastCount)
@@ -364,6 +377,8 @@ namespace EvolverCore.Models
                 else
                     break;
             }
+
+            if(DataChanged != null) DataChanged(this, EventArgs.Empty);
         }
 
         private void runHistoryNextData()
@@ -377,19 +392,21 @@ namespace EvolverCore.Models
             DateTime nextDataTime = DateTime.MaxValue;
             for (int i = 0; i < Bars.Count; i++)
             {
-                if (Bars[i].GetValueAt(Bars[i].CurrentBarIndex + 1).Time < nextDataTime)
+                DateTime x = Bars[i].GetValueAt(Bars[i].CurrentBarIndex + 1).Time;
+                if ( x < nextDataTime)
                 {
                     barsIndex = i;
-                    nextDataTime = DateTime.MaxValue;
+                    nextDataTime = x;
                 }
             }
             for (int i = 0; i < Inputs.Count; i++)
             {
-                if (Inputs[i].Indicator.Outputs[Inputs[i].PlotIndex].GetValueAt(Inputs[i].CurrentBarIndex + 1).Time < nextDataTime)
+                DateTime x = Inputs[i].Indicator.Outputs[Inputs[i].PlotIndex].GetValueAt(Inputs[i].CurrentBarIndex + 1).Time;
+                if (x < nextDataTime)
                 {
                     inputIndex = i;
                     barsIndex = -1;
-                    nextDataTime = DateTime.MaxValue;
+                    nextDataTime = x;
                 }
             }
 
@@ -404,8 +421,6 @@ namespace EvolverCore.Models
                 {
                     foreach (OutputPlot outputPlot in Outputs)
                     {
-                        if (outputPlot.Series == null) continue;
-
                         outputPlot.CurrentBarIndex++;
                         outputPlot.Series.Add(new TimeDataPoint(nextDataTime, double.NaN));
                         outputPlot.Properties.Add(new PlotProperties(outputPlot.DefaultProperties));
@@ -424,8 +439,6 @@ namespace EvolverCore.Models
                 {
                     foreach (OutputPlot outputPlot in Outputs)
                     {
-                        if (outputPlot.Series == null) continue;
-
                         outputPlot.CurrentBarIndex++;
                         outputPlot.Series.Add(new TimeDataPoint(nextDataTime, double.NaN));
                         outputPlot.Properties.Add(new PlotProperties(outputPlot.DefaultProperties));

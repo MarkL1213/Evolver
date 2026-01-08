@@ -11,15 +11,14 @@ namespace EvolverCore.Models.Indicators
 {
     public class SMA : Indicator
     {
-        public SMA() { }
+        public SMA(IndicatorProperties properties) : base(properties) { }
 
         public void ConfigurePlots()
         {
             PlotProperties plotProperties = new PlotProperties();
-            plotProperties.Style = PlotStyle.Line;
             plotProperties.Name = "SMA";
 
-            Outputs.Add(new OutputPlot("SMA",plotProperties));
+            Outputs.Add(new OutputPlot("SMA",plotProperties, PlotStyle.Line));
         }
 
         //public override void Calculate()

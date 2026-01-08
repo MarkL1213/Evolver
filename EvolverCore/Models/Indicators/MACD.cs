@@ -11,15 +11,12 @@ namespace EvolverCore.Models.Indicators
 {
     internal class MACD : Indicator
     {
-        public MACD(){ }
+        public MACD(IndicatorProperties properties) : base(properties) { }
 
         public void ConfigurePlots()
         {
             PlotProperties plotProperties = new PlotProperties();
-            plotProperties.Style = PlotStyle.Line;
-
-
-            Outputs.Add(new OutputPlot("MACD",plotProperties));
+            Outputs.Add(new OutputPlot("MACD",plotProperties, PlotStyle.Line));
         }
 
         //public override void Calculate()

@@ -10,8 +10,10 @@ using System.IO;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
@@ -36,7 +38,7 @@ namespace EvolverCore
         internal int StartOffset { get { return _startDateOffset; } }
         internal int EndOffset { get { return _endDateOffset; } }
 
-        public DataLoadState LoadState { get; internal set; }
+        public DataLoadState LoadState { get { return _loadState; } internal set { _loadState = value; } }
 
         public int Count
         {
@@ -165,11 +167,18 @@ namespace EvolverCore
 
         }
 
-        public TimeDataBar this[int barsAgo]
-        {
-            get { return null; }//FIXME
-            set { }
-        }
+        //public TimeDataBar this[int index]
+        //{
+        //    get
+        //    {
+        //        return GetValueAt(index);
+        //    }
+        //    set
+        //    {
+
+        //       SetValueAt(value, index);
+        //    }
+        //}
 
         //async task to request load of underlying data
         //set min/max index offsets during load
@@ -466,7 +475,7 @@ namespace EvolverCore
 
         public int Count { get; }
 
-        public T GetValue(int barsAgo);
+        //public T GetValue(int barsAgo);
     }
 
     public class DataSeries<T> : IDataSeries<T> where T : IDataPoint
@@ -488,6 +497,10 @@ namespace EvolverCore
             return _values.Where(predicate);
         }
 
+        public IEnumerable<(T,int)> Select(Func<T, int, (T,int)> selector)
+        {
+            return _values.Select(selector);
+        }
         public IEnumerable<T> Select(Func<T, int, T> selector)
         {
             return _values.Select(selector);
@@ -543,19 +556,20 @@ namespace EvolverCore
         }
 
         public T GetValueAt(int index) { return _values[index]; }
-        public T GetValue(int barsAgo) { return this[barsAgo]; }
-        public T this[int barsAgo]
+        //public T GetValue(int barsAgo) { return this[barsAgo]; }
+        public T this[int index]
         {
             get
             {
-                int c = _values.Count - 1;
-                if (barsAgo < 0 || barsAgo >= c)
-                {
-                    throw new EvolverException();
-                }
-                return _values[c - barsAgo];
+                //int c = _values.Count - 1;
+                //if (barsAgo < 0 || barsAgo > c)
+                //{
+                //    throw new EvolverException();
+                //}
+                //return _values[c - barsAgo];
+                return _values[index];
             }
-            internal set { }
+            internal set { _values[index] = value; }
         }
 
         public virtual void Add(T value) { _values.Add(value); }
@@ -845,6 +859,68 @@ namespace EvolverCore
             _instrumentCache.Add(record);
         }
 
+        public Indicator? CreateIndicator(Type indicatorType, IndicatorProperties properties, Indicator source, CalculationSource sourceType, int sourcePlotIndex = -1)
+        {
+            if (source.SourceRecord == null)
+            {
+                Globals.Instance.Log.LogMessage("CreateIndicator failed: source indicator has no record.", LogLevel.Error);
+                return null;
+            }
+
+            //FIXME : check cache first, only instance if needed
+            //foreach (Indicator cachedIndicator in _indicatorCache)
+            //{
+            //    if (cachedIndicator.IsDataOnly || cachedIndicator.SourceRecord == null) continue;
+
+            //    if (sourceType == CalculationSource.BarData)
+            //    {
+            //        //if (cachedIndicator.SourceRecord.SourceType != )
+            //        //{
+            //        //    return cachedIndicator;
+            //        //}
+            //    }
+            //}
+
+            if (indicatorType.BaseType != typeof(Indicator))
+            {
+                Globals.Instance.Log.LogMessage("CreateIndicator failed: type is not an indicator.", LogLevel.Error);
+                return null;
+            }
+
+            ConstructorInfo? iConstructor = indicatorType.GetConstructor(new Type[] { typeof(IndicatorProperties) });
+            if (iConstructor == null)
+            {
+                Globals.Instance.Log.LogMessage("CreateIndicator failed: failed to locate constructor.", LogLevel.Error);
+                return null;
+            }
+
+            Indicator? newIndicator = iConstructor.Invoke(new object[] { properties }) as Indicator;
+            if (newIndicator == null)
+            {
+                Globals.Instance.Log.LogMessage("CreateIndicator failed: constructor failed", LogLevel.Error);
+                return null;
+            }
+
+            IndicatorDataSourceRecord newSourceRecord = new IndicatorDataSourceRecord();
+            newSourceRecord.SourceBarData = source.SourceRecord.SourceBarData;
+            newSourceRecord.SourceIndicator = source;
+            newSourceRecord.SourcePlotIndex = sourcePlotIndex;
+            newSourceRecord.SourceType = sourceType;
+            newSourceRecord.StartDate = source.SourceRecord.StartDate;
+            newSourceRecord.EndDate = source.SourceRecord.EndDate;
+            
+            newIndicator.SetSourceData(newSourceRecord);
+            newIndicator.Startup();
+            _indicatorCache.Add(newIndicator);
+
+            if (newIndicator.WaitingForDataLoad)
+                source.DataChanged += newIndicator.OnSourceDataLoaded;
+            else
+                IndicatorReadyToRun(newIndicator);
+
+            return newIndicator;
+        }
+
         public Indicator? CreateDataIndicator(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
             InstrumentDataSliceRecord sliceRecord = new InstrumentDataSliceRecord()
@@ -868,14 +944,14 @@ namespace EvolverCore
 
             foreach (Indicator cachedIndicator in _indicatorCache)
             {
-                if (cachedIndicator.SourceRecord == null) continue;
+                if (!cachedIndicator.IsDataOnly || cachedIndicator.SourceRecord == null) continue;
                 if (cachedIndicator.SourceRecord == iSliceRecord)
                 {
                     return cachedIndicator;
                 }
             }
 
-            Indicator indicator = new Indicator();
+            Indicator indicator = new Indicator(new IndicatorProperties());
             indicator.Name = instrument.Name;
             indicator.IsDataOnly = true;
             indicator.SetSourceData(iSliceRecord);
@@ -930,6 +1006,14 @@ namespace EvolverCore
             return null;
         }
 
+        ////////////////////
+        //FIXME : this should be a call dependency graph
+        //        that can deliver live data updates in dependency order
+        object _indicatorLiveGraphLock = new object();
+        Queue<Indicator> _indicatorLiveGraph = new Queue<Indicator>();
+        ///////////////////
+
+
         object _indicatorReadyToRunQueueLock = new object();
         Queue<Indicator> _indicatorReadyToRunQueue = new Queue<Indicator>();
         Thread _indicatorWorker;
@@ -974,14 +1058,16 @@ namespace EvolverCore
                     {
                         if (indicator.State != IndicatorState.Startup || indicator.WaitingForDataLoad)
                         {
-                            //error
                             Globals.Instance.Log.LogMessage($"Indicator {indicator.Name} trying to run when not ready", LogLevel.Error);
                             continue;
                         }
 
                         indicator.RunHistory();
 
-                       //FIXME place the indicator into the live tick dependency graph (leave in history mode until 1st live tick arrives)
+                        lock (_indicatorLiveGraphLock)
+                        {
+                            _indicatorLiveGraph.Enqueue(indicator);
+                        }
                     }
                 }
                 catch (ThreadInterruptedException)

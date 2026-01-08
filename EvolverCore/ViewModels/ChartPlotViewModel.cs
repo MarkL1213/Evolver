@@ -23,7 +23,5 @@ namespace EvolverCore.ViewModels
         [ObservableProperty] double _plotLineThickness = 1.5;
         [ObservableProperty] SerializableDashStyle _plotLineStyle = new SerializableDashStyle();
         [ObservableProperty] PlotStyle _style = PlotStyle.Line;
-
-        [ObservableProperty] string _name = string.Empty;
     }
 }

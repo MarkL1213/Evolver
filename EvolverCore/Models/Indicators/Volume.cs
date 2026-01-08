@@ -13,7 +13,7 @@ namespace EvolverCore.Models.Indicators
 {
     public class Volume : Indicator
     {
-        public Volume()
+        public Volume(IndicatorProperties properties) : base(properties)
         {
             Name = "Volume";
         }
@@ -21,9 +21,7 @@ namespace EvolverCore.Models.Indicators
         public override void Configure()
         {
             PlotProperties plotProperties = new PlotProperties();
-            plotProperties.Style = PlotStyle.Bar;
-            
-            OutputPlot oplot = new OutputPlot("Volume", plotProperties);
+            OutputPlot oplot = new OutputPlot("Volume", plotProperties, PlotStyle.Bar);
             Outputs.Add(oplot);
         }
 

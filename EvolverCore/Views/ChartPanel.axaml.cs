@@ -60,6 +60,7 @@ public partial class ChartPanel : Decorator
         PointerPressed += OnPointerPressed;
         PointerMoved += OnPointerMoved;
         PointerReleased += OnPointerReleased;
+        PointerExited += OnPointerExited;
         SizeChanged += PanelSizeChanged;
 
         ContextMenu = ChartPanelContextMenu.CreateDefault();
@@ -124,6 +125,7 @@ public partial class ChartPanel : Decorator
 
     internal void OnDataUpdate()
     {
+        UpdateYAxisRange();
         foreach (ChartComponentBase component in _attachedComponents) component.CalculateSnapPoints();
         InvalidateVisual();
     }
@@ -172,6 +174,19 @@ public partial class ChartPanel : Decorator
             e.Pointer.Capture(this);
             e.Handled = true;
         }
+    }
+
+    private void OnPointerExited(object? sender, PointerEventArgs e)
+    {
+        if (_vm != null)
+        {
+            _vm.CrosshairPrice = null;
+            _vm.CrosshairTime = null;
+            InvalidateVisual();
+        }
+
+        e.Handled = true;
+        return;
     }
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)

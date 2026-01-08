@@ -12,15 +12,14 @@ namespace EvolverCore.Models.Indicators
 {
     internal class EMA : Indicator
     {
-        public EMA() { }
+        public EMA(IndicatorProperties properties) : base(properties) { }
 
         public void ConfigurePlots()
         {
             PlotProperties plotProperties = new PlotProperties();
-            plotProperties.Style = PlotStyle.Line;
             plotProperties.Name = "EMA";
 
-            Outputs.Add(new OutputPlot("EMA", plotProperties));
+            Outputs.Add(new OutputPlot("EMA", plotProperties, PlotStyle.Line));
         }
 
         public override void OnDataUpdate()

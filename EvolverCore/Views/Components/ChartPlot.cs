@@ -137,16 +137,21 @@ namespace EvolverCore.Views
 
         public double MinY(DateTime rangeMin, DateTime rangeMax)
         {
-            return 0;
+            IndicatorViewModel? vm = Properties.Indicator;
+            if (vm == null || vm.Indicator == null) return 0;
+
+            IEnumerable<(IDataPoint,int)> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
+            return vBars.Count() > 0 ? vBars.Min(p => p.Item1.Y) : 0;
         }
         public double MaxY(DateTime rangeMin, DateTime rangeMax)
         {
             IndicatorViewModel? vm = Properties.Indicator;
             if (vm == null || vm.Indicator == null) return 100;
 
-            IEnumerable<IDataPoint> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
+            IEnumerable<(IDataPoint,int)> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
 
-            return vBars.Count() > 0 ? vBars.Max(p => new BarPricePoint(p as TimeDataBar, Properties.PriceField).Y) : 100;
+            //return vBars.Count() > 0 ? vBars.Max(p => new BarPricePoint(p as TimeDataBar, Properties.PriceField).Y) : 100;
+            return vBars.Count() > 0 ? vBars.Max(p => p.Item1.Y) : 100;
         }
 
         public void Render(DrawingContext context)
@@ -169,8 +174,8 @@ namespace EvolverCore.Views
 
             _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
 
-            IEnumerable<IDataPoint> visibleDataPoints = ivm.Indicator.SelectOutputPointsInRange(vm.XAxis.Min, vm.XAxis.Max, Properties.PlotIndex, true);
-            IEnumerable<Point> visibleScreenPoints = visibleDataPoints.Select<IDataPoint, Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Y, bounds)));
+            IEnumerable<(IDataPoint, int)> visibleDataPoints = ivm.Indicator.SelectOutputPointsInRange(vm.XAxis.Min, vm.XAxis.Max, Properties.PlotIndex, true);
+            IEnumerable<Point> visibleScreenPoints = visibleDataPoints.Select<(IDataPoint, int), Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.Item1.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Item1.Y, bounds)));
 
             if (visibleScreenPoints.Count() < 2) return;
 
@@ -195,10 +200,11 @@ namespace EvolverCore.Views
 
             double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * ivm.Indicator.Interval.Ticks / 2)); // auto-scale width
 
-            IEnumerable<IDataPoint> visiblePoints = ivm.Indicator.SelectOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max,plotVM.PlotIndex);
+            IEnumerable<(IDataPoint,int)> visiblePoints = ivm.Indicator.SelectOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max,plotVM.PlotIndex);
 
-            foreach (var dataPoint in visiblePoints)
+            foreach (var tuple in visiblePoints)
             {
+                IDataPoint dataPoint = tuple.Item1;
                 if (dataPoint == null) continue;
 
                 double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);

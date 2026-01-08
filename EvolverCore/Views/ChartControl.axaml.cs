@@ -149,7 +149,7 @@ internal partial class ChartControl : UserControl
         PrimaryChartPanel.DetachAllChartComponents();
         DataComponent dataComponent = new DataComponent(PrimaryChartPanel);
         dataComponent.ChartPanelNumber = 0;
-
+        
         IndicatorViewModel ? ivm = dataComponent.Properties as IndicatorViewModel;
         if (ivm == null)
         {
@@ -231,30 +231,56 @@ internal partial class ChartControl : UserControl
 
     private void Test_AddVolumeIndicator()
     {
-        //ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        //if (vm == null|| vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
+        ChartControlViewModel? vm = DataContext as ChartControlViewModel;
+        if (vm == null || vm.PrimaryChartPanelViewModel.ChartComponents.Count == 0) return;
 
-        //DataComponent? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
-        //IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
-        //if (dataComponent == null || ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0) return;
+        DataComponent? dataComponent = PrimaryChartPanel.GetFirstDataComponent();
+        IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
+        if (dataComponent == null || ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0) return;
 
-        //VolumeViewModel vivm = new VolumeViewModel(ivm.Indicator);
+        SubPanel? panel = AddNewSubPanel();
+        if (panel == null) return;
+        if (panel.Panel == null || panel.Panel.DataContext == null) { RemoveSubPanel(panel.ID); return; }
+        ChartPanelViewModel? panelVM = panel.Panel.DataContext as ChartPanelViewModel;
+        if (panelVM == null) { RemoveSubPanel(panel.ID); return; }
 
-        //SubPanel? panel = AddNewSubPanel();
-        //if (panel == null) return;
-        //if (panel.Panel == null || panel.Panel.DataContext == null) { RemoveSubPanel(panel.ID); return; }
-        //ChartPanelViewModel? panelVM = panel.Panel.DataContext as ChartPanelViewModel;
-        //if (panelVM == null) { RemoveSubPanel(panel.ID); return; }
+        IndicatorProperties properties = new IndicatorProperties();
 
-        //Volume vi = new Volume(panel.Panel);
-        //vi.SetDataContext(vivm);
+        Volume? vi = Globals.Instance.DataManager.CreateIndicator(typeof(Volume), properties, ivm.Indicator, CalculationSource.BarData) as Volume;
+        if (vi == null)
+        {
+            Globals.Instance.Log.LogMessage("Failed to create indicator: Volume", LogLevel.Error);
+            RemoveSubPanel(panel.ID);
+            return;
+        }
+        vi.DataChanged += OnDataChanged;
 
-        //vi.Calculate();
-        //panel.Panel.AttachChartComponent(vi);
-        //panel.Panel.UpdateYAxisRange();
+        VolumeViewModel vivm = new VolumeViewModel(ivm.Indicator);
+        vivm.Indicator = vi;
 
-        //_volPanel = panel.Panel;
-        //_volIndicator = vi;
+        IndicatorComponent component = new IndicatorComponent(panel.Panel);
+        component.SetDataContext(vivm);
+
+        for (int i=0;i <vi.Outputs.Count;i++)
+        {
+            OutputPlot oPlot = vi.Outputs[i];
+            ChartPlotViewModel plotVM = new ChartPlotViewModel();
+            plotVM.PlotIndex = i;
+            plotVM.Indicator = vivm;
+            plotVM.Style = oPlot.Style;
+
+            ChartPlot plot = new ChartPlot(component);
+            plot.Properties = plotVM;
+            component.AddPlot(plot);
+        }
+
+        
+
+        panel.Panel.AttachChartComponent(component);
+        panel.Panel.UpdateYAxisRange();
+
+        _volPanel = panel.Panel;
+        _volIndicator = vi;
     }
 
     private void Test_RemoveVolumeIndicator()

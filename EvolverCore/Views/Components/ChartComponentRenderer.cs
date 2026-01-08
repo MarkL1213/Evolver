@@ -77,15 +77,12 @@ namespace EvolverCore.Views.Components
         internal void SetDataContext(ChartComponentViewModel vm)
         {
             _properties = vm;
-
-            ConfigurePlots();
-
             Parent.InvalidateVisual();
         }
 
         public virtual double MinY() { return 0; }
         public virtual double MaxY() { return 100; }
-        public virtual void ConfigurePlots() { }
+
 
         private List<IDataPoint> _snapPoints = new List<IDataPoint>();
         public List<IDataPoint> SnapPoints { get { return _snapPoints; } }
