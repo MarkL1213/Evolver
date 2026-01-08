@@ -1,19 +1,14 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Data;
-using Avalonia.Markup.Xaml;
 using Avalonia.Media;
-using Avalonia.Skia;
-using System.Collections.Generic;
-using System;
-using EvolverCore.ViewModels;
-using EvolverCore.Views.Components;
-using System.Linq;
-using CommunityToolkit.Mvvm.Input;
-using EvolverCore.Views;
-using EvolverCore.Models.Indicators;
-using EvolverCore.Models;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Input;
+using EvolverCore.Models;
+using EvolverCore.Models.Indicators;
+using EvolverCore.ViewModels;
+using EvolverCore.Views;
+using EvolverCore.Views.Components;
+using System;
+using System.Linq;
 
 namespace EvolverCore;
 
@@ -42,9 +37,9 @@ internal partial class ChartControl : UserControl
 
         if (PrimaryChartPanel.ContainsIndicator(indicator))
         {
-            if(indicator.IsDataOnly && AxisPositionTrackingData)
+            if (indicator.IsDataOnly && AxisPositionTrackingData)
                 PrimaryChartPanel.UpdateXAxisRange();
-            
+
             PrimaryChartPanel.OnDataUpdate();
         }
         else
@@ -65,7 +60,7 @@ internal partial class ChartControl : UserControl
 
     #region test cases
     private void AddTestMenu()
-    { 
+    {
         MenuItem testMenu = new MenuItem();
         testMenu.Header = "Test";
 
@@ -148,7 +143,7 @@ internal partial class ChartControl : UserControl
         PrimaryChartPanel.DetachAllChartComponents();
         DataComponent dataComponent = new DataComponent(PrimaryChartPanel);
         dataComponent.ChartPanelNumber = 0;
-        
+
         IndicatorViewModel ivm = new IndicatorViewModel(indicator);
         ivm.Indicator = indicator;
         ivm.RenderOrder = 0;
@@ -273,7 +268,7 @@ internal partial class ChartControl : UserControl
         Instrument? instrument = Globals.Instance.InstrumentCollection.Lookup("Random");
         if (instrument == null)
         {
-            Globals.Instance.Log.LogMessage("Unable to locate the Random instrument.",LogLevel.Error);
+            Globals.Instance.Log.LogMessage("Unable to locate the Random instrument.", LogLevel.Error);
             return;
         }
 
@@ -329,7 +324,7 @@ internal partial class ChartControl : UserControl
         base.OnDataContextChanged(e);
 
         //ChartControlViewModel? vm = DataContext as ChartControlViewModel;
-        
+
         if (DataContext is ChartControlViewModel vm)
         {
             PrimaryChartPanel.ClearValue(DataContextProperty);
@@ -351,7 +346,7 @@ internal partial class ChartControl : UserControl
         base.Render(context);
     }
 
-    
+
     int _subPanelNextNumber = 1;
 
     internal SubPanel? AddNewSubPanel()
@@ -362,7 +357,7 @@ internal partial class ChartControl : UserControl
 
         int subPanelCount = vm.SubPanelViewModels.Count;
 
-        ChartPanelViewModel subVM = new ChartPanelViewModel { XAxis = vm.SharedXAxis};
+        ChartPanelViewModel subVM = new ChartPanelViewModel { XAxis = vm.SharedXAxis };
         //foreach (BarDataSeries bds in vm.PrimaryChartPanelViewModel.Data)
         //{
         //    subVM.Data.Add(bds);
@@ -380,13 +375,13 @@ internal partial class ChartControl : UserControl
 
         ChartPanelGrid.RowDefinitions[0].Height = new GridLength(80, GridUnitType.Star);
         ChartPanelGrid.RowDefinitions.Insert(n, new RowDefinition(3, GridUnitType.Pixel));
-        ChartPanelGrid.RowDefinitions.Insert(n+1, new RowDefinition(20, GridUnitType.Star));
+        ChartPanelGrid.RowDefinitions.Insert(n + 1, new RowDefinition(20, GridUnitType.Star));
 
         Grid.SetRow(PrimaryXAxisSplitter, Grid.GetRow(PrimaryXAxisSplitter) + 2);
         Grid.SetRow(PrimaryXAxis, Grid.GetRow(PrimaryXAxis) + 2);
 
         GridSplitter gs = new GridSplitter();
-        Grid.SetRow(gs, (subPanelCount*2) + 1);
+        Grid.SetRow(gs, (subPanelCount * 2) + 1);
         Grid.SetColumn(gs, 0);
         Grid.SetColumnSpan(gs, 2);
         subPanel.Splitter = gs;
@@ -409,7 +404,7 @@ internal partial class ChartControl : UserControl
 
         cs.SetConnectedChartPanel(cp);
         cp.SetConnectedChartYAxis(cs);
-        
+
         return subPanel;
     }
     internal void RemoveSubPanel(Guid id)

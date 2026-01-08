@@ -1,23 +1,15 @@
-﻿using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Media;
+﻿using Avalonia.Media;
 using EvolverCore.Models;
 using EvolverCore.ViewModels;
 using EvolverCore.Views.Components;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EvolverCore.Views
 {
     public class IndicatorComponent : ChartComponentBase
     {
-        internal IndicatorComponent(ChartPanel parent):base(parent) { }
+        internal IndicatorComponent(ChartPanel parent) : base(parent) { }
         internal List<ChartPlot> ChartPlots { get; } = new List<ChartPlot>();
 
         internal void AddAllPlots(IndicatorViewModel vivm)

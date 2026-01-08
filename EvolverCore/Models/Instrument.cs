@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Threading.Tasks;
-using System.Xml.Serialization;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Collections;
+using System.Xml.Serialization;
 
 namespace EvolverCore
 {
@@ -14,7 +11,7 @@ namespace EvolverCore
 
     public class InstrumentCollection
     {
-        Dictionary<string,Instrument> _instruments = new Dictionary<string, Instrument> ();
+        Dictionary<string, Instrument> _instruments = new Dictionary<string, Instrument>();
 
         public InstrumentCollection() { }
 
@@ -27,8 +24,8 @@ namespace EvolverCore
 
         public Instrument? Lookup(string name)
         {
-            if(string.IsNullOrEmpty(name)) {  return null; }
-            if(!_instruments.ContainsKey(name)) { return null; }
+            if (string.IsNullOrEmpty(name)) { return null; }
+            if (!_instruments.ContainsKey(name)) { return null; }
             return _instruments[name];
         }
     }
@@ -91,7 +88,7 @@ namespace EvolverCore
             if (DataLoaded != null) DataLoaded(this, new InstrumentDataLoadedEventArgs(slice));
         }
 
-        public string FileName { get;internal set; } = string.Empty;
+        public string FileName { get; internal set; } = string.Empty;
 
         public InstrumentDataSeries? Data { get; internal set; } = null;
     }

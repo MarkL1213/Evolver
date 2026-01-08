@@ -8,7 +8,8 @@ namespace EvolverCore.Models
 
         internal bool DirectoryExists
         {
-            get {
+            get
+            {
                 string dir = Path.Combine(Globals.Instance.LayoutDirectory, Name);
                 return Directory.Exists(dir);
             }

@@ -1,13 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
+using EvolverCore.Views;
 using EvolverCore.Views.ContextMenus;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using EvolverCore.Views;
 
 namespace EvolverCore;
 
@@ -21,7 +20,7 @@ public partial class ChartXAxis : Decorator
             FontSizeProperty
         );
     }
-    
+
     public ChartXAxis()
     {
         InitializeComponent();
@@ -108,7 +107,7 @@ public partial class ChartXAxis : Decorator
         DataComponent? dataComponent = DataPanel.GetFirstDataComponent();
         IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
         DataInterval dataInterval;
-        if (dataComponent == null || ivm==null || ivm.Indicator == null)
+        if (dataComponent == null || ivm == null || ivm.Indicator == null)
             dataInterval = new DataInterval(Interval.Hour, 2);
         else
             dataInterval = ivm.Indicator.Interval;
@@ -125,7 +124,7 @@ public partial class ChartXAxis : Decorator
             {
                 case Interval.Second: label = tick.ToString("HH:mm:ss"); break;
                 case Interval.Minute: label = tick.ToString("HH:mm"); break;
-                case Interval.Hour: label = (tick.Hour==0 && tick.Minute==0)? tick.ToString("MMM d") : tick.ToString("HH:mm"); break;
+                case Interval.Hour: label = (tick.Hour == 0 && tick.Minute == 0) ? tick.ToString("MMM d") : tick.ToString("HH:mm"); break;
                 case Interval.Day: label = tick.ToString("MMM"); break;
                 case Interval.Month: label = i % 2 == 0 ? tick.ToString("MMM") : tick.ToString("y"); break;
                 case Interval.Year: label = tick.ToString("yyyy"); break;

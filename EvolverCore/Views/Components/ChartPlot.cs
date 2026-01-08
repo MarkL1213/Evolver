@@ -1,16 +1,11 @@
 ﻿using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
+using EvolverCore.Models;
 using EvolverCore.ViewModels;
 using EvolverCore.Views.Components;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using EvolverCore.Models;
-using System.Security;
 
 
 namespace EvolverCore.Views
@@ -141,7 +136,7 @@ namespace EvolverCore.Views
             IndicatorViewModel? vm = Properties.Indicator;
             if (vm == null || vm.Indicator == null) return 0;
 
-            IEnumerable<(IDataPoint,int)> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
+            IEnumerable<(IDataPoint, int)> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
             return vBars.Count() > 0 ? vBars.Min(p => p.Item1.Y) : 0;
         }
         public double MaxY(DateTime rangeMin, DateTime rangeMax)
@@ -149,7 +144,7 @@ namespace EvolverCore.Views
             IndicatorViewModel? vm = Properties.Indicator;
             if (vm == null || vm.Indicator == null) return 100;
 
-            IEnumerable<(IDataPoint,int)> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
+            IEnumerable<(IDataPoint, int)> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
 
             //return vBars.Count() > 0 ? vBars.Max(p => new BarPricePoint(p as TimeDataBar, Properties.PriceField).Y) : 100;
             return vBars.Count() > 0 ? vBars.Max(p => p.Item1.Y) : 100;
@@ -157,7 +152,7 @@ namespace EvolverCore.Views
 
         public void Render(DrawingContext context)
         {
-            if(Parent.Properties.IsHidden) return;
+            if (Parent.Properties.IsHidden) return;
 
             if (Style == PlotStyle.Bar) { DrawHistogram(context); }
             else if (Style == PlotStyle.Line) { DrawCurve(context); }
@@ -252,7 +247,7 @@ namespace EvolverCore.Views
 
             double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * indicator.Interval.Ticks / 2)); // auto-scale width
 
-            List<(IDataPoint,int)> visiblePoints = indicator.SelectOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max,plotIndex).ToList();
+            List<(IDataPoint, int)> visiblePoints = indicator.SelectOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max, plotIndex).ToList();
 
             //////////////
             //FIXME : optimize this to pre-select the visible range only
@@ -284,7 +279,7 @@ namespace EvolverCore.Views
                             double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
                             double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
                             double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
-                            
+
                             var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
 
                             if (currentFill != null) { context.FillRectangle(currentFill, rect); }

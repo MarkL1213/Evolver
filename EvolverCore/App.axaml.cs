@@ -1,11 +1,10 @@
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using EvolverCore.ViewModels;
 using EvolverCore.Views;
+using System.Linq;
 
 namespace EvolverCore
 {
@@ -32,7 +31,7 @@ namespace EvolverCore
                 Globals.Instance.Load();
 
 
-                 MainWindow mainWindow = new MainWindow
+                MainWindow mainWindow = new MainWindow
                 {
                     DataContext = new MainWindowViewModel(),
                 };

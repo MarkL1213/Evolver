@@ -69,15 +69,15 @@ namespace EvolverCore
 
         public void SaveProperties()
         {//serialize the EvolverProperties
-            if(!File.Exists(PropertiesFileName)) File.Create(PropertiesFileName);
+            if (!File.Exists(PropertiesFileName)) File.Create(PropertiesFileName);
 
-            using (FileStream fs = new FileStream(PropertiesFileName,FileMode.Truncate))
+            using (FileStream fs = new FileStream(PropertiesFileName, FileMode.Truncate))
             {
                 XmlSerializer serializer = new XmlSerializer(typeof(EvolverProperties));
                 serializer.Serialize(fs, Properties);
             }
         }
-        
+
         public void LoadProperties()
         {//deserialize the EvolverProperties
             if (!File.Exists(PropertiesFileName)) return;
@@ -85,7 +85,7 @@ namespace EvolverCore
             using (FileStream fs = File.OpenRead(PropertiesFileName))
             {
                 XmlSerializer serializer = new XmlSerializer(typeof(EvolverProperties));
-                EvolverProperties? props=serializer.Deserialize(fs) as EvolverProperties;
+                EvolverProperties? props = serializer.Deserialize(fs) as EvolverProperties;
                 Properties = props != null ? props : new EvolverProperties();
             }
         }

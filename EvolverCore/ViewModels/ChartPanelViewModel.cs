@@ -5,14 +5,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using EvolverCore.Models;
 using System;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Xml.Serialization;
 
 namespace EvolverCore.ViewModels
 {
     public partial class ChartPanelViewModel : ViewModelBase
     {
-        
+
         public static double DefaultScrollSensitivity = .25;
         public static double DefaultPanSensitivity = 1;
         public static bool DefaultShowGridLines = true;
@@ -36,10 +34,10 @@ namespace EvolverCore.ViewModels
         public static int DefaultCrosshairReadoutFontSize = 12;
 
         public static IBrush DefaultBackgroundColor = Brushes.Black;
-        
+
         internal ChartXAxisViewModel? XAxis { set; get; }
         internal ChartYAxisViewModel YAxis { get; } = new ChartYAxisViewModel();
-        
+
         internal ObservableCollection<ChartComponentViewModel> ChartComponents { get; } = new ObservableCollection<ChartComponentViewModel>();
 
         [ObservableProperty] double _scrollSensitivity = DefaultScrollSensitivity;
@@ -49,7 +47,7 @@ namespace EvolverCore.ViewModels
 
         [ObservableProperty]
         SerializableBrush _backgroundColor = new SerializableBrush(DefaultBackgroundColor);
-        
+
 
         [ObservableProperty] SerializableBrush _gridLinesColor = new SerializableBrush(DefaultGridLinesColor);
         [ObservableProperty] double _gridLinesThickness = DefaultGridLinesThickness;

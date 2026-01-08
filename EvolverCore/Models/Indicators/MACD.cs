@@ -1,10 +1,4 @@
-﻿using EvolverCore.ViewModels;
-using EvolverCore.Views;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using EvolverCore.Views;
 
 namespace EvolverCore.Models.Indicators
 {
@@ -15,7 +9,7 @@ namespace EvolverCore.Models.Indicators
         public void ConfigurePlots()
         {
             PlotProperties plotProperties = new PlotProperties();
-            Outputs.Add(new OutputPlot("MACD",plotProperties, PlotStyle.Line));
+            Outputs.Add(new OutputPlot("MACD", plotProperties, PlotStyle.Line));
         }
 
         //public override void Calculate()

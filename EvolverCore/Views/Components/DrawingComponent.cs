@@ -1,12 +1,5 @@
-﻿using Avalonia;
-using Avalonia.Media;
-using EvolverCore.ViewModels;
+﻿using Avalonia.Media;
 using EvolverCore.Views.Components;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EvolverCore.Views
 {

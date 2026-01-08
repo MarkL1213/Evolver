@@ -1,11 +1,6 @@
 ﻿using Avalonia.Media;
-using EvolverCore.ViewModels;
 using EvolverCore.Views;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EvolverCore.Models.Indicators
 {
@@ -21,7 +16,7 @@ namespace EvolverCore.Models.Indicators
     {
         public SMA(IndicatorProperties properties) : base(properties) { }
 
-        public new SMAProperties Properties { get { return  (SMAProperties)base.Properties; } }
+        public new SMAProperties Properties { get { return (SMAProperties)base.Properties; } }
 
         public override void Configure()
         {
@@ -29,7 +24,7 @@ namespace EvolverCore.Models.Indicators
             plotProperties.Name = "SMA";
             plotProperties.PlotLineBrush = Brushes.Red;
 
-            Outputs.Add(new OutputPlot("SMA",plotProperties, PlotStyle.Line));
+            Outputs.Add(new OutputPlot("SMA", plotProperties, PlotStyle.Line));
         }
 
         double _sum = 0;

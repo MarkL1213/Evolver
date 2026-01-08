@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
 using EvolverCore.Views.ContextMenus;
@@ -150,8 +149,8 @@ public partial class ChartYAxis : Decorator
     }
 
     private void DrawTickLinesAndLabels(DrawingContext context)
-    { 
-        if(_vm == null || _vm.XAxis == null) { return; }
+    {
+        if (_vm == null || _vm.XAxis == null) { return; }
 
         var yTicks = ChartPanel.ComputeDoubleTicks(_vm.YAxis.Min, _vm.YAxis.Max);
         _cachedTickLinePen ??= new Pen(TickLineColor, TickLineThickness, TickLineDashStyle);

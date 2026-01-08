@@ -1,23 +1,13 @@
 ﻿using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Layout;
-using Avalonia.Media;
-using Avalonia.Metadata;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using EvolverCore.Models;
 using NP.Ava.UniDock;
-using NP.Ava.UniDock.Factories;
 using NP.UniDockService;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel.DataAnnotations;
 using System;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Avalonia.OpenGL;
-using EvolverCore.Models;
 
 namespace EvolverCore.ViewModels
 {

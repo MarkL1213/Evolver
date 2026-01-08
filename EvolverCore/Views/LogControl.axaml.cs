@@ -1,11 +1,9 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using EvolverCore.ViewModels;
 using System;
-using System.IO;
 using System.Collections.Generic;
+using System.IO;
 
 namespace EvolverCore;
 
@@ -62,7 +60,7 @@ public partial class LogControl : UserControl
 
             viewModel.LoadExistingLog(lines);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Globals.Instance.Log.LogException(ex);
         }
@@ -72,7 +70,7 @@ public partial class LogControl : UserControl
     {
         if (!Dispatcher.UIThread.CheckAccess())
         {
-            Dispatcher.UIThread.InvokeAsync(()=>AppendText(text));
+            Dispatcher.UIThread.InvokeAsync(() => AppendText(text));
             return;
         }
 

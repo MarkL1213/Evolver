@@ -1,16 +1,13 @@
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.Input;
-using EvolverCore.ViewModels;
 using EvolverCore.Models;
+using EvolverCore.ViewModels;
 using NP.Ava.UniDock;
-using NP.Ava.Visuals.Controls;
 using NP.UniDockService;
 using System;
 using System.Collections.ObjectModel;
-using System.Security.Cryptography.X509Certificates;
 using System.Linq;
-using AvaloniaUI.DiagnosticsSupport;
 
 namespace EvolverCore.Views
 {
@@ -39,7 +36,7 @@ namespace EvolverCore.Views
         protected override void OnDataContextChanged(EventArgs e)
         {
             base.OnDataContextChanged(e);
-            MainWindowViewModel? vm= DataContext as MainWindowViewModel;
+            MainWindowViewModel? vm = DataContext as MainWindowViewModel;
             if (vm != null)
             {
                 vm.AvailableLayouts.CollectionChanged -= RefreshAvailableLayouts;
@@ -63,7 +60,7 @@ namespace EvolverCore.Views
         {
             RefreshAvailableLayoutsWork();
         }
-        
+
         private void RefreshAvailableLayoutsWork()
         {
             MainWindowViewModel? vm = DataContext as MainWindowViewModel;
@@ -80,7 +77,7 @@ namespace EvolverCore.Views
                 layoutItem.Header = layout.Name;
                 layoutItem.Command = new RelayCommand<Layout>(new Action<Layout?>(LoadLayoutMenuCommand));
                 layoutItem.CommandParameter = layout;
-                
+
                 LayoutMenuItem.Items.Add(layoutItem);
             }
             LayoutMenuItem.Items.Add(new Separator());
@@ -131,7 +128,7 @@ namespace EvolverCore.Views
             if (string.IsNullOrEmpty(Globals.Instance.Properties.LastUsedLayout)) return;
             MainWindowViewModel? vm = DataContext as MainWindowViewModel;
             if (vm == null) return;
-            Layout? layout=vm.AvailableLayouts.FirstOrDefault(p=>p.Name == Globals.Instance.Properties.LastUsedLayout);
+            Layout? layout = vm.AvailableLayouts.FirstOrDefault(p => p.Name == Globals.Instance.Properties.LastUsedLayout);
             if (layout != null) vm.LoadLayout(layout);
         }
 

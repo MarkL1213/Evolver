@@ -1,15 +1,9 @@
 ﻿using Avalonia.Media;
 using Avalonia.Media.Immutable;
-using Avalonia.Media.TextFormatting.Unicode;
-using CommunityToolkit.Mvvm.ComponentModel;
 using EvolverCore.Views;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EvolverCore.Models
 {
@@ -32,7 +26,7 @@ namespace EvolverCore.Models
         public double PlotLineThickness { get; set; } = 1.5;
         public IDashStyle? PlotLineStyle { get; set; } = null;
 
-        
+
         public string Name { get; set; } = string.Empty;
 
         public PlotProperties() { }
@@ -53,7 +47,7 @@ namespace EvolverCore.Models
 
         public bool ValueEquals(PlotProperties b)
         {
-            if(b == null) return false;
+            if (b == null) return false;
 
             if (PlotLineThickness != b.PlotLineThickness) return false;
 
@@ -61,7 +55,7 @@ namespace EvolverCore.Models
             if (PlotLineStyle != null && b.PlotLineStyle == null) return false;
             if (PlotLineStyle != null && b.PlotLineStyle != null)
             {
-                if(PlotLineStyle.Offset != b.PlotLineStyle.Offset) return false;
+                if (PlotLineStyle.Offset != b.PlotLineStyle.Offset) return false;
 
                 if (PlotLineStyle.Dashes == null && b.PlotLineStyle.Dashes != null) return false;
                 if (PlotLineStyle.Dashes != null && b.PlotLineStyle.Dashes == null) return false;
@@ -180,7 +174,7 @@ namespace EvolverCore.Models
             DefaultProperties = new PlotProperties();
             Properties = new PlotPropertyCollection(this);
         }
-        public OutputPlot(string name,PlotProperties defaultProperties, PlotStyle style)
+        public OutputPlot(string name, PlotProperties defaultProperties, PlotStyle style)
         {
             Name = name;
             DefaultProperties = defaultProperties;
@@ -297,7 +291,7 @@ namespace EvolverCore.Models
             return CurrentBarIndex == Slice.Count - 1;
         }
 
-        public IEnumerable<TimeDataBar> Where(Func<TimeDataBar,bool> predicate)
+        public IEnumerable<TimeDataBar> Where(Func<TimeDataBar, bool> predicate)
         {
             return Slice.Where(predicate);
         }
@@ -318,7 +312,7 @@ namespace EvolverCore.Models
             {
 
                 int n = CurrentBarIndex - barsAgo;
-                Slice.SetValueAt(value,n);
+                Slice.SetValueAt(value, n);
             }
         }
     }
@@ -326,7 +320,7 @@ namespace EvolverCore.Models
     [Serializable]
     public class IndicatorProperties
     {
-        
+
     }
 
     public class Indicator
@@ -369,7 +363,7 @@ namespace EvolverCore.Models
             }
             if (_sourceRecord.SourceIndicator != null && _sourceRecord.SourceType == CalculationSource.IndicatorPlot)
             {
-                Inputs.Add(new InputIndicator(_sourceRecord.SourceIndicator,_sourceRecord.SourcePlotIndex));
+                Inputs.Add(new InputIndicator(_sourceRecord.SourceIndicator, _sourceRecord.SourcePlotIndex));
                 if (DataChanged != null) DataChanged(this, EventArgs.Empty);
             }
         }
@@ -386,7 +380,7 @@ namespace EvolverCore.Models
 
         internal void OnSourceDataLoaded(object? sender, EventArgs e)
         {
-            if(_sourceRecord == null) { return; }
+            if (_sourceRecord == null) { return; }
 
             InstrumentDataSlice? sourceInstrumentSlice = sender as InstrumentDataSlice;
             if (sourceInstrumentSlice != null) sourceInstrumentSlice.DataLoaded -= OnSourceDataLoaded;
@@ -409,7 +403,7 @@ namespace EvolverCore.Models
             {
                 if (_sourceRecord.SourceType == CalculationSource.BarData && Bars.Count > 0)
                     return Bars[0].Where(p => p.Time >= min && p.Time <= max).ToList();
-                else if(_sourceRecord.SourceType == CalculationSource.IndicatorPlot && Inputs.Count > 0)
+                else if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && Inputs.Count > 0)
                     return Inputs[0].Indicator.SelectOutputPointsInRange(min, max, Inputs[0].PlotIndex).Select(tuple => tuple.Item1).ToList();
             }
 
@@ -500,7 +494,7 @@ namespace EvolverCore.Models
                 }
                 foreach (InputIndicator input in Inputs)
                 {
-                    if(input.Indicator.WaitingForDataLoad) return true;
+                    if (input.Indicator.WaitingForDataLoad) return true;
                 }
 
                 return false;
@@ -567,7 +561,7 @@ namespace EvolverCore.Models
                     break;
             }
 
-            if(DataChanged != null) DataChanged(this, EventArgs.Empty);
+            if (DataChanged != null) DataChanged(this, EventArgs.Empty);
         }
 
         private void runHistoryNextData()
@@ -582,7 +576,7 @@ namespace EvolverCore.Models
             for (int i = 0; i < Bars.Count; i++)
             {
                 DateTime x = Bars[i].GetValueAt(Bars[i].CurrentBarIndex + 1).Time;
-                if ( x < nextDataTime)
+                if (x < nextDataTime)
                 {
                     barsIndex = i;
                     nextDataTime = x;

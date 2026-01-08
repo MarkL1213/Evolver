@@ -3,7 +3,9 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using EvolverCore.Models;
 using EvolverCore.ViewModels;
+using EvolverCore.Views;
 using EvolverCore.Views.Components;
 using EvolverCore.Views.ContextMenus;
 using System;
@@ -11,9 +13,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using EvolverCore.Views;
-using EvolverCore.Models;
-using System.Runtime.InteropServices;
 
 
 namespace EvolverCore;
@@ -45,11 +44,11 @@ public partial class ChartPanel : Decorator
             CrosshairLineThicknessProperty,
             CrosshairLineDashStyleProperty
         };
-        
+
         foreach (AvaloniaProperty p in penProperties)
             p.Changed.AddClassHandler<ChartPanel>((c, _) => c.InvalidatePenCache());
 
-        
+
     }
 
     public ChartPanel()
@@ -112,7 +111,7 @@ public partial class ChartPanel : Decorator
             if (_vm.XAxis != null) _vm.XAxis.PropertyChanged -= AxisPropertyChanged;
             _vm.YAxis.PropertyChanged -= AxisPropertyChanged;
         }
-        
+
         _vm = DataContext as ChartPanelViewModel;
 
         if (_vm != null)
@@ -147,7 +146,7 @@ public partial class ChartPanel : Decorator
         foreach (ChartComponentBase component in _attachedComponents) component.CalculateSnapPoints();
         InvalidateVisual();
     }
-    
+
     private void InvalidatePenCache()
     {
         _cachedGridLinesPen = null;
@@ -372,7 +371,7 @@ public partial class ChartPanel : Decorator
     #endregion
 
     #region static coordinate and axis tick helpers
-    internal static double MapXToScreen(ChartXAxisViewModel vm,DateTime dateX, Rect bounds)
+    internal static double MapXToScreen(ChartXAxisViewModel vm, DateTime dateX, Rect bounds)
     {
         if (vm == null) return 0;
         var span = vm.Max - vm.Min;
@@ -381,7 +380,7 @@ public partial class ChartPanel : Decorator
         return (dateX - vm.Min).TotalMilliseconds / span.TotalMilliseconds * bounds.Width;
     }
 
-    internal static double MapYToScreen(ChartYAxisViewModel vm,double worldY, Rect bounds)
+    internal static double MapYToScreen(ChartYAxisViewModel vm, double worldY, Rect bounds)
     {
         if (worldY == double.NaN) return double.NaN;
 
@@ -422,7 +421,7 @@ public partial class ChartPanel : Decorator
             Interval.Day => TimeSpan.FromDays(Math.Max(1, interval.Value * 7)),      // 1d to weekly ticks
             Interval.Week => TimeSpan.FromDays(30),                                  // Weekly to monthly
             Interval.Month => TimeSpan.FromDays(90),                                  // Monthly to quarterly
-            Interval.Year => TimeSpan.FromDays(365*10),                                  // Yearly to decade
+            Interval.Year => TimeSpan.FromDays(365 * 10),                                  // Yearly to decade
             _ => TimeSpan.FromDays(1)
         };
 
@@ -644,7 +643,7 @@ public partial class ChartPanel : Decorator
         set { SetValue(CrosshairReadoutBackgroundColorProperty, value); }
     }
     #endregion
-    
+
     #region CrosshairReadoutFontSize property
     public static readonly StyledProperty<int> CrosshairReadoutFontSizeProperty =
         AvaloniaProperty.Register<ChartPanel, int>(nameof(CrosshairReadoutFontSize), 12);
@@ -665,22 +664,22 @@ public partial class ChartPanel : Decorator
     {
         get { return _connectedChartYAxis; }
     }
-    
+
     public void SetConnectedChartYAxis(ChartYAxis? chartChartYAxis)
     {
         _connectedChartYAxis = chartChartYAxis;
     }
     #endregion
     #endregion
-    
+
     internal void AttachChartComponent(ChartComponentBase component)
     {
         if (_vm == null) return;
         _attachedComponents.Add(component);
         _vm.ChartComponents.Add(component.Properties);
-        
+
         UpdateYAxisRange();
-        
+
         InvalidateVisual();
     }
 
@@ -697,7 +696,7 @@ public partial class ChartPanel : Decorator
         {
             if (component is IndicatorComponent)
             {
-                IndicatorComponent? indicatorComponent =  component as IndicatorComponent;
+                IndicatorComponent? indicatorComponent = component as IndicatorComponent;
                 if (indicatorComponent == null) continue;
                 if (indicatorComponent.ContainsIndicator(indicator)) return true;
             }
@@ -721,7 +720,7 @@ public partial class ChartPanel : Decorator
         DataComponent? dataComponent = GetFirstDataComponent();
         if (_vm.ChartComponents.Count == 0 || dataComponent == null) useDefaults = true;
         IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
-        if(ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0 || ivm.ChartPlots.Count == 0) useDefaults = true;
+        if (ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0 || ivm.ChartPlots.Count == 0) useDefaults = true;
 
         DataPlotViewModel? plot = ivm?.ChartPlots[0] as DataPlotViewModel;
         if (plot == null) useDefaults = true;
@@ -737,7 +736,7 @@ public partial class ChartPanel : Decorator
             return;
         }
 
-        
+
 
         double preferredWidth = plot.PreferredCandleWidth;
 
@@ -824,7 +823,7 @@ public partial class ChartPanel : Decorator
         DataComponent? dataComponent = GetFirstDataComponent();
         IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
         DataInterval dataInterval;
-        if (dataComponent == null || ivm==null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0)
+        if (dataComponent == null || ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0)
             dataInterval = new DataInterval(Interval.Hour, 2);
         else
             dataInterval = ivm.Indicator.Interval;
@@ -832,7 +831,7 @@ public partial class ChartPanel : Decorator
         var xTicks = ComputeDateTimeTicks(_vm.XAxis.Min, _vm.XAxis.Max, Bounds, dataInterval);
         foreach (var tick in xTicks)
         {
-            double x = MapXToScreen(_vm.XAxis,tick,Bounds);
+            double x = MapXToScreen(_vm.XAxis, tick, Bounds);
             var pen = IsMajorTick(tick) ? _cachedGridLinesBoldPen : _cachedGridLinesPen;
             context.DrawLine(pen, new Point(x, 0), new Point(x, Bounds.Height));
         }

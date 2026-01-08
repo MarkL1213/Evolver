@@ -1,9 +1,6 @@
-﻿using Avalonia.Data;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 
 namespace EvolverCore.Models
@@ -38,7 +35,7 @@ namespace EvolverCore.Models
         bool _disposedValue;
         Thread _logThread;
         StreamWriter? _logStream;
-        List<LogControl> _logControls = new List<LogControl> ();
+        List<LogControl> _logControls = new List<LogControl>();
 
 
         public Log()
@@ -55,7 +52,7 @@ namespace EvolverCore.Models
                 _logControls.Add(control);
             }
         }
-        
+
         internal void UnRegisterLogControl(LogControl control)
         {
             lock (_logControlsLock)
@@ -87,7 +84,7 @@ namespace EvolverCore.Models
                     _messages.Enqueue(new LogMessage(indent + t.Name + ": " + ex.Message, LogLevel.Error));
                     if (!string.IsNullOrEmpty(ex.StackTrace)) _messages.Enqueue(new LogMessage(indent + ex.StackTrace, LogLevel.Error));
 
-                    if(ex.InnerException != null)
+                    if (ex.InnerException != null)
                     {
                         indent += "    ";
                         ex = ex.InnerException;

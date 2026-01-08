@@ -1,8 +1,8 @@
-using System;
-using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using EvolverCore.ViewModels;
+using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace EvolverCore
 {
@@ -19,7 +19,7 @@ namespace EvolverCore
             if (param is null)
                 return null;
 
-            
+
 
             var name = param.GetType().FullName!.Replace("ViewModel", "View", StringComparison.Ordinal);
             var type = Type.GetType(name);

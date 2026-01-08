@@ -1,28 +1,18 @@
 ﻿using EvolverCore.Models;
 using MessagePack;
-using Microsoft.VisualBasic;
 using NP.Utilities;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Net.Http.Headers;
-using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Serialization;
-using Tmds.DBus.Protocol;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace EvolverCore
 {
-    public enum DataLoadState { NotLoaded,Loading, Loaded, Error };
+    public enum DataLoadState { NotLoaded, Loading, Loaded, Error };
 
     [Serializable]
     public class InstrumentDataSlice : IEnumerable<TimeDataBar>
@@ -191,7 +181,7 @@ namespace EvolverCore
     public class InstrumentDataSliceRecord
     {
         public InstrumentDataSliceRecord() { }
-        public Instrument Instrument {get;internal set;} = new Instrument();
+        public Instrument Instrument { get; internal set; } = new Instrument();
 
         public DataInterval Interval { get; internal set; } = new DataInterval() { Type = global::EvolverCore.Interval.Minute, Value = 1 };
 
@@ -335,7 +325,7 @@ namespace EvolverCore
             }
         }
 
-        public DateTime Add(DateTime dateTime,int n)
+        public DateTime Add(DateTime dateTime, int n)
         {
             switch (Type)
             {
@@ -356,7 +346,7 @@ namespace EvolverCore
             get
             {
                 DateTime now = DateTime.Now;
-                DateTime then = Add(now,1);
+                DateTime then = Add(now, 1);
                 return (now - then).Ticks;
             }
         }
@@ -372,7 +362,7 @@ namespace EvolverCore
         {
             return !(a == b);
         }
-        
+
         public static bool operator ==(DataInterval a, DataInterval b)
         {
             return (a.Type == b.Type && a.Value == b.Value);
@@ -497,7 +487,7 @@ namespace EvolverCore
             return _values.Where(predicate);
         }
 
-        public IEnumerable<(T,int)> Select(Func<T, int, (T,int)> selector)
+        public IEnumerable<(T, int)> Select(Func<T, int, (T, int)> selector)
         {
             return _values.Select(selector);
         }
@@ -698,7 +688,7 @@ namespace EvolverCore
             return (series[1].X - series[0].X).Ticks;
         }
 
-        public static BarDataSeries? RandomSeries(DateTime startTime, DataInterval interval,int size)
+        public static BarDataSeries? RandomSeries(DateTime startTime, DataInterval interval, int size)
         {
             BarDataSeries barDataSeries = new BarDataSeries();
             barDataSeries.Interval = interval;
@@ -736,7 +726,7 @@ namespace EvolverCore
                 TimeDataBar iBar = GetValueAt(i);
                 if (iBar.Time >= time)
                 {
-                    if(i==0 || iBar.Time == time) return i;
+                    if (i == 0 || iBar.Time == time) return i;
 
                     TimeDataBar prev = GetValueAt(i - 1);
                     TimeSpan prevSpan = time - prev.Time;
@@ -750,7 +740,7 @@ namespace EvolverCore
             return -1;
         }
 
-        public static InstrumentDataSeries? RandomSeries(Instrument instrument,DateTime startTime, DataInterval interval, int size)
+        public static InstrumentDataSeries? RandomSeries(Instrument instrument, DateTime startTime, DataInterval interval, int size)
         {
             InstrumentDataSeries barDataSeries = new InstrumentDataSeries();
             barDataSeries.Instrument = instrument;
@@ -781,7 +771,7 @@ namespace EvolverCore
     {
         List<InstrumentDataRecord> _instrumentCache = new List<InstrumentDataRecord>();
         List<Indicator> _indicatorCache = new List<Indicator>();
-        
+
         public delegate void DataChangeDelegate(InstrumentDataRecord instrumentRecord);
         public event DataChangeDelegate? DataChange = null;
 
@@ -908,7 +898,7 @@ namespace EvolverCore
             newSourceRecord.SourceType = sourceType;
             newSourceRecord.StartDate = source.SourceRecord.StartDate;
             newSourceRecord.EndDate = source.SourceRecord.EndDate;
-            
+
             newIndicator.SetSourceData(newSourceRecord);
             newIndicator.Startup();
             _indicatorCache.Add(newIndicator);

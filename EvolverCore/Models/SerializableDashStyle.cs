@@ -1,14 +1,10 @@
-﻿using Avalonia.Controls.Converters;
-using Avalonia.Media;
-using Avalonia.Media.Immutable;
+﻿using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Reactive.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace EvolverCore.Models
@@ -28,7 +24,8 @@ namespace EvolverCore.Models
         public IDashStyle? Style
         {
             get { return (_dashes != null && _dashes.Count > 0) ? new DashStyle(_dashes, _offset) : null; }
-            set {
+            set
+            {
                 SetProperty(ref _offset, (value != null) ? value.Offset : 0);
                 SetProperty(ref _dashes, (value != null && value.Dashes != null) ? value.Dashes.ToList() : null);
             }
