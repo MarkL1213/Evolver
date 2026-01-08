@@ -1079,6 +1079,12 @@ namespace EvolverCore
                 {
                     break;
                 }
+                catch (Exception e)
+                {
+                    Globals.Instance.Log.LogMessage("DataManager.indicatorWorker thread exception:", LogLevel.Error);
+                    Globals.Instance.Log.LogException(e);
+                    break;
+                }
             }
         }
 
@@ -1124,8 +1130,19 @@ namespace EvolverCore
         internal void Shutdown()
         {
             _wantExit = true;
-            if (_isSleeping) _indicatorWorker.Interrupt();
-            _indicatorWorker.Join();
+            if (_isSleeping && _indicatorWorker.IsAlive) _indicatorWorker.Interrupt();
+
+            if (_indicatorWorker.IsAlive)
+            {
+                if (!_indicatorWorker.Join(TimeSpan.FromSeconds(3)))
+                {
+                    Globals.Instance.Log.LogMessage("DataManager.indicatorWorker failed to shutdown.", LogLevel.Error);
+                }
+            }
+            else
+            {
+                Globals.Instance.Log.LogMessage("DataManager.indicatorWorker was already terminated.", LogLevel.Warn);
+            }
         }
 
         protected virtual void Dispose(bool disposing)

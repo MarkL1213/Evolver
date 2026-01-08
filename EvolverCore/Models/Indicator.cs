@@ -235,21 +235,28 @@ namespace EvolverCore.Models
             if (_sourceRecord != null)
             {
                 if (_sourceRecord.SourceType == CalculationSource.BarData && Bars.Count > 0)
-                    return Bars[0].Where(p => p.Time >= min && p.Time <= max);
+                    return Bars[0].Where(p => p.Time >= min && p.Time <= max).ToList();
                 else if(_sourceRecord.SourceType == CalculationSource.IndicatorPlot && Inputs.Count > 0)
-                    return Inputs[0].Indicator.SelectOutputPointsInRange(min, max, Inputs[0].PlotIndex).Select(tuple => tuple.Item1);
+                    return Inputs[0].Indicator.SelectOutputPointsInRange(min, max, Inputs[0].PlotIndex).Select(tuple => tuple.Item1).ToList();
             }
 
             return Enumerable.Empty<IDataPoint>();
         }
+
+        object _outputLock = new object();
+
         internal IEnumerable<(IDataPoint, int)> SelectOutputPointsInRange(DateTime min, DateTime max, int plotIndex, bool skipLeadingNaN = false)
         {
             if (plotIndex < 0 || plotIndex >= Outputs.Count) return Enumerable.Empty<(IDataPoint, int)>();
 
-            return Outputs[plotIndex].Series
-                    .Select((item, index) => (item!, index))
-                    .Where(tuple => tuple.Item1.X >= min && tuple.Item1.X <= max)
-                    .Select(t => ((IDataPoint)t.Item1, t.Item2));
+            lock (_outputLock)
+            {
+                return Outputs[plotIndex].Series
+                        .Select((item, index) => (item!, index))
+                        .Where(tuple => tuple.Item1.X >= min && tuple.Item1.X <= max)
+                        .Select(t => ((IDataPoint)t.Item1, t.Item2))
+                        .ToList();
+            }
         }
 
         public DateTime MinTime(int lastCount)
@@ -288,10 +295,11 @@ namespace EvolverCore.Models
 
         public int OutputElementCount(int plotIndex)
         {
-            if (plotIndex < 0 || plotIndex >= Outputs.Count) return 0;
-            OutputPlot oPlot = Outputs[plotIndex];
-            if (oPlot.Series == null) return 0;
-            return oPlot.Series.Count;
+            lock (_outputLock)
+            {
+                if (plotIndex < 0 || plotIndex >= Outputs.Count) return 0;
+                return Outputs[plotIndex].Series.Count;
+            }
         }
 
         public DataInterval Interval
@@ -338,9 +346,12 @@ namespace EvolverCore.Models
             {
                 input.CurrentBarIndex = -1;
             }
-            foreach (OutputPlot output in Outputs)
+            lock (_outputLock)
             {
-                output.CurrentBarIndex = -1;
+                foreach (OutputPlot output in Outputs)
+                {
+                    output.CurrentBarIndex = -1;
+                }
             }
         }
 
@@ -373,7 +384,12 @@ namespace EvolverCore.Models
                 }
 
                 if (moreHistory)
-                    runHistoryNextData();
+                {
+                    lock (_outputLock)
+                    {
+                        runHistoryNextData();
+                    }
+                }
                 else
                     break;
             }

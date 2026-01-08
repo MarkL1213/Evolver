@@ -190,9 +190,13 @@ namespace EvolverCore.Models
         public void Shutdown()
         {
             _wantExit = true;
-            if (_isSleeping) _logThread.Interrupt();
-            _logThread.Join();
-            
+            if (_isSleeping && _logThread.IsAlive) _logThread.Interrupt();
+
+            if (_logThread.IsAlive)
+            {
+                _logThread.Join(TimeSpan.FromSeconds(5));
+            }
+
             if (_logStream != null)
             {
                 _logStream?.Close();
