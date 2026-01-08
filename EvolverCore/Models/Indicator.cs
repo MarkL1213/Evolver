@@ -1,10 +1,12 @@
 ﻿using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Media.TextFormatting.Unicode;
 using CommunityToolkit.Mvvm.ComponentModel;
 using EvolverCore.Views;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -43,15 +45,151 @@ namespace EvolverCore.Models
             PlotLineBrush = SerializableBrush.CopyBrush(source.PlotLineBrush);
             PlotLineStyle = SerializableDashStyle.CopyStyle(source.PlotLineStyle);
         }
+
+        public Pen CreateLinePen()
+        {
+            return new Pen(PlotLineBrush, PlotLineThickness, PlotLineStyle);
+        }
+
+        public bool ValueEquals(PlotProperties b)
+        {
+            if(b == null) return false;
+
+            if (PlotLineThickness != b.PlotLineThickness) return false;
+
+            if (PlotLineStyle == null && b.PlotLineStyle != null) return false;
+            if (PlotLineStyle != null && b.PlotLineStyle == null) return false;
+            if (PlotLineStyle != null && b.PlotLineStyle != null)
+            {
+                if(PlotLineStyle.Offset != b.PlotLineStyle.Offset) return false;
+
+                if (PlotLineStyle.Dashes == null && b.PlotLineStyle.Dashes != null) return false;
+                if (PlotLineStyle.Dashes != null && b.PlotLineStyle.Dashes == null) return false;
+                if (PlotLineStyle.Dashes != null && b.PlotLineStyle.Dashes != null)
+                {
+                    if (PlotLineStyle.Dashes.Count != b.PlotLineStyle.Dashes.Count) return false;
+                    for (int i = 0; i < PlotLineStyle.Dashes.Count; i++)
+                    {
+                        if (PlotLineStyle.Dashes[i] != b.PlotLineStyle.Dashes[i]) return false;
+                    }
+                }
+            }
+
+            if (PlotLineBrush == null && b.PlotLineBrush != null) return false;
+            if (PlotLineBrush != null && b.PlotLineBrush == null) return false;
+            if (PlotLineBrush != null && b.PlotLineBrush != null)
+            {
+                if (PlotLineBrush.GetType() != b.PlotLineBrush.GetType()) return false;
+
+                if (PlotLineBrush is SolidColorBrush)
+                {
+                    SolidColorBrush brushA = (PlotLineBrush as SolidColorBrush)!;
+                    SolidColorBrush brushB = (b.PlotLineBrush as SolidColorBrush)!;
+
+                    if (brushA.Color != brushB.Color) return false;
+                    if (brushA.Opacity != brushB.Opacity) return false;
+                }
+                else if (PlotLineBrush is ImmutableSolidColorBrush)
+                {
+                    ImmutableSolidColorBrush brushA = (PlotLineBrush as ImmutableSolidColorBrush)!;
+                    ImmutableSolidColorBrush brushB = (b.PlotLineBrush as ImmutableSolidColorBrush)!;
+
+                    if (brushA.Color != brushB.Color) return false;
+                    if (brushA.Opacity != brushB.Opacity) return false;
+                }
+                else
+                {
+                    throw new EvolverException($"Brush type {PlotLineBrush.GetType()} value comparison not implemented.");
+                }
+            }
+
+            if (PlotFillBrush == null && b.PlotFillBrush != null) return false;
+            if (PlotFillBrush != null && b.PlotFillBrush == null) return false;
+            if (PlotFillBrush != null && b.PlotFillBrush != null)
+            {
+                if (PlotFillBrush.GetType() != b.PlotFillBrush.GetType()) return false;
+
+                if (PlotFillBrush is SolidColorBrush)
+                {
+                    SolidColorBrush brushA = (PlotFillBrush as SolidColorBrush)!;
+                    SolidColorBrush brushB = (b.PlotFillBrush as SolidColorBrush)!;
+
+                    if (brushA.Color != brushB.Color) return false;
+                    if (brushA.Opacity != brushB.Opacity) return false;
+                }
+                else if (PlotFillBrush is ImmutableSolidColorBrush)
+                {
+                    ImmutableSolidColorBrush brushA = (PlotFillBrush as ImmutableSolidColorBrush)!;
+                    ImmutableSolidColorBrush brushB = (b.PlotFillBrush as ImmutableSolidColorBrush)!;
+
+                    if (brushA.Color != brushB.Color) return false;
+                    if (brushA.Opacity != brushB.Opacity) return false;
+                }
+                else
+                {
+                    throw new EvolverException($"Brush type {PlotFillBrush.GetType()} value comparison not implemented.");
+                }
+            }
+            return true;
+        }
+    }
+
+    public class PlotPropertyCollection
+    {
+        OutputPlot _parent;
+        private List<PlotProperties> _properties = new List<PlotProperties>();
+        public PlotPropertyCollection(OutputPlot parent) { _parent = parent; }
+
+        public PlotProperties GetValueAt(int index)
+        {
+            return _properties[index];
+        }
+
+        public List<PlotProperties> ToList() { return _properties.ToList(); }
+
+        public void Add(PlotProperties prop) { _properties.Add(prop); }
+
+        public PlotProperties this[int barsAgo]
+        {
+            get
+            {
+                int n = _parent.CurrentBarIndex - barsAgo;
+
+                if (n > _properties.Count || n < 0)
+                    throw new EvolverException("PlotPropertyCollection get[barsAgo] out of range.");
+
+                return _properties[n];
+            }
+            set
+            {
+                int n = _parent.CurrentBarIndex - barsAgo;
+
+                if (n > _properties.Count || n < 0)
+                    throw new EvolverException("PlotPropertyCollection set[barsAgo] out of range.");
+
+                _properties[n] = value;
+            }
+        }
+
     }
 
     public class OutputPlot
     {
-        public OutputPlot() { DefaultProperties = new PlotProperties(); }
-        public OutputPlot(string name,PlotProperties defaultProperties, PlotStyle style) { Name = name; DefaultProperties = defaultProperties; Style = style; }
+        public OutputPlot()
+        {
+            DefaultProperties = new PlotProperties();
+            Properties = new PlotPropertyCollection(this);
+        }
+        public OutputPlot(string name,PlotProperties defaultProperties, PlotStyle style)
+        {
+            Name = name;
+            DefaultProperties = defaultProperties;
+            Style = style;
+            Properties = new PlotPropertyCollection(this);
+        }
 
         public string Name { get; internal set; } = string.Empty;
-        public List<PlotProperties> Properties { get; } = new List<PlotProperties>();
+        public PlotPropertyCollection Properties { get; }
         public TimeDataSeries Series { get; internal set; } = new TimeDataSeries();
 
         public PlotStyle Style { get; set; } = PlotStyle.Line;

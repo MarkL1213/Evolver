@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using EvolverCore.Models;
+using System.Security;
 
 
 namespace EvolverCore.Views
@@ -168,19 +169,67 @@ namespace EvolverCore.Views
             ChartPanelViewModel? vm = Parent.Parent.DataContext as ChartPanelViewModel;
             IndicatorViewModel? ivm = Properties.Indicator;
 
-
             if (vm == null || vm.XAxis == null || ivm == null || ivm.Indicator == null || ivm.Indicator.OutputElementCount(Properties.PlotIndex) == 0) { return; }
+
             Rect bounds = Parent.Parent.Bounds;
+            Indicator indicator = ivm.Indicator;
+            int plotIndex = Properties.PlotIndex;
 
-            _cachedPlotLinePen ??= new Pen(PlotLineColor, PlotLineThickness, PlotLineStyle);
+            List<(IDataPoint, int)> visibleDataPoints = indicator.SelectOutputPointsInRange(
+                    vm.XAxis.Min, vm.XAxis.Max, plotIndex, skipLeadingNaN: true).ToList();
 
-            IEnumerable<(IDataPoint, int)> visibleDataPoints = ivm.Indicator.SelectOutputPointsInRange(vm.XAxis.Min, vm.XAxis.Max, Properties.PlotIndex, true);
-            IEnumerable<Point> visibleScreenPoints = visibleDataPoints.Select<(IDataPoint, int), Point>(p => new Point(ChartPanel.MapXToScreen(vm.XAxis, p.Item1.X, bounds), ChartPanel.MapYToScreen(vm.YAxis, p.Item1.Y, bounds)));
+            List<Point> visibleScreenPoints = visibleDataPoints
+                .Select(p => new Point(
+                    ChartPanel.MapXToScreen(vm.XAxis, p.Item1.X, bounds),
+                    ChartPanel.MapYToScreen(vm.YAxis, p.Item1.Y, bounds)))
+                .ToList();
 
             if (visibleScreenPoints.Count() < 2) return;
 
-            var geometry = new PolylineGeometry(visibleScreenPoints, false);
-            context.DrawGeometry(null, _cachedPlotLinePen, geometry);
+            //////////////
+            //FIXME : optimize this to pre-select the visible range only
+            List<PlotProperties> propertiesList = indicator.Outputs[plotIndex].Properties.ToList();
+            //////////////
+
+            // Start the first batch with the first segment (points 0 to 1)
+            var currentBatch = new List<Point> { visibleScreenPoints[0], visibleScreenPoints[1] };
+            var currentProp = propertiesList[visibleDataPoints[0].Item2];
+            var currentPen = currentProp.CreateLinePen();
+
+            for (int i = 2; i < visibleScreenPoints.Count; i++)
+            {
+                // The segment being added is from (i-1) to i, styled by prop at (i-1)
+                PlotProperties segProp = propertiesList[visibleDataPoints[i - 1].Item2];
+
+                if (currentProp.ValueEquals(segProp))
+                {
+                    currentBatch.Add(visibleScreenPoints[i]);
+                }
+                else
+                {
+                    if (currentBatch.Count >= 2)
+                    {
+                        var geometry = new PolylineGeometry(currentBatch, false);
+                        context.DrawGeometry(null, currentPen, geometry);
+                    }
+
+                    currentBatch.Clear();
+                    currentBatch.Add(visibleScreenPoints[i - 1]);
+                    currentBatch.Add(visibleScreenPoints[i]);
+                    currentProp = segProp;
+                    currentPen = segProp.CreateLinePen();
+                }
+            }
+
+
+            if (currentBatch.Count >= 2)
+            {
+                var geometry = new PolylineGeometry(currentBatch, false);
+                context.DrawGeometry(null, currentPen, geometry);
+            }
+
+            //var geometry = new PolylineGeometry(visibleScreenPoints, false);
+            //context.DrawGeometry(null, _cachedPlotLinePen, geometry);
         }
 
         private void DrawHistogram(DrawingContext context)
@@ -192,34 +241,79 @@ namespace EvolverCore.Views
             ChartPanelViewModel? panelVM = Parent.Parent.DataContext as ChartPanelViewModel;
             if (panelVM == null || panelVM.XAxis == null) return;
             Rect bounds = Parent.Parent.Bounds;
+            Indicator indicator = ivm.Indicator;
+            int plotIndex = Properties.PlotIndex;
+
 
             TimeSpan xSpan = panelVM.XAxis.Max - panelVM.XAxis.Min;
             double yRange = panelVM.YAxis.Max - panelVM.YAxis.Min;
             if (xSpan <= TimeSpan.Zero || yRange <= 0) return;
             double pixelsPerTick = bounds.Width / xSpan.Ticks;
 
-            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * ivm.Indicator.Interval.Ticks / 2)); // auto-scale width
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * indicator.Interval.Ticks / 2)); // auto-scale width
 
-            IEnumerable<(IDataPoint,int)> visiblePoints = ivm.Indicator.SelectOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max,plotVM.PlotIndex);
+            List<(IDataPoint,int)> visiblePoints = indicator.SelectOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max,plotIndex).ToList();
 
-            foreach (var tuple in visiblePoints)
+            //////////////
+            //FIXME : optimize this to pre-select the visible range only
+            List<PlotProperties> propertiesList = indicator.Outputs[plotIndex].Properties.ToList();
+            //////////////
+
+            // Start the first batch with the first bar (point 0)
+            var currentBatch = new List<IDataPoint> { visiblePoints[0].Item1 };
+            var currentProp = propertiesList[visiblePoints[0].Item2];
+            var currentPen = currentProp.CreateLinePen();
+            var currentFill = currentProp.PlotFillBrush;
+
+
+
+            for (int i = 1; i < visiblePoints.Count; i++)
             {
-                IDataPoint dataPoint = tuple.Item1;
-                if (dataPoint == null) continue;
+                PlotProperties nextBarProp = propertiesList[visiblePoints[i].Item2];
 
-                double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
-                double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
-                double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
+                if (currentProp.ValueEquals(nextBarProp))
+                {
+                    currentBatch.Add(visiblePoints[i].Item1);
+                }
+                else
+                {
+                    if (currentBatch.Count > 0)
+                    {
+                        foreach (IDataPoint dataPoint in currentBatch)
+                        {
+                            double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
+                            double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
+                            double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
+                            
+                            var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
 
-                var fillBrush = Properties.PlotFillBrush.Color;
+                            if (currentFill != null) { context.FillRectangle(currentFill, rect); }
+                            context.DrawRectangle(currentPen, rect);
+                        }
+                    }
 
-                _cachedPlotLinePen ??= new Pen(Properties.PlotLineBrush.Color, Properties.PlotLineThickness, Properties.PlotLineStyle.Style);
-                if (fillBrush == null || _cachedPlotLinePen == null) { return; }
 
-                var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
+                    currentBatch.Clear();
+                    currentBatch.Add(visiblePoints[i].Item1);
+                    currentProp = nextBarProp;
+                    currentPen = nextBarProp.CreateLinePen();
+                    currentFill = nextBarProp.PlotFillBrush;
+                }
+            }
 
-                context.FillRectangle(fillBrush, rect);
-                context.DrawRectangle(_cachedPlotLinePen, rect);
+            if (currentBatch.Count > 0)
+            {
+                foreach (IDataPoint dataPoint in currentBatch)
+                {
+                    double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
+                    double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
+                    double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
+
+                    var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
+
+                    if (currentFill != null) { context.FillRectangle(currentFill, rect); }
+                    context.DrawRectangle(currentPen, rect);
+                }
             }
         }
 
