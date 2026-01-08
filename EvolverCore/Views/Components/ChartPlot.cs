@@ -194,7 +194,7 @@ namespace EvolverCore.Views
             // Start the first batch with the first segment (points 0 to 1)
             var currentBatch = new List<Point> { visibleScreenPoints[0], visibleScreenPoints[1] };
             var currentProp = propertiesList[visibleDataPoints[0].Item2];
-            var currentPen = currentProp.CreateLinePen();
+            var currentPen = currentProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
 
             for (int i = 2; i < visibleScreenPoints.Count; i++)
             {
@@ -217,7 +217,7 @@ namespace EvolverCore.Views
                     currentBatch.Add(visibleScreenPoints[i - 1]);
                     currentBatch.Add(visibleScreenPoints[i]);
                     currentProp = segProp;
-                    currentPen = segProp.CreateLinePen();
+                    currentPen = segProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
                 }
             }
 
@@ -262,7 +262,7 @@ namespace EvolverCore.Views
             // Start the first batch with the first bar (point 0)
             var currentBatch = new List<IDataPoint> { visiblePoints[0].Item1 };
             var currentProp = propertiesList[visiblePoints[0].Item2];
-            var currentPen = currentProp.CreateLinePen();
+            var currentPen = currentProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
             var currentFill = currentProp.PlotFillBrush;
 
 
@@ -296,7 +296,7 @@ namespace EvolverCore.Views
                     currentBatch.Clear();
                     currentBatch.Add(visiblePoints[i].Item1);
                     currentProp = nextBarProp;
-                    currentPen = nextBarProp.CreateLinePen();
+                    currentPen = nextBarProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
                     currentFill = nextBarProp.PlotFillBrush;
                 }
             }
