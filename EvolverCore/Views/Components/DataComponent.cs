@@ -11,10 +11,7 @@ namespace EvolverCore.Views
 {
     internal class DataComponent : IndicatorComponent
     {
-        public DataComponent(ChartPanel panel):base(panel)
-        {
-            Properties = new IndicatorViewModel();
-        }
+        public DataComponent(ChartPanel panel) : base(panel) { }
 
         public override double MinY()
         {

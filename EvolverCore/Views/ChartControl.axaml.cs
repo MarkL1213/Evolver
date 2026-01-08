@@ -149,13 +149,10 @@ internal partial class ChartControl : UserControl
         DataComponent dataComponent = new DataComponent(PrimaryChartPanel);
         dataComponent.ChartPanelNumber = 0;
         
-        IndicatorViewModel ? ivm = dataComponent.Properties as IndicatorViewModel;
-        if (ivm == null)
-        {
-            throw new EvolverException("New DataComponent does not have an IndicatorViewModel");
-        }
+        IndicatorViewModel ivm = new IndicatorViewModel(indicator);
         ivm.Indicator = indicator;
         ivm.RenderOrder = 0;
+        dataComponent.Properties = ivm;
 
         DataPlotViewModel dataProperties = new DataPlotViewModel();
         dataProperties.Indicator = ivm;
@@ -166,7 +163,6 @@ internal partial class ChartControl : UserControl
         dataComponent.AddPlot(dataPlot);
 
         PrimaryChartPanel.AttachChartComponent(dataComponent);
-        PrimaryChartPanel.UpdateXAxisRange();
     }
 
     private void Test_AddSMAToVolume()
@@ -185,27 +181,12 @@ internal partial class ChartControl : UserControl
         }
         vi.DataChanged += OnDataChanged;
 
-        IndicatorViewModel vivm = new IndicatorViewModel();
-        vivm.Indicator = vi;
-
+        IndicatorViewModel vivm = new IndicatorViewModel(vi);
         IndicatorComponent component = new IndicatorComponent(_volPanel);
         component.SetDataContext(vivm);
-
-        for (int i = 0; i < vi.Outputs.Count; i++)
-        {
-            OutputPlot oPlot = vi.Outputs[i];
-            ChartPlotViewModel plotVM = new ChartPlotViewModel();
-            plotVM.PlotIndex = i;
-            plotVM.Indicator = vivm;
-            plotVM.Style = oPlot.Style;
-
-            ChartPlot plot = new ChartPlot(component);
-            plot.Properties = plotVM;
-            component.AddPlot(plot);
-        }
+        component.AddAllPlots(vivm);
 
         _volPanel.AttachChartComponent(component);
-        _volPanel.UpdateYAxisRange();
     }
 
     private void Test_AddSMAToPrice()
@@ -229,27 +210,12 @@ internal partial class ChartControl : UserControl
         }
         vi.DataChanged += OnDataChanged;
 
-        IndicatorViewModel vivm = new IndicatorViewModel();
-        vivm.Indicator = vi;
-
+        IndicatorViewModel vivm = new IndicatorViewModel(vi);
         IndicatorComponent component = new IndicatorComponent(PrimaryChartPanel);
         component.SetDataContext(vivm);
-
-        for (int i = 0; i < vi.Outputs.Count; i++)
-        {
-            OutputPlot oPlot = vi.Outputs[i];
-            ChartPlotViewModel plotVM = new ChartPlotViewModel();
-            plotVM.PlotIndex = i;
-            plotVM.Indicator = vivm;
-            plotVM.Style = oPlot.Style;
-
-            ChartPlot plot = new ChartPlot(component);
-            plot.Properties = plotVM;
-            component.AddPlot(plot);
-        }
+        component.AddAllPlots(vivm);
 
         PrimaryChartPanel.AttachChartComponent(component);
-        PrimaryChartPanel.UpdateYAxisRange();
     }
 
     ChartPanel? _volPanel;
@@ -281,27 +247,12 @@ internal partial class ChartControl : UserControl
         }
         vi.DataChanged += OnDataChanged;
 
-        IndicatorViewModel vivm = new IndicatorViewModel();
-        vivm.Indicator = vi;
-
+        IndicatorViewModel vivm = new IndicatorViewModel(vi);
         IndicatorComponent component = new IndicatorComponent(panel.Panel);
         component.SetDataContext(vivm);
-
-        for (int i=0;i <vi.Outputs.Count;i++)
-        {
-            OutputPlot oPlot = vi.Outputs[i];
-            ChartPlotViewModel plotVM = new ChartPlotViewModel();
-            plotVM.PlotIndex = i;
-            plotVM.Indicator = vivm;
-            plotVM.Style = oPlot.Style;
-
-            ChartPlot plot = new ChartPlot(component);
-            plot.Properties = plotVM;
-            component.AddPlot(plot);
-        }
+        component.AddAllPlots(vivm);
 
         panel.Panel.AttachChartComponent(component);
-        panel.Panel.UpdateYAxisRange();
 
         _volPanel = panel.Panel;
         _volIndicator = vi;

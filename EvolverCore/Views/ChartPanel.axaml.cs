@@ -678,6 +678,9 @@ public partial class ChartPanel : Decorator
         if (_vm == null) return;
         _attachedComponents.Add(component);
         _vm.ChartComponents.Add(component.Properties);
+        
+        UpdateYAxisRange();
+        
         InvalidateVisual();
     }
 
