@@ -36,9 +36,9 @@ namespace EvolverCore.Models.Indicators
                 BarPricePoint p = new BarPricePoint(Bars[0][0], Properties.PriceField);
                 _sum += p.Y;
 
-                if (CurrentBarIndex >= Properties.Period)
+                if (CurrentBarIndex + 1 >= Properties.Period)
                 {
-                    BarPricePoint oldP = new BarPricePoint(Bars[0][Properties.Period], Properties.PriceField);
+                    BarPricePoint oldP = new BarPricePoint(Bars[0][Properties.Period - 1], Properties.PriceField);
                     _sum -= oldP.Y;
 
                     Outputs[0][0] = _sum / Properties.Period;
@@ -47,9 +47,9 @@ namespace EvolverCore.Models.Indicators
             else if (SourceRecord!.SourceType == CalculationSource.IndicatorPlot)
             {
                 _sum += Inputs[0][0];
-                if (CurrentInputIndex >= Properties.Period)
+                if (CurrentInputIndex + 1 >= Properties.Period)
                 {
-                    _sum -= Inputs[0][Properties.Period];
+                    _sum -= Inputs[0][Properties.Period - 1];
                     Outputs[0][0] = _sum / Properties.Period;
                 }
             }

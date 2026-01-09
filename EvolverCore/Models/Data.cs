@@ -1086,7 +1086,7 @@ namespace EvolverCore
                 if (instrument == null)
                     throw new EvolverException($"Unknown Instrument: Random");
 
-                await Task.Delay(5000);//<-- fake 5 sec delay for testing 
+                await Task.Delay(2000);//<-- fake 2 sec delay for testing 
 
                 ///////////////////////////
                 TimeSpan span = dataRecord.EndTime - dataRecord.StartTime;

@@ -186,15 +186,44 @@ namespace EvolverCore.Views
             List<PlotProperties> propertiesList = indicator.Outputs[plotIndex].Properties.ToList();
             //////////////
 
-            // Start the first batch with the first segment (points 0 to 1)
-            var currentBatch = new List<Point> { visibleScreenPoints[0], visibleScreenPoints[1] };
-            var currentProp = propertiesList[visibleDataPoints[0].Item2];
+            int n = 0;
+            for (int i = 0; i < visibleScreenPoints.Count-1; i++)
+            {
+                if (!double.IsNaN(visibleDataPoints[i].Item1.Y)) { n = i; break; }
+            }
+
+            var currentBatch = new List<Point> { visibleScreenPoints[n] };
+            var currentProp = propertiesList[visibleDataPoints[n].Item2];
             var currentPen = currentProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
 
-            for (int i = 2; i < visibleScreenPoints.Count; i++)
+            for (int i = n+1; i < visibleScreenPoints.Count; i++)
             {
                 // The segment being added is from (i-1) to i, styled by prop at (i-1)
                 PlotProperties segProp = propertiesList[visibleDataPoints[i - 1].Item2];
+
+                if (double.IsNaN(visibleDataPoints[i].Item1.Y))
+                {//draw the current batch an skip
+                    if (currentBatch.Count >= 2)
+                    {
+                        var geometry = new PolylineGeometry(currentBatch, false);
+                        context.DrawGeometry(null, currentPen, geometry);
+                    }
+                    else if (currentBatch.Count == 1)
+                    {
+                        context.FillRectangle(currentPen.Brush!, new Rect(currentBatch[0].X, currentBatch[0].Y, 1, 1));
+                    }
+
+                    currentBatch.Clear();
+                    continue;
+                }
+
+                if (currentBatch.Count == 0)
+                {//skip forward until we get 2 valid points...
+                    currentBatch.Add(visibleScreenPoints[i]);
+                    currentProp = propertiesList[visibleDataPoints[i].Item2];
+                    currentPen = currentProp.CreateLinePen();
+                    continue;
+                }
 
                 if (currentProp.ValueEquals(segProp))
                 {
@@ -222,9 +251,10 @@ namespace EvolverCore.Views
                 var geometry = new PolylineGeometry(currentBatch, false);
                 context.DrawGeometry(null, currentPen, geometry);
             }
-
-            //var geometry = new PolylineGeometry(visibleScreenPoints, false);
-            //context.DrawGeometry(null, _cachedPlotLinePen, geometry);
+            else if (currentBatch.Count == 1)
+            {
+                context.FillRectangle(currentPen.Brush!, new Rect(currentBatch[0].X, currentBatch[0].Y, 1, 1));
+            }
         }
 
         private void DrawHistogram(DrawingContext context)
@@ -254,17 +284,46 @@ namespace EvolverCore.Views
             List<PlotProperties> propertiesList = indicator.Outputs[plotIndex].Properties.ToList();
             //////////////
 
+
+            int n = 0;
+            for (int i = 0; i < visiblePoints.Count - 1; i++)
+            {
+                if (!double.IsNaN(visiblePoints[i].Item1.Y)) { n = i; break; }
+            }
+
             // Start the first batch with the first bar (point 0)
-            var currentBatch = new List<IDataPoint> { visiblePoints[0].Item1 };
-            var currentProp = propertiesList[visiblePoints[0].Item2];
+            var currentBatch = new List<IDataPoint> { visiblePoints[n].Item1 };
+            var currentProp = propertiesList[visiblePoints[n].Item2];
             var currentPen = currentProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
             var currentFill = currentProp.PlotFillBrush;
 
 
 
-            for (int i = 1; i < visiblePoints.Count; i++)
+            for (int i = n+1; i < visiblePoints.Count; i++)
             {
                 PlotProperties nextBarProp = propertiesList[visiblePoints[i].Item2];
+
+                if (double.IsNaN(visiblePoints[n].Item1.Y))
+                {
+                    if (currentBatch.Count > 0)
+                    {
+                        foreach (IDataPoint dataPoint in currentBatch)
+                        {
+                            double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
+                            double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
+                            double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
+
+                            var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
+
+                            if (currentFill != null) { context.FillRectangle(currentFill, rect); }
+                            context.DrawRectangle(currentPen, rect);
+                        }
+                    }
+
+                    currentBatch.Clear();
+                    continue;
+                }
+
 
                 if (currentProp.ValueEquals(nextBarProp))
                 {
