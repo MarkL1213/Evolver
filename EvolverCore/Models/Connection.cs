@@ -68,7 +68,7 @@ namespace EvolverCore.Models
             ConnectionState oldState = State;
             State = ConnectionState.Connecting;
             WantConnect = true;
-            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs(oldState, State));
+            StateChange?.Invoke(this, new ConnectionStateChangeEventArgs(oldState, State));
 
             wakeup();
         }
@@ -79,7 +79,8 @@ namespace EvolverCore.Models
             ConnectionState oldState = State;
             State = ConnectionState.Disconnecting;
             WantConnect = false;
-            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs(oldState, State));
+            StateChange?.Invoke(this, new ConnectionStateChangeEventArgs(oldState, State));
+
             wakeup();
         }
 
@@ -106,7 +107,7 @@ namespace EvolverCore.Models
                             ConnectionState oldState = State;
                             State = ConnectionState.Disconnected;
                             Thread.MemoryBarrier();
-                            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs(oldState, State));
+                            StateChange?.Invoke(this, new ConnectionStateChangeEventArgs(oldState, State));
                             continue;
                         }
                         else if (State == ConnectionState.Connecting || (State != ConnectionState.Connected && WantConnect && _connectRetryCounter < MaxConnectionRetryCount))
@@ -116,7 +117,7 @@ namespace EvolverCore.Models
                             ConnectionState oldState = State;
                             State = ConnectionState.Connected;
                             Thread.MemoryBarrier();
-                            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs(oldState, State));
+                            StateChange?.Invoke(this, new ConnectionStateChangeEventArgs(oldState, State));
                             continue;
                         }
                         else if (State == ConnectionState.Connected)
@@ -131,7 +132,8 @@ namespace EvolverCore.Models
                             Instrument? i = Globals.Instance.InstrumentCollection.Lookup("Random");
                             if (i == null)
                                 Globals.Instance.Log.LogMessage("Connection data stream failed to find Random instrument.", LogLevel.Error);
-                            else if (DataUpdate != null) DataUpdate(this, new ConnectionDataUpdateEventArgs(i, DataEvent.Last, v));
+                            else 
+                                DataUpdate?.Invoke(this, new ConnectionDataUpdateEventArgs(i, DataEvent.Last, v));
                             ///////////
                         }
 
