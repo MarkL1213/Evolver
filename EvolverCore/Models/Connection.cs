@@ -12,9 +12,11 @@ namespace EvolverCore.Models
 
     public class ConnectionDataUpdateEventArgs : EventArgs
     {
-        public ConnectionDataUpdateEventArgs(DataEvent dataEvent, double value) { Event = dataEvent;Value = value; }
+        public ConnectionDataUpdateEventArgs(Instrument instrument, DataEvent dataEvent, double value) { Event = dataEvent;Value = value; Instrument = instrument; }
         public DataEvent Event { get; private set; }
         public double Value { get; private set; }
+
+        public Instrument Instrument { get; private set; }
 
     }
 
@@ -126,7 +128,10 @@ namespace EvolverCore.Models
                             Thread.Sleep(5000);
                             Random r = new Random(DateTime.Now.Second);
                             double v = r.Next(20, 100);
-                            if (DataUpdate != null) DataUpdate(this, new ConnectionDataUpdateEventArgs(DataEvent.Last, v));
+                            Instrument? i = Globals.Instance.InstrumentCollection.Lookup("Random");
+                            if (i == null)
+                                Globals.Instance.Log.LogMessage("Connection data stream failed to find Random instrument.", LogLevel.Error);
+                            else if (DataUpdate != null) DataUpdate(this, new ConnectionDataUpdateEventArgs(i, DataEvent.Last, v));
                             ///////////
                         }
 
