@@ -1170,4 +1170,149 @@ namespace EvolverCore
             GC.SuppressFinalize(this);
         }
     }
+
+    internal class DataGraph
+    {
+        object _lock = new object();
+
+        internal List<DataGraphNode> RootNodes { get; private set; } = new List<DataGraphNode>();
+
+        internal DataGraph() { }
+
+        internal void OnDataUpdate(object? sender, ConnectionDataUpdateEventArgs args)
+        {
+            lock (_lock)
+            {
+                List<DataGraphNode> relevantRootNodes = FindAllDataNodes(args.Instrument);
+                foreach (DataGraphNode node in relevantRootNodes)
+                {
+                    //TODO: deliver data update, breadth first
+                }
+            }
+        }
+
+        internal bool AddIndicator(Indicator indicator)
+        {
+            lock (_lock)
+            {
+                DataGraphNode? node = FindNode(indicator);
+                if (node != null) return true;//node already exists...
+
+                if (indicator.IsDataOnly)
+                {//data only nodes are always root nodes...
+                    DataGraphNode newNode = new DataGraphNode(this, indicator);
+                    RootNodes.Add(newNode);
+                    return true;
+                }
+                else
+                {
+                    DataGraphNode newNode = new DataGraphNode(this, indicator);
+
+                    foreach (BarsPointer bars in indicator.Bars)
+                    {
+
+                        DataGraphNode? parentNode = FindDataNode(bars.Record.Instrument, bars.Record.Interval);
+                        if (parentNode == null)
+                        {
+                            Globals.Instance.Log.LogMessage("", LogLevel.Error);
+                            return false;
+                        }
+
+                        newNode.Parents.Add(parentNode);
+                        parentNode.Children.Add(newNode);
+                    }
+
+                    foreach (InputIndicator input in indicator.Inputs)
+                    {
+                        DataGraphNode? parentNode = FindNode(input.Indicator);
+                        if (parentNode == null)
+                        {
+                            Globals.Instance.Log.LogMessage("", LogLevel.Error);
+                            return false;
+                        }
+
+                        newNode.Parents.Add(parentNode);
+                        parentNode.Children.Add(newNode);
+                    }
+
+                    return true;
+                }
+            }
+        }
+
+        List<DataGraphNode> FindAllDataNodes(Instrument instrument)
+        {
+            List<DataGraphNode> rootNodes = new List<DataGraphNode>();
+
+            lock (_lock)
+            {
+                foreach (DataGraphNode node in RootNodes)
+                {
+                    if (node.Indicator.SourceRecord != null &&
+                        node.Indicator.SourceRecord.SourceBarData != null &&
+                        node.Indicator.SourceRecord.SourceBarData.Record.Instrument == instrument
+                        )
+                        rootNodes.Add(node);
+                }
+
+                return rootNodes;
+            }
+        }
+
+        DataGraphNode? FindDataNode(Instrument instrument, DataInterval interval)
+        {
+            lock (_lock)
+            {
+                foreach (DataGraphNode node in RootNodes)
+                {
+                    if (node.Indicator.SourceRecord != null &&
+                        node.Indicator.SourceRecord.SourceBarData != null &&
+                        node.Indicator.SourceRecord.SourceBarData.Record.Instrument == instrument &&
+                        node.Indicator.Interval == interval)
+                        return node;
+                }
+                return null;
+            }
+        }
+
+        internal DataGraphNode? FindNode(Indicator indicator)
+        {
+            lock (_lock)
+            {
+                foreach (DataGraphNode node in RootNodes)
+                {
+                    if (node.Indicator == indicator) return node;
+                    if (indicator.IsDataOnly) continue;
+
+                    DataGraphNode? childNode = node.FindChildNode(indicator);
+                    if (childNode != null) return childNode;
+                }
+                return null;
+            }
+        }
+    }
+
+    internal class DataGraphNode
+    {
+        internal DataGraphNode(DataGraph graph, Indicator indicator) { _parentGraph = graph; Indicator = indicator; }
+
+        private DataGraph _parentGraph;
+        internal Indicator Indicator { get; private set; }
+
+        internal List<DataGraphNode> Parents { get; private set; } = new List<DataGraphNode>();
+        internal List<DataGraphNode> Children { get; private set; } = new List<DataGraphNode>();
+
+        internal DataGraphNode? FindChildNode(Indicator indicator)
+        {
+            foreach (DataGraphNode node in Children)
+            {
+                if (node.Indicator == indicator) return node;
+
+                DataGraphNode? childNode = node.FindChildNode(indicator);
+                if (childNode != null) return childNode;
+            }
+
+            return null;
+        }
+    }
 }

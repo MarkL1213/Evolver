@@ -15,54 +15,71 @@ namespace EvolverCore.Models
         }
 
         private DateTime _endTime;
+        private object _lock = new object();
 
         public DataInterval Interval { get; private set; }
         public TimeDataBar? FormingBar { get; private set; }
 
-        public event EventHandler<TimeDataBar> BarComplete;
+        public event EventHandler<TimeDataBar>? BarComplete;
 
         public void StartBar(DateTime startTime)
         {
-            FormingBar = new TimeDataBar(startTime, 0, 0, 0, 0, 0, 0, 0);
-            _endTime = Interval.Add(FormingBar.Time, 1);
+            lock (_lock)
+            {
+                FormingBar = new TimeDataBar(startTime, 0, 0, 0, 0, 0, 0, 0);
+                _endTime = Interval.Add(FormingBar.Time, 1);
+            }
         }
 
         public bool AddTick()
         {
-            if (FormingBar == null) return false;
+            lock (_lock)
+            {
+                if (FormingBar == null) return false;
 
+                //TODO implement tick add
 
-            return false;
+                return false;
+            }
         }
 
         public bool AddBar(TimeDataBar addBar, DataInterval addInterval)
         {
-            if (FormingBar == null) return false;
-            if(!Interval.IsFactor(addInterval)) return false;
-            if (addBar.Time > _endTime)
+            lock (_lock)
             {
-                fireBarComplete();
-                StartBar(_endTime);
+                if (FormingBar == null) return false;
+                if (!Interval.IsFactor(addInterval)) return false;
+                if (addBar.Time > _endTime)
+                {
+                    fireBarComplete();
+                    StartBar(_endTime);
+                }
+
+                FormingBar.Volume += addBar.Volume;
+                FormingBar.Close = addBar.Close;
+
+                if (FormingBar.High == 0 || addBar.High > FormingBar.High) FormingBar.High = addBar.High;
+                if (FormingBar.Low == 0 || addBar.Low < FormingBar.Low) FormingBar.Low = addBar.Low;
+                if (FormingBar.Open == 0) FormingBar.Open = addBar.Open;
+
+                if (FormingBar.Bid == 0 || addBar.Bid > FormingBar.Bid) FormingBar.Bid = addBar.Bid;
+                if (FormingBar.Ask == 0 || addBar.Ask < FormingBar.Ask) FormingBar.Ask = addBar.Ask;
+
+                return true;
             }
-
-            FormingBar.Volume += addBar.Volume;
-            FormingBar.Close = addBar.Close;
-
-            if (FormingBar.High == 0 || addBar.High > FormingBar.High) FormingBar.High = addBar.High;
-            if (FormingBar.Low == 0 || addBar.Low < FormingBar.Low) FormingBar.Low = addBar.Low;
-            if (FormingBar.Open == 0) FormingBar.Open = addBar.Open;
-
-            if (FormingBar.Bid == 0 || addBar.Bid > FormingBar.Bid) FormingBar.Bid = addBar.Bid;
-            if (FormingBar.Ask == 0 || addBar.Ask < FormingBar.Ask) FormingBar.Ask = addBar.Ask;
-
-            return true;
         }
 
         private void fireBarComplete()
         {
-            if (FormingBar == null) return;
-            BarComplete?.Invoke(this, FormingBar);
-            FormingBar = null;
+            TimeDataBar completedBar;
+            lock (_lock)
+            {
+                if (FormingBar == null) return;
+                completedBar = FormingBar;
+                FormingBar = null;
+            }
+
+            BarComplete?.Invoke(this, completedBar);
         }
     }
 }
