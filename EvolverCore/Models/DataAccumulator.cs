@@ -61,7 +61,7 @@ namespace EvolverCore.Models
         private void fireBarComplete()
         {
             if (FormingBar == null) return;
-            if (BarComplete != null) BarComplete(this, FormingBar);
+            BarComplete?.Invoke(this, FormingBar);
             FormingBar = null;
         }
     }

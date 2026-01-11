@@ -80,12 +80,12 @@ namespace EvolverCore
         internal void FireDataLoadFailed(Exception e)
         {
             LoadState = DataLoadState.Error;
-            if (DataLoaded != null) DataLoaded(this, new InstrumentDataLoadedEventArgs(e));
+            DataLoaded?.Invoke(this, new InstrumentDataLoadedEventArgs(e));
         }
         internal void FireDataLoadCompleted(InstrumentDataSlice slice)
         {
             LoadState = DataLoadState.Loaded;
-            if (DataLoaded != null) DataLoaded(this, new InstrumentDataLoadedEventArgs(slice));
+            DataLoaded?.Invoke(this, new InstrumentDataLoadedEventArgs(slice));
         }
 
         public string FileName { get; internal set; } = string.Empty;

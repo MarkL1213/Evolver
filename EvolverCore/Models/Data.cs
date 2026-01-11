@@ -106,7 +106,7 @@ namespace EvolverCore
                 SetData(dataRecord);
             }
 
-            if (DataLoaded != null) DataLoaded(this, new EventArgs());
+            DataLoaded?.Invoke(this, new EventArgs());
         }
 
         public DateTime MinTime(int lastCount)
@@ -785,8 +785,8 @@ namespace EvolverCore
         List<InstrumentDataRecord> _instrumentCache = new List<InstrumentDataRecord>();
         List<Indicator> _indicatorCache = new List<Indicator>();
 
-        public delegate void DataChangeDelegate(InstrumentDataRecord instrumentRecord);
-        public event DataChangeDelegate? DataChange = null;
+
+        public event EventHandler<InstrumentDataRecord>? DataChange = null;
 
         internal DataManager()
         {
