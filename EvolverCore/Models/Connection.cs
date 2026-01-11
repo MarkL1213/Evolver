@@ -8,12 +8,21 @@ namespace EvolverCore.Models
 {
     public enum ConnectionState { Disconnected, Connecting, Connected, Disconnecting, Error};
 
+    public enum DataEvent { Bid, Ask, Last };
+
     public class ConnectionDataUpdateEventArgs : EventArgs
     {
+        public ConnectionDataUpdateEventArgs(DataEvent dataEvent, double value) { Event = dataEvent;Value = value; }
+        public DataEvent Event { get; private set; }
+        public double Value { get; private set; }
+
     }
 
     public class ConnectionStateChangeEventArgs : EventArgs
     {
+        public ConnectionStateChangeEventArgs(ConnectionState oldState, ConnectionState newState) { OldState = oldState; NewState = newState; }
+        public ConnectionState OldState { get; private set; }
+        public ConnectionState NewState { get; private set; }
     }
 
     public class ConnectionSettings
@@ -54,9 +63,10 @@ namespace EvolverCore.Models
         public void Connect()
         {
             if (State == ConnectionState.Connecting || State == ConnectionState.Connected) return;
+            ConnectionState oldState = State;
             State = ConnectionState.Connecting;
             WantConnect = true;
-            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs());
+            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs(oldState, State));
 
             wakeup();
         }
@@ -64,9 +74,10 @@ namespace EvolverCore.Models
         public void Disconnect()
         {
             if (State != ConnectionState.Connecting && State != ConnectionState.Connected) return;
+            ConnectionState oldState = State;
             State = ConnectionState.Disconnecting;
             WantConnect = false;
-            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs());
+            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs(oldState, State));
             wakeup();
         }
 
@@ -90,18 +101,20 @@ namespace EvolverCore.Models
                         {
                             //TODO: perform disconnect
 
+                            ConnectionState oldState = State;
                             State = ConnectionState.Disconnected;
                             Thread.MemoryBarrier();
-                            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs());
+                            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs(oldState, State));
                             continue;
                         }
                         else if (State == ConnectionState.Connecting || (State != ConnectionState.Connected && WantConnect && _connectRetryCounter < MaxConnectionRetryCount))
                         {
                             //TODO: perform connect
 
+                            ConnectionState oldState = State;
                             State = ConnectionState.Connected;
                             Thread.MemoryBarrier();
-                            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs());
+                            if (StateChange != null) StateChange(this, new ConnectionStateChangeEventArgs(oldState, State));
                             continue;
                         }
                         else if (State == ConnectionState.Connected)
@@ -111,7 +124,9 @@ namespace EvolverCore.Models
                             ///////////
                             /// Fake connection for testing
                             Thread.Sleep(5000);
-                            if(DataUpdate != null) DataUpdate(this,new ConnectionDataUpdateEventArgs());
+                            Random r = new Random(DateTime.Now.Second);
+                            double v = r.Next(20, 100);
+                            if (DataUpdate != null) DataUpdate(this, new ConnectionDataUpdateEventArgs(DataEvent.Last, v));
                             ///////////
                         }
 

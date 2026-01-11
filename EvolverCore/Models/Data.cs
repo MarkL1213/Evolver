@@ -763,8 +763,8 @@ namespace EvolverCore
             int lastClose = -1;
             for (int i = 0; i < size; i++)
             {
-                int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
-                int close = r.Next(10, 100);
+                int open = lastClose == -1 ? r.Next(20, 100) : lastClose;
+                int close = r.Next(20, 100);
                 int volume = r.Next(100, 1000);
                 int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
                 int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
