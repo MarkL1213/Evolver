@@ -7,6 +7,7 @@ using NP.Ava.UniDock;
 using NP.UniDockService;
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace EvolverCore.Views
@@ -54,6 +55,31 @@ namespace EvolverCore.Views
             }
 
             RefreshAvailableLayoutsWork();
+            RefreshConnections();
+        }
+
+        private void RefreshConnections()
+        {
+            ConnectionsMenuItem.Items.Clear();
+            List<string> knownConnections = Globals.Instance.Connections.GetKnownConnections();
+
+            ConnectionStatusViewModel? vm = ConnectionStatusControl.DataContext as ConnectionStatusViewModel;
+            if (vm == null) return;
+
+            foreach (string connection in knownConnections)
+            {
+                MenuItem cMenuItem = new MenuItem();
+                cMenuItem.Header = connection;
+                cMenuItem.Command = new RelayCommand<string>(vm.ConnectionMenuItemClicked);
+                cMenuItem.CommandParameter = connection;
+
+                ConnectionStatusControl icon = new ConnectionStatusControl(connection) { Width = 16, Height = 16 };
+                icon.DataContext = ConnectionStatusControl.DataContext;
+
+                cMenuItem.Icon = icon;
+
+                ConnectionsMenuItem.Items.Add(cMenuItem);
+            }
         }
 
         private void RefreshAvailableLayouts(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)

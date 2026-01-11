@@ -37,18 +37,9 @@
     </ResourceDictionary>
 </Window.Resources>
                       
-
-
-    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="32" />
-			<RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-			<ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        
-        <Menu Grid.Row="0" Grid.Column="0">
+    <DockPanel LastChildFill="True">
+        <Border DockPanel.Dock="Top" Height="32" BorderBrush="Black" BorderThickness="0,0,0,1">
+        <Menu Name="MainMenu">
             <MenuItem Header="_File">
                 <MenuItem Name="NewChartItem" Header="new Chart" />
                 <MenuItem Name="RemoveChartItem" Header="remove Chart" />
@@ -60,10 +51,36 @@
             <MenuItem Name="LayoutMenuItem" Header="_Layouts">
                 <MenuItem Name="SaveLayoutMenuItem" Header="_Save" />
             </MenuItem>
+            <MenuItem Name="ConnectionsMenuItem" Header="_Connections" />
         </Menu>
+            </Border>
+
+        <Border DockPanel.Dock="Bottom" Height="32" BorderBrush="Black" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+					<RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="32" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Row="0" Grid.Column="1">
+                    <local:ConnectionStatusControl Name="ConnectionStatusControl"/>
+                </Border>
+            </Grid>
+        </Border>
+
+<ContentControl>
+    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
         <np:RootDockGroup np:DockAttachedProperties.TheDockManager="{x:Static local:MyContainer.TheDockManager}"
-                        Grid.Row="1" Grid.Column="0">
+                        Grid.Row="0" Grid.Column="0">
 
 
             <np:StackDockGroup x:Name="TheStackGroup"
@@ -106,9 +123,13 @@
             
             </np:StackDockGroup>
         </np:RootDockGroup>
-    </Grid>
+        </Grid>
+    </ContentControl>
 
 
+    
+
+</DockPanel>
     
     
 </Window>

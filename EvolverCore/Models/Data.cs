@@ -341,6 +341,19 @@ namespace EvolverCore
             }
         }
 
+        public bool IsFactor(DataInterval subInterval)
+        {//is the subInterval and factor of this?
+
+            if (subInterval.Type > Type) return false;
+
+            double thisSpan = GetTimeSpan().TotalSeconds;
+            double subSpan = subInterval.GetTimeSpan().TotalSeconds;
+
+            if ((thisSpan % subSpan) == 0) return true;
+
+            return false;
+        }
+
         public long Ticks
         {
             get
@@ -1024,12 +1037,12 @@ namespace EvolverCore
 
         private void indicatorWorker()
         {
-            while (true)
+            try
             {
-                if (_wantExit) break;
-
-                try
+                while (true)
                 {
+                    if (_wantExit) break;
+
                     int queueCount = 0;
                     Indicator? indicator = null;
                     lock (_indicatorReadyToRunQueueLock)
@@ -1060,22 +1073,21 @@ namespace EvolverCore
                         }
                     }
                 }
-                catch (ThreadInterruptedException)
-                {
-                    _isSleeping = false;
-                    //Console.WriteLine($"Thread '{Thread.CurrentThread.Name}' awoken.");
-                }
-                catch (ThreadAbortException)
-                {
-                    break;
-                }
-                catch (Exception e)
-                {
-                    Globals.Instance.Log.LogMessage("DataManager.indicatorWorker thread exception:", LogLevel.Error);
-                    Globals.Instance.Log.LogException(e);
-                    break;
-                }
             }
+            catch (ThreadInterruptedException)
+            {
+                _isSleeping = false;
+            }
+            catch (ThreadAbortException)
+            {
+                Globals.Instance.Log.LogMessage("DataManager.indicatorWorker thread abort", LogLevel.Info);
+            }
+            catch (Exception e)
+            {
+                Globals.Instance.Log.LogMessage("DataManager.indicatorWorker thread exception:", LogLevel.Error);
+                Globals.Instance.Log.LogException(e);
+            }
+
         }
 
         internal async Task<InstrumentDataRecord> LoadDataAsync(InstrumentDataRecord dataRecord)
@@ -1116,6 +1128,10 @@ namespace EvolverCore
             return dataRecord;
         }
 
+        public void OnConnectionDataUpdate(object? sender, ConnectionDataUpdateEventArgs e)
+        {
+
+        }
 
         internal void Shutdown()
         {
@@ -1141,9 +1157,7 @@ namespace EvolverCore
             {
                 if (disposing)
                 {
-                    _wantExit = true;
-                    if (_isSleeping) { _indicatorWorker.Interrupt(); }
-                    _indicatorWorker.Join();
+                    Shutdown();
                 }
                 disposedValue = true;
             }

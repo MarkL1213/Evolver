@@ -98,10 +98,9 @@ namespace EvolverCore.Models
 
         private void logWorker()
         {
-            //Console.WriteLine($"Thread '{Thread.CurrentThread.Name}' about to sleep indefinitely.");
-            while (true)
+            try
             {
-                try
+                while (true)
                 {
                     int queueCount = 0;
                     LogMessage message = new LogMessage();
@@ -165,15 +164,14 @@ namespace EvolverCore.Models
                         #endregion
                     }
                 }
-                catch (ThreadInterruptedException)
-                {
-                    _isSleeping = false;
-                    //Console.WriteLine($"Thread '{Thread.CurrentThread.Name}' awoken.");
-                }
-                catch (ThreadAbortException)
-                {
-                    break;
-                }
+            }
+            catch (ThreadInterruptedException)
+            {
+                _isSleeping = false;
+            }
+            catch (ThreadAbortException)
+            {
+
             }
 
             if (_logStream != null)
@@ -209,16 +207,7 @@ namespace EvolverCore.Models
             {
                 if (disposing)
                 {
-                    _wantExit = true;
-                    if (_isSleeping) { _logThread.Interrupt(); }
-                    _logThread.Join();
-
-                    if (_logStream != null)
-                    {
-                        _logStream.Close();
-                        _logStream.Dispose();
-                        _logStream = null;
-                    }
+                    Shutdown();
                 }
 
                 _disposedValue = true;

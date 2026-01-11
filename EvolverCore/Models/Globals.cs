@@ -4,6 +4,7 @@ using NP.Ava.UniDock.Factories;
 using NP.DependencyInjection.Interfaces;
 using NP.IoCy;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml.Serialization;
 
@@ -35,6 +36,7 @@ namespace EvolverCore
             _sessionHoursCollection = new SessionHoursCollection();
             _instrumentCollection = new InstrumentCollection();
             _dataManager = new DataManager();
+            _connections = new ConnectionCollection();
             _log = new Log();
         }
 
@@ -49,6 +51,7 @@ namespace EvolverCore
         }
 
 
+        ConnectionCollection _connections;
         SessionHoursCollection _sessionHoursCollection;
         InstrumentCollection _instrumentCollection;
         DataManager _dataManager;
@@ -58,6 +61,8 @@ namespace EvolverCore
         public string PropertiesFileName { get; } = "D:\\Evolver\\EvolverProperties.xml";
         public string LayoutDirectory { get; } = "D:\\Evolver\\Layouts";
         public EvolverProperties Properties = new EvolverProperties();
+
+        public ConnectionCollection Connections { get { return _connections; } }
 
         public SessionHoursCollection SessionHoursCollection { get { return _sessionHoursCollection; } }
 

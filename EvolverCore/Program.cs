@@ -25,6 +25,16 @@ namespace EvolverCore
 
             try
             {
+                Globals.Instance.Connections.ShutdownAll();
+            }
+            catch (Exception ex)
+            {
+                Globals.Instance.Log.LogMessage("***** Evolver Exception *****", Models.LogLevel.Error);
+                Globals.Instance.Log.LogException(ex);
+            }
+
+            try
+            {
                 Globals.Instance.DataManager.Shutdown();
             }
             catch (Exception ex)
