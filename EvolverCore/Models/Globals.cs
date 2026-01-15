@@ -60,6 +60,10 @@ namespace EvolverCore
         public string LogFileName { get; } = "D:\\Evolver\\Evolver.log";
         public string PropertiesFileName { get; } = "D:\\Evolver\\EvolverProperties.xml";
         public string LayoutDirectory { get; } = "D:\\Evolver\\Layouts";
+
+        public string DataDirectory { get; } = "D:\\Evolver\\MarketData";
+
+
         public EvolverProperties Properties = new EvolverProperties();
 
         public ConnectionCollection Connections { get { return _connections; } }

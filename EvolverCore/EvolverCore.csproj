@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Apache.Arrow" Version="22.1.0" />
     <PackageReference Include="Avalonia" Version="11.3.9" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.9" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.9" />
@@ -32,6 +33,7 @@
     <PackageReference Include="NP.Ava.UniDock" Version="1.0.19" />
     <PackageReference Include="NP.Ava.Visuals" Version="1.0.48" />
     <PackageReference Include="NP.IoCy" Version="1.0.34" />
+    <PackageReference Include="ParquetSharp" Version="21.0.0" />
   </ItemGroup>
 
   <ItemGroup>

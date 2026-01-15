@@ -14,7 +14,8 @@ namespace EvolverCore.Models
             FormingBar = null;
         }
 
-        private DateTime _endTime;
+        //private DateTime _endTime;
+        private DateTime _startTime;
         private object _lock = new object();
 
         public DataInterval Interval { get; private set; }
@@ -22,12 +23,12 @@ namespace EvolverCore.Models
 
         public event EventHandler<TimeDataBar>? BarComplete;
 
-        public void StartBar(DateTime startTime)
+        public void StartBar(DateTime barTime)
         {
             lock (_lock)
             {
-                FormingBar = new TimeDataBar(startTime, 0, 0, 0, 0, 0, 0, 0);
-                _endTime = Interval.Add(FormingBar.Time, 1);
+                FormingBar = new TimeDataBar(barTime, 0, 0, 0, 0, 0, 0, 0);
+                _startTime = Interval.Add(FormingBar.Time, -1);
             }
         }
 
@@ -49,10 +50,12 @@ namespace EvolverCore.Models
             {
                 if (FormingBar == null) return false;
                 if (!Interval.IsFactor(addInterval)) return false;
-                if (addBar.Time > _endTime)
+                if (addBar.Time < _startTime) return false;
+
+                if (addBar.Time > FormingBar.Time)
                 {
                     fireBarComplete();
-                    StartBar(_endTime);
+                    StartBar(Interval.Add(FormingBar.Time,1));
                 }
 
                 FormingBar.Volume += addBar.Volume;

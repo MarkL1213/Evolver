@@ -278,6 +278,7 @@ namespace EvolverCore
 
     public enum Interval
     {
+        Tick,
         Second,
         Minute,
         Hour,
@@ -392,6 +393,11 @@ namespace EvolverCore
         {
             string s = Type.ToString() + Value.ToString();
             return s.GetHashCode();
+        }
+
+        public override string ToString()
+        {
+            return $"{Value}{Type.ToString()}";
         }
     }
 

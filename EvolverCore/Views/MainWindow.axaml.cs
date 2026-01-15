@@ -2,12 +2,14 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.Input;
 using EvolverCore.Models;
+using EvolverCore.Models.DataV2;
 using EvolverCore.ViewModels;
 using NP.Ava.UniDock;
 using NP.UniDockService;
 using System;
-using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics.Metrics;
 using System.Linq;
 
 namespace EvolverCore.Views
@@ -43,6 +45,7 @@ namespace EvolverCore.Views
                 vm.AvailableLayouts.CollectionChanged -= RefreshAvailableLayouts;
             }
 
+            ArrowTestItem.Command = new RelayCommand(ArrowTestItemCommand);
             ExitMenuItem.Command = new RelayCommand(ExitMenuItemCommand);
             NewLogWindow.Command = vm == null ? null : vm.NewLogDocumentCommand;
             NewChartItem.Command = vm == null ? null : vm.NewChartDocumentCommand;
@@ -135,8 +138,48 @@ namespace EvolverCore.Views
             vm.CurrentLayout = layout;
         }
 
-        private void NewLogWindowMenuItemCommand()
+        private async void ArrowTestItemCommand()
         {
+            try
+            {
+                Instrument? randomInstrument = Globals.Instance.InstrumentCollection.Lookup("Random");
+                if (randomInstrument == null)
+                {
+                    Globals.Instance.Log.LogMessage("Random instrument not found.", LogLevel.Error);
+                    return;
+                }
+                DataInterval interval = new DataInterval(Interval.Hour, 1);
+                DateTime startTime = DateTime.Now;
+                int n = 72;
+
+                InstrumentDataSeries? series = InstrumentDataSeries.RandomSeries(randomInstrument, startTime, interval, n);
+                if (series == null)
+                {
+                    Globals.Instance.Log.LogMessage("Unable to generate random data.", LogLevel.Error);
+                    return;
+                }
+
+                //TODO: <-- write it to disk
+
+
+                //read it back
+                ICurrentTable table = await DataWarehouse.ReadToTableAsync(randomInstrument, interval, startTime, interval.Add(startTime, n));
+                BarTable? barTable = table as BarTable;
+                if (barTable == null)
+                {
+                    Globals.Instance.Log.LogMessage("Result ICurrentTable is not of type BarTable.", LogLevel.Error);
+                    return;
+                }
+
+                //TODO: <-- compare table v series for validation of disk roudtrip
+
+
+                barTable.AddColumnTest();
+            }
+            catch (Exception ex)
+            {
+                Globals.Instance.Log.LogException(ex);
+            }
 
         }
 
