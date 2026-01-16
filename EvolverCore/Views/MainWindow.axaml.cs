@@ -180,11 +180,13 @@ namespace EvolverCore.Views
                 Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
 
 
-                if (!ArrowTest_CompareData(series,barTable.Table))
+                if (!ArrowTest_CompareData(series, barTable))
                 {
                     Globals.Instance.Log.LogMessage("Test compare failed.", LogLevel.Error);
                     return;
                 }
+                else
+                    Globals.Instance.Log.LogMessage("Test compare passed.", LogLevel.Error);
 
                 barTable.AddColumnTest();
             }
@@ -195,7 +197,7 @@ namespace EvolverCore.Views
 
         }
 
-        private bool ArrowTest_CompareData(InstrumentDataSeries original, Table readTable)
+        private bool ArrowTest_CompareData(InstrumentDataSeries original, BarTable readTable)
         {
             if (original.Count != readTable.RowCount)
             {
@@ -203,28 +205,35 @@ namespace EvolverCore.Views
                 return false;
             }
 
-            var timeCol = readTable.Column(readTable.Schema.GetFieldIndex("Time")).Data.ArrayCount;
-            
-            //var openCol = (DoubleArray)readTable.Column("Open").Data;
-            //var highCol = (DoubleArray)readTable.Column("High").Data;
-            //var lowCol = (DoubleArray)readTable.Column("Low").Data;
-            //var closeCol = (DoubleArray)readTable.Column("Close").Data;
-            //var volumeCol = (Int64Array)readTable.Column("Volume").Data;
-
             for (int i = 0; i < original.Count; i++)
             {
                 TimeDataBar origBar = original[i];
 
-                //if (timeCol.GetTimestamp(i).UtcDateTime != orig.Time ||
-                //    Math.Abs(openCol.GetValue(i) - orig.Open) > 1e-6 ||
-                //    Math.Abs(highCol.GetValue(i) - orig.High) > 1e-6 ||
-                //    Math.Abs(lowCol.GetValue(i) - orig.Low) > 1e-6 ||
-                //    Math.Abs(closeCol.GetValue(i) - orig.Close) > 1e-6 ||
-                //    volumeCol.GetValue(i) != orig.Volume)
-                //{
-                //    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {orig.Close}, read {closeCol.GetValue(i)}", LogLevel.Error);
-                //    return false;
-                //}
+                if(origBar.Volume != readTable.Volume.GetValueAt(i))
+                {
+                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
+                    return false;
+                }
+                if (origBar.High != readTable.High.GetValueAt(i))
+                {
+                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.High}, read {readTable.High.GetValueAt(i)}", LogLevel.Error);
+                    return false;
+                }
+                if (origBar.Low != readTable.Low.GetValueAt(i))
+                {
+                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Low}, read {readTable.Low.GetValueAt(i)}", LogLevel.Error);
+                    return false;
+                }
+                if (origBar.Close != readTable.Close.GetValueAt(i))
+                {
+                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Close}, read {readTable.Close.GetValueAt(i)}", LogLevel.Error);
+                    return false;
+                }
+                if (origBar.Volume != readTable.Volume.GetValueAt(i))
+                {
+                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
+                    return false;
+                }
             }
 
             return true;

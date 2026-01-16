@@ -22,7 +22,7 @@ namespace EvolverCore.ViewModels
         /// </summary>
         public void AppendLines(string text)
         {
-            var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            string[] lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
             Dispatcher.UIThread.InvokeAsync(() =>
             {

@@ -215,6 +215,7 @@ namespace EvolverCore.Models.DataV2
     public interface ICurrentTable
     {
         public int CurrentIndex { get; }
+        public long RowCount { get; }
     }
 
     public class BarTable : ICurrentTable
@@ -240,6 +241,8 @@ namespace EvolverCore.Models.DataV2
         internal Table Table { get; init; }
 
         public int CurrentIndex { get; private set; }
+
+        public long RowCount { get { return Table.RowCount; } }
 
         public ColumnPointer<DateTime> Time { get; private set; }
         public ColumnPointer<double> Open { get; private set; }
@@ -270,6 +273,8 @@ namespace EvolverCore.Models.DataV2
         public Table Table { get; init; }
 
         public int CurrentIndex { get; private set; }
+
+        public long RowCount { get { return Table.RowCount; } }
 
         public ColumnPointer<DateTime> Time { get; private set; }
         public ColumnPointer<byte> Type { get; private set; }
