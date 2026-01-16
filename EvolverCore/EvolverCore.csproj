@@ -33,7 +33,7 @@
     <PackageReference Include="NP.Ava.UniDock" Version="1.0.19" />
     <PackageReference Include="NP.Ava.Visuals" Version="1.0.48" />
     <PackageReference Include="NP.IoCy" Version="1.0.34" />
-    <PackageReference Include="ParquetSharp" Version="21.0.0" />
+    <PackageReference Include="Parquet.Net" Version="5.4.0" />
   </ItemGroup>
 
   <ItemGroup>

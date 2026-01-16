@@ -1,3 +1,4 @@
+using Apache.Arrow;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.Input;
@@ -150,20 +151,20 @@ namespace EvolverCore.Views
                 }
                 DataInterval interval = new DataInterval(Interval.Hour, 1);
                 DateTime startTime = DateTime.Now;
-                int n = 72;
+                int numBarsToGenerate = 72;
+                int seed = 69;
 
-                InstrumentDataSeries? series = InstrumentDataSeries.RandomSeries(randomInstrument, startTime, interval, n);
+                InstrumentDataSeries? series = InstrumentDataSeries.RandomSeries(randomInstrument, startTime, interval, numBarsToGenerate, seed);
                 if (series == null)
                 {
                     Globals.Instance.Log.LogMessage("Unable to generate random data.", LogLevel.Error);
                     return;
                 }
 
-                //TODO: <-- write it to disk
+                BarTable seriesBarTable = DataTableHelpers.ConvertSeriesToBarTable(series);
+                DataWarehouse.WritePartitionedBars(seriesBarTable.Table, randomInstrument, interval);
 
-
-                //read it back
-                ICurrentTable table = await DataWarehouse.ReadToTableAsync(randomInstrument, interval, startTime, interval.Add(startTime, n));
+                ICurrentTable table = await DataWarehouse.ReadToTableAsync(randomInstrument, interval, startTime, interval.Add(startTime, numBarsToGenerate));
                 BarTable? barTable = table as BarTable;
                 if (barTable == null)
                 {
@@ -171,8 +172,19 @@ namespace EvolverCore.Views
                     return;
                 }
 
-                //TODO: <-- compare table v series for validation of disk roudtrip
 
+                //Apache.Arrow.Column c = barTable.Table.Column(barTable.Table.Schema.GetFieldIndex("Time"));
+                //ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
+                //DateTime fileStartDate = cp.GetValueAt(0);
+                //DateTime fileEndDate = cp.GetValueAt(c.Length - 1);
+                //Globals.Instance.Log.LogMessage($"Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
+
+
+                if (!ArrowTest_CompareData(series,barTable.Table))
+                {
+                    Globals.Instance.Log.LogMessage("Test compare failed.", LogLevel.Error);
+                    return;
+                }
 
                 barTable.AddColumnTest();
             }
@@ -181,6 +193,41 @@ namespace EvolverCore.Views
                 Globals.Instance.Log.LogException(ex);
             }
 
+        }
+
+        private bool ArrowTest_CompareData(InstrumentDataSeries original, Table readTable)
+        {
+            if (original.Count != readTable.RowCount)
+            {
+                Globals.Instance.Log.LogMessage($"Row count mismatch: original {original.Count}, read {readTable.RowCount}",LogLevel.Error);
+                return false;
+            }
+
+            var timeCol = readTable.Column(readTable.Schema.GetFieldIndex("Time")).Data.ArrayCount;
+            
+            //var openCol = (DoubleArray)readTable.Column("Open").Data;
+            //var highCol = (DoubleArray)readTable.Column("High").Data;
+            //var lowCol = (DoubleArray)readTable.Column("Low").Data;
+            //var closeCol = (DoubleArray)readTable.Column("Close").Data;
+            //var volumeCol = (Int64Array)readTable.Column("Volume").Data;
+
+            for (int i = 0; i < original.Count; i++)
+            {
+                TimeDataBar origBar = original[i];
+
+                //if (timeCol.GetTimestamp(i).UtcDateTime != orig.Time ||
+                //    Math.Abs(openCol.GetValue(i) - orig.Open) > 1e-6 ||
+                //    Math.Abs(highCol.GetValue(i) - orig.High) > 1e-6 ||
+                //    Math.Abs(lowCol.GetValue(i) - orig.Low) > 1e-6 ||
+                //    Math.Abs(closeCol.GetValue(i) - orig.Close) > 1e-6 ||
+                //    volumeCol.GetValue(i) != orig.Volume)
+                //{
+                //    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {orig.Close}, read {closeCol.GetValue(i)}", LogLevel.Error);
+                //    return false;
+                //}
+            }
+
+            return true;
         }
 
         private void ExitMenuItemCommand()

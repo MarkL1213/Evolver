@@ -759,12 +759,12 @@ namespace EvolverCore
             return -1;
         }
 
-        public static InstrumentDataSeries? RandomSeries(Instrument instrument, DateTime startTime, DataInterval interval, int size)
+        public static InstrumentDataSeries? RandomSeries(Instrument instrument, DateTime startTime, DataInterval interval, int size,int seed=0)
         {
             InstrumentDataSeries barDataSeries = new InstrumentDataSeries();
             barDataSeries.Instrument = instrument;
             barDataSeries.Interval = interval;
-            Random r = new Random(DateTime.Now.Second);
+            Random r = new Random(seed != 0 ? seed : DateTime.Now.Second);
 
             int lastClose = -1;
             for (int i = 0; i < size; i++)
