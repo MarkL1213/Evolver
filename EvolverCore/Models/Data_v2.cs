@@ -1,14 +1,10 @@
 ﻿using Apache.Arrow;
-using Apache.Arrow.C;
 using Apache.Arrow.Types;
 using Parquet;
 using Parquet.Data;
 using Parquet.Schema;
-using Parquet.Utils;
-
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,6 +13,7 @@ using System.Threading.Tasks;
 namespace EvolverCore.Models.DataV2
 {
     public enum TickType : byte { Bid, Ask };
+    
     public enum TableType : byte { Bar, Tick };
 
     public readonly struct Tick
@@ -69,6 +66,7 @@ namespace EvolverCore.Models.DataV2
             return new RecordBatch(schema, arrays, length: 0);
         }
     }
+    
     public readonly struct Bar
     {
         public Bar(DateTime time, double open, double high, double low, double close, long volume)
@@ -430,6 +428,20 @@ namespace EvolverCore.Models.DataV2
                 }
             }
 
+            if (!File.Exists(filePath))
+            {
+                switch (tableType)
+                {
+                    case TableType.Bar:
+                        RecordBatch emptyBarBatch = Bar.EmptyBatch();
+                        return Table.TableFromRecordBatches(emptyBarBatch.Schema, new[] { emptyBarBatch });
+                    case TableType.Tick:
+                        RecordBatch emptyTickBatch = Tick.EmptyBatch();
+                        return Table.TableFromRecordBatches(emptyTickBatch.Schema, new[] { emptyTickBatch });
+                    default: throw new ArgumentException("Unrecognized table type.", nameof(tableType));
+                }
+            }
+
             using (ParquetReader reader = await ParquetReader.CreateAsync(filePath, GetParquetProperties()))
             {
                 int[] rowGroupsToRead;
@@ -479,7 +491,7 @@ namespace EvolverCore.Models.DataV2
             }
         }
 
-        private static async void WriteFromArrowAsync(string filePath, TableType tableType, RecordBatch[] arrowBatches)
+        private static async Task WriteFromArrowAsync(string filePath, TableType tableType, RecordBatch[] arrowBatches)
         {
             Schema schema;
             switch (tableType)
@@ -496,6 +508,13 @@ namespace EvolverCore.Models.DataV2
                     throw new EvolverException("Schema mismatch.");
                 }
             }
+
+            string? dirName = Path.GetDirectoryName(filePath);
+            if (dirName == null)
+                throw new EvolverException();
+
+            Directory.CreateDirectory(dirName);
+            if (!File.Exists(filePath)) File.Create(filePath);
 
             ParquetSchema pSchema = SchemaHelpers.ConvertArrowToParquet(schema);
 
@@ -519,7 +538,7 @@ namespace EvolverCore.Models.DataV2
             }
         }
 
-        private static async void WriteFromArrowAsync(string filePath, TableType tableType, RecordBatch arrowBatch)
+        private static async Task WriteFromArrowAsync(string filePath, TableType tableType, RecordBatch arrowBatch)
         {
             Schema schema;
             switch (tableType)
@@ -533,6 +552,13 @@ namespace EvolverCore.Models.DataV2
             {
                 throw new EvolverException("Schema mismatch.");
             }
+
+            string? dirName = Path.GetDirectoryName(filePath);
+            if (dirName == null)
+                throw new EvolverException();
+
+            Directory.CreateDirectory(dirName);
+            if (!File.Exists(filePath)) File.Create(filePath);
 
             ParquetSchema pSchema = SchemaHelpers.ConvertArrowToParquet(schema);
 
@@ -554,7 +580,7 @@ namespace EvolverCore.Models.DataV2
         }
 
         // New partitioned write method
-        internal static void WritePartitionedBars(Table arrowTable, Instrument instrument, DataInterval interval)
+        internal static async Task WritePartitionedBars(Table arrowTable, Instrument instrument, DataInterval interval)
         {
             if (arrowTable.RowCount == 0) return; // nothing to write
 
@@ -604,14 +630,26 @@ namespace EvolverCore.Models.DataV2
                 for (int colIdx = 0; colIdx < arrowTable.Schema.FieldsList.Count; colIdx++)
                     subColumns.Add(arrowTable.Column(colIdx).Slice(group.Index, group.Length));
 
-                WriteFromArrowAsync(
+                Table subTable = new Table(arrowTable.Schema, subColumns);
+
+                ////////
+                //TEST CODE - remove after verification
+                BarTable barTable = new BarTable(instrument, interval, subTable);
+                Apache.Arrow.Column c = barTable.Table.Column(barTable.Table.Schema.GetFieldIndex("Time"));
+                ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
+                DateTime fileStartDate = cp.GetValueAt(0);
+                DateTime fileEndDate = cp.GetValueAt(c.Length - 1);
+                Globals.Instance.Log.LogMessage($"subTable {date.ToString()}: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
+                ////////
+
+                await WriteFromArrowAsync(
                     GetBarPartitionPath(instrument, interval, date),
                     TableType.Bar,
-                    new Table(arrowTable.Schema, subColumns));
+                    subTable);
             }
         }
 
-        private static async void WriteFromArrowAsync(string filePath, TableType tableType, Table arrowTable)
+        private static async Task WriteFromArrowAsync(string filePath, TableType tableType, Table arrowTable)
         {
             Schema schema;
             switch (tableType)
@@ -631,6 +669,7 @@ namespace EvolverCore.Models.DataV2
                 throw new EvolverException();
 
             Directory.CreateDirectory(dirName);
+            if (!File.Exists(filePath)) File.Create(filePath);
 
             ParquetSchema pSchema = SchemaHelpers.ConvertArrowToParquet(schema);
 
@@ -838,8 +877,9 @@ namespace EvolverCore.Models.DataV2
             var parquetType = aType.TypeId switch
             {
                 ArrowTypeId.Double => typeof(double),
-                ArrowTypeId.Int64 => typeof(int),
-                ArrowTypeId.Timestamp => typeof(DateTimeOffset),
+                ArrowTypeId.Int64 => typeof(long),
+                ArrowTypeId.Int32 => typeof(int),
+                ArrowTypeId.Timestamp => typeof(DateTime),
                 ArrowTypeId.Int8 => typeof(byte),
                 _ => throw new NotSupportedException(aType.TypeId.ToString())
             };
@@ -850,8 +890,9 @@ namespace EvolverCore.Models.DataV2
         {
             if (type == typeof(double)) return new DoubleType();
             if (type == typeof(byte)) return new UInt8Type();
-            if (type == typeof(DateTimeOffset)) return new TimestampType(TimeUnit.Millisecond, TimeZoneInfo.Utc);
+            if (type == typeof(DateTime)) return new TimestampType(TimeUnit.Millisecond, TimeZoneInfo.Utc);
             if (type == typeof(int)) return new Int32Type();
+            if (type == typeof(long)) return new Int64Type();
             throw new NotSupportedException($"Unsupported Parquet type: {type}");
         }
 
@@ -895,53 +936,34 @@ namespace EvolverCore.Models.DataV2
 
         internal static (ParquetSchema Schema, DataColumn[] Data) ConvertArrowToParquet(Table arrowTable)
         {
-            var parquetFields = new List<DataField>(arrowTable.Schema.FieldsList.Count);
-            var parquetData = new List<System.Array>(arrowTable.Schema.FieldsList.Count);
+            var parquetData = new List<DataColumn>(arrowTable.Schema.FieldsList.Count);
+
+            ParquetSchema pSchema = SchemaHelpers.ConvertArrowToParquet(arrowTable.Schema);
 
             for (int i = 0; i < arrowTable.Schema.FieldsList.Count; i++)
             {
                 var field = arrowTable.Schema.GetFieldByIndex(i);
-                var chunked = arrowTable.Column(i).Data as ChunkedArray
-                    ?? throw new InvalidOperationException("Column data is not ChunkedArray");
+                ChunkedArray chunked = arrowTable.Column(i).Data;
 
-                var values = new List<object?>();
-                for (int chunkIdx = 0; chunkIdx < chunked.ArrayCount; chunkIdx++)
+                var parquetField = pSchema.DataFields[i];
+
+                DataColumn col = field.DataType.TypeId switch
                 {
-                    var arr = chunked.ArrowArray(chunkIdx);
+                    ArrowTypeId.Double => BuildDoubleColumn(chunked, parquetField),
+                    ArrowTypeId.Int64 => BuildInt64Column(chunked, parquetField),
+                    ArrowTypeId.Int32 => BuildInt32Column(chunked, parquetField),
+                    ArrowTypeId.Timestamp => BuildTimestampColumn(chunked, parquetField),
+                    ArrowTypeId.UInt8 => BuildUInt8Column(chunked, parquetField),
+                    _ => throw new NotSupportedException(field.DataType.TypeId.ToString())
+                };
 
-                    for (int j = 0; j < arr.Length; j++)
-                    {
-                        object? val = arr switch
-                        {
-                            DoubleArray da => da.GetValue(j),
-                            Int64Array ia => ia.GetValue(j),
-                            TimestampArray ta => ta.GetTimestamp(j),
-                            Int8Array ba => ba.GetValue(j),
-                            _ => throw new NotSupportedException(arr.GetType().Name)
-                        };
-
-                        values.Add(val);
-                    }
-                }
-
-                var parquetType = ConvertArrowTypeToType(field.DataType);
-
-                var parquetField = new DataField(field.Name, parquetType, field.IsNullable);
-                var dataArray = values.ToArray();
-
-                parquetFields.Add(parquetField);
-                parquetData.Add(dataArray);
+                parquetData.Add(col);
             }
 
-            var parquetSchema = new ParquetSchema(parquetFields);
-            var columns = new DataColumn[parquetFields.Count];
-            for (int i = 0; i < columns.Length; i++)
-            {
-                columns[i] = new DataColumn(parquetFields[i], parquetData[i]);
-            }
-
-            return (parquetSchema, columns);
+            return (pSchema, parquetData.ToArray());
         }
+
+        private static DateTime? ConvertOffset(DateTimeOffset? offset) { if (offset != null && offset.HasValue) return offset.Value.UtcDateTime; return null; }
 
         internal static (ParquetSchema Schema, DataColumn[] Data) ConvertArrowBatchToParquet(RecordBatch arrowBatch)
         {
@@ -961,7 +983,7 @@ namespace EvolverCore.Models.DataV2
                     {
                         DoubleArray da => da.GetValue(j),
                         Int64Array ia => ia.GetValue(j),
-                        TimestampArray ta => ta.GetTimestamp(j),
+                        TimestampArray ta => ConvertOffset(ta.GetTimestamp(j)),
                         Int8Array ba => ba.GetValue(j),
                         _ => throw new NotSupportedException(colArray.GetType().Name)
                     };
@@ -987,6 +1009,7 @@ namespace EvolverCore.Models.DataV2
 
             return (parquetSchema, columns);
         }
+        
         internal static Table ConvertParquetToArrow(DataColumn[] parquetColumns, ParquetSchema parquetSchema)
         {
             RecordBatch batch = ConvertParquetToArrowBatch(parquetColumns, parquetSchema);
@@ -1010,7 +1033,7 @@ namespace EvolverCore.Models.DataV2
                 var field = col.Field;
 
                 IArrowArray arrowArray;
-                if (field.ClrType == typeof(DateTimeOffset))
+                if (field.ClrType == typeof(DateTime))
                 {
                     if (field.IsNullable) throw new Exception("Time field can not be nullable.");
                     arrowArray = BuildTimestampArray(col.Data);
@@ -1039,13 +1062,52 @@ namespace EvolverCore.Models.DataV2
             var builder = new TimestampArray.Builder();
             builder.Reserve(valueArray.Length);
 
-            var values = (DateTimeOffset[])valueArray;
+            var values = (DateTime[])valueArray;
             for (int i = 0; i < values.Length; i++)
             {
-                builder.Append(values[i]);
+                builder.Append(new DateTimeOffset(values[i]));
             }
 
             return builder.Build();
+        }
+
+        private static DataColumn BuildTimestampColumn(ChunkedArray chunkedArray, DataField parquetField)
+        {
+            if (parquetField.IsNullable)
+            {
+                var values = new List<DateTime?>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as TimestampArray
+                        ?? throw new InvalidOperationException("Expected TimestampArray");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        DateTime? dt = ConvertOffset(arr.GetTimestamp(j));
+                        values.Add(dt);
+
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
+            else
+            {
+                var values = new List<DateTime>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as TimestampArray
+                        ?? throw new InvalidOperationException("Expected TimestampArray");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        DateTime? dt = ConvertOffset(arr.GetTimestamp(j));
+                        if (dt == null || !dt.HasValue) throw new NullReferenceException();
+                        values.Add(dt.Value);
+
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
         }
 
         private static DoubleArray BuildDoubleArray(System.Array valueArray, bool isNullable)
@@ -1068,6 +1130,43 @@ namespace EvolverCore.Models.DataV2
             return builder.Build();
         }
 
+        private static DataColumn BuildDoubleColumn(ChunkedArray chunkedArray, DataField parquetField)
+        {
+            if (parquetField.IsNullable)
+            {
+                var values = new List<double?>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as DoubleArray
+                        ?? throw new InvalidOperationException("Expected DoubleArray");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        double? dt = arr.GetValue(j);
+                        values.Add(dt);
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
+            else
+            {
+                var values = new List<double>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as DoubleArray
+                        ?? throw new InvalidOperationException("Expected DoubleArray");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        double? dt = arr.GetValue(j);
+                        if (dt == null || !dt.HasValue) throw new NullReferenceException();
+                        values.Add(dt.Value);
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
+        }
+
         private static Int64Array BuildInt64Array(System.Array valueArray, bool isNullable)
         {
             var builder = new Int64Array.Builder();
@@ -1086,6 +1185,43 @@ namespace EvolverCore.Models.DataV2
             }
 
             return builder.Build();
+        }
+
+        private static DataColumn BuildInt64Column(ChunkedArray chunkedArray, DataField parquetField)
+        {
+            if (parquetField.IsNullable)
+            {
+                var values = new List<long?>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as Int64Array
+                        ?? throw new InvalidOperationException("Expected Int64Array");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        long? dt = arr.GetValue(j);
+                        values.Add(dt);
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
+            else
+            {
+                var values = new List<long>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as Int64Array
+                        ?? throw new InvalidOperationException("Expected Int64Array");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        long? dt = arr.GetValue(j);
+                        if (dt == null || !dt.HasValue) throw new NullReferenceException();
+                        values.Add(dt.Value);
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
         }
 
         private static Int32Array BuildInt32Array(System.Array valueArray, bool isNullable)
@@ -1108,6 +1244,43 @@ namespace EvolverCore.Models.DataV2
             return builder.Build();
         }
 
+        private static DataColumn BuildInt32Column(ChunkedArray chunkedArray, DataField parquetField)
+        {
+            if (parquetField.IsNullable)
+            {
+                var values = new List<int?>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as Int32Array
+                        ?? throw new InvalidOperationException("Expected Int32Array");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        int? dt = arr.GetValue(j);
+                        values.Add(dt);
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
+            else
+            {
+                var values = new List<int>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as Int32Array
+                        ?? throw new InvalidOperationException("Expected Int32Array");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        int? dt = arr.GetValue(j);
+                        if (dt == null || !dt.HasValue) throw new NullReferenceException();
+                        values.Add(dt.Value);
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
+        }
+
         private static UInt8Array BuildUInt8Array(System.Array valueArray, bool isNullable)
         {
             var builder = new UInt8Array.Builder();
@@ -1126,6 +1299,43 @@ namespace EvolverCore.Models.DataV2
             }
 
             return builder.Build();
+        }
+
+        private static DataColumn BuildUInt8Column(ChunkedArray chunkedArray, DataField parquetField)
+        {
+            if (parquetField.IsNullable)
+            {
+                var values = new List<byte?>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as UInt8Array
+                        ?? throw new InvalidOperationException("Expected UInt8Array");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        byte? dt = arr.GetValue(j);
+                        values.Add(dt);
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
+            else
+            {
+                var values = new List<byte>((int)chunkedArray.Length);
+                for (int c = 0; c < chunkedArray.ArrayCount; c++)
+                {
+                    var arr = chunkedArray.ArrowArray(c) as UInt8Array
+                        ?? throw new InvalidOperationException("Expected UInt8Array");
+
+                    for (int j = 0; j < arr.Length; j++)
+                    {
+                        byte? dt = arr.GetValue(j);
+                        if (dt == null || !dt.HasValue) throw new NullReferenceException();
+                        values.Add(dt.Value);
+                    }
+                }
+                return new DataColumn(parquetField, values.ToArray());
+            }
         }
     }
 }

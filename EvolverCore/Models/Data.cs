@@ -1047,42 +1047,47 @@ namespace EvolverCore
             {
                 while (true)
                 {
-                    if (_wantExit) break;
+                    try
+                    {
+                        if (_wantExit) break;
 
-                    int queueCount = 0;
-                    Indicator? indicator = null;
-                    lock (_indicatorReadyToRunQueueLock)
-                    {
-                        queueCount = _indicatorReadyToRunQueue.Count;
-                        if (queueCount > 0)
-                            indicator = _indicatorReadyToRunQueue.Dequeue();
-                    }
-
-                    if (queueCount == 0)
-                    {
-                        _isSleeping = true;
-                        Thread.Sleep(Timeout.Infinite);
-                    }
-                    else if (indicator != null)
-                    {
-                        if (indicator.State != IndicatorState.Startup || indicator.WaitingForDataLoad)
+                        int queueCount = 0;
+                        Indicator? indicator = null;
+                        lock (_indicatorReadyToRunQueueLock)
                         {
-                            Globals.Instance.Log.LogMessage($"Indicator {indicator.Name} trying to run when not ready", LogLevel.Error);
-                            continue;
+                            queueCount = _indicatorReadyToRunQueue.Count;
+                            if (queueCount > 0)
+                                indicator = _indicatorReadyToRunQueue.Dequeue();
                         }
 
-                        indicator.RunHistory();
-
-                        lock (_indicatorLiveGraphLock)
+                        if (queueCount == 0)
                         {
-                            _indicatorLiveGraph.Enqueue(indicator);
+                            _isSleeping = true;
+                            Thread.MemoryBarrier();
+
+                            Thread.Sleep(Timeout.Infinite);
                         }
+                        else if (indicator != null)
+                        {
+                            if (indicator.State != IndicatorState.Startup || indicator.WaitingForDataLoad)
+                            {
+                                Globals.Instance.Log.LogMessage($"Indicator {indicator.Name} trying to run when not ready", LogLevel.Error);
+                                continue;
+                            }
+
+                            indicator.RunHistory();
+
+                            lock (_indicatorLiveGraphLock)
+                            {
+                                _indicatorLiveGraph.Enqueue(indicator);
+                            }
+                        }
+                    }
+                    catch (ThreadInterruptedException)
+                    {
+                        _isSleeping = false;
                     }
                 }
-            }
-            catch (ThreadInterruptedException)
-            {
-                _isSleeping = false;
             }
             catch (ThreadAbortException)
             {
@@ -1093,7 +1098,6 @@ namespace EvolverCore
                 Globals.Instance.Log.LogMessage("DataManager.indicatorWorker thread exception:", LogLevel.Error);
                 Globals.Instance.Log.LogException(e);
             }
-
         }
 
         internal async Task<InstrumentDataRecord> LoadDataAsync(InstrumentDataRecord dataRecord)

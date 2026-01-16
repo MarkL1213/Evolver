@@ -69,6 +69,7 @@ namespace EvolverCore.Models
             {
                 _messages.Enqueue(new LogMessage(message, level));
             }
+
             if (_isSleeping) { _logThread.Interrupt(); }
         }
 
@@ -94,6 +95,8 @@ namespace EvolverCore.Models
                     break;
                 }
             }
+
+            if (_isSleeping) { _logThread.Interrupt(); }
         }
 
         private void logWorker()
@@ -102,72 +105,79 @@ namespace EvolverCore.Models
             {
                 while (true)
                 {
-                    int queueCount = 0;
-                    LogMessage message = new LogMessage();
-
-                    lock (_queueLock)
+                    try
                     {
-                        queueCount = _messages.Count;
-                        if (queueCount > 0)
-                            message = _messages.Dequeue();
-                    }
 
-                    if (queueCount == 0)
-                    {
-                        if (_wantExit) break;
+                        int queueCount = 0;
+                        LogMessage message = new LogMessage();
 
-                        _isSleeping = true;
-                        Thread.Sleep(Timeout.Infinite);
-                    }
-                    else
-                    {
-                        #region Log to File
-                        try
+                        lock (_queueLock)
                         {
-                            if (_logStream == null)
+                            queueCount = _messages.Count;
+                            if (queueCount > 0)
+                                message = _messages.Dequeue();
+                        }
+
+                        if (queueCount == 0)
+                        {
+                            if (_wantExit) break;
+
+                            _isSleeping = true;
+                            Thread.MemoryBarrier();
+
+                            Thread.Sleep(Timeout.Infinite);
+                        }
+                        else
+                        {
+                            #region Log to File
+                            try
                             {
-                                FileStreamOptions options = new FileStreamOptions();
-                                options.Share = FileShare.ReadWrite;
-                                options.Mode = FileMode.Append;
-                                options.Access = FileAccess.Write;
+                                if (_logStream == null)
+                                {
+                                    FileStreamOptions options = new FileStreamOptions();
+                                    options.Share = FileShare.ReadWrite;
+                                    options.Mode = FileMode.Append;
+                                    options.Access = FileAccess.Write;
 
-                                _logStream = new StreamWriter(Globals.Instance.LogFileName, options);
+                                    _logStream = new StreamWriter(Globals.Instance.LogFileName, options);
+                                }
                             }
-                        }
-                        catch (ThreadAbortException) { break; }
-                        catch (Exception e)
-                        {
-                            throw new EvolverException($"Logger failed to log message : '{message}'", e);
-                        }
-
-                        _logStream.WriteLine(message.ToString());
-
-                        try
-                        {
-                            _logStream.Flush();
-                        }
-                        catch (ThreadAbortException) { break; }
-                        catch (Exception e)
-                        {
-                            throw new EvolverException($"Logger failed.", e);
-                        }
-                        #endregion
-
-                        #region Log to Control
-                        lock (_logControlsLock)
-                        {
-                            foreach (LogControl control in _logControls)
+                            catch (ThreadAbortException) { break; }
+                            catch (Exception e)
                             {
-                                control.AppendText(message.ToString());
+                                throw new EvolverException($"Logger failed to log message : '{message}'", e);
                             }
+
+                            _logStream.WriteLine(message.ToString());
+
+                            try
+                            {
+                                _logStream.Flush();
+                            }
+                            catch (ThreadAbortException) { break; }
+                            catch (Exception e)
+                            {
+                                throw new EvolverException($"Logger failed.", e);
+                            }
+                            #endregion
+
+                            #region Log to Control
+                            lock (_logControlsLock)
+                            {
+                                foreach (LogControl control in _logControls)
+                                {
+                                    control.AppendText(message.ToString());
+                                }
+                            }
+                            #endregion
                         }
-                        #endregion
+                    }
+                    catch (ThreadInterruptedException)
+                    {
+                        _isSleeping = false;
                     }
                 }
-            }
-            catch (ThreadInterruptedException)
-            {
-                _isSleeping = false;
+
             }
             catch (ThreadAbortException)
             {

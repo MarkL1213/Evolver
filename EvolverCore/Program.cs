@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.Styling;
 using System;
+using System.Threading.Tasks;
 
 namespace EvolverCore
 {
@@ -12,6 +13,13 @@ namespace EvolverCore
         [STAThread]
         public static void Main(string[] args)
         {
+            TaskScheduler.UnobservedTaskException += (sender, e) =>
+            {
+                Globals.Instance.Log.LogMessage("***** Evolver Unobserved Task Exception *****", Models.LogLevel.Error);
+                Globals.Instance.Log.LogException(e.Exception);
+                e.SetObserved();
+            };
+
             Globals.Instance.Log.LogMessage("===== Evolver Started =====", Models.LogLevel.Info);
             try
             {

@@ -10,7 +10,7 @@ using NP.UniDockService;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics.Metrics;
+using System.Threading.Tasks;
 using System.Linq;
 
 namespace EvolverCore.Views
@@ -46,7 +46,7 @@ namespace EvolverCore.Views
                 vm.AvailableLayouts.CollectionChanged -= RefreshAvailableLayouts;
             }
 
-            ArrowTestItem.Command = new RelayCommand(ArrowTestItemCommand);
+            ArrowTestItem.Command = new AsyncRelayCommand(ArrowTestItemCommand);
             ExitMenuItem.Command = new RelayCommand(ExitMenuItemCommand);
             NewLogWindow.Command = vm == null ? null : vm.NewLogDocumentCommand;
             NewChartItem.Command = vm == null ? null : vm.NewChartDocumentCommand;
@@ -139,7 +139,7 @@ namespace EvolverCore.Views
             vm.CurrentLayout = layout;
         }
 
-        private async void ArrowTestItemCommand()
+        private async Task ArrowTestItemCommand()
         {
             try
             {
@@ -162,7 +162,7 @@ namespace EvolverCore.Views
                 }
 
                 BarTable seriesBarTable = DataTableHelpers.ConvertSeriesToBarTable(series);
-                DataWarehouse.WritePartitionedBars(seriesBarTable.Table, randomInstrument, interval);
+                await DataWarehouse.WritePartitionedBars(seriesBarTable.Table, randomInstrument, interval);
 
                 ICurrentTable table = await DataWarehouse.ReadToTableAsync(randomInstrument, interval, startTime, interval.Add(startTime, numBarsToGenerate));
                 BarTable? barTable = table as BarTable;
@@ -173,11 +173,11 @@ namespace EvolverCore.Views
                 }
 
 
-                //Apache.Arrow.Column c = barTable.Table.Column(barTable.Table.Schema.GetFieldIndex("Time"));
-                //ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
-                //DateTime fileStartDate = cp.GetValueAt(0);
-                //DateTime fileEndDate = cp.GetValueAt(c.Length - 1);
-                //Globals.Instance.Log.LogMessage($"Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
+                Apache.Arrow.Column c = barTable.Table.Column(barTable.Table.Schema.GetFieldIndex("Time"));
+                ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
+                DateTime fileStartDate = cp.GetValueAt(0);
+                DateTime fileEndDate = cp.GetValueAt(c.Length - 1);
+                Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
 
 
                 if (!ArrowTest_CompareData(series,barTable.Table))
