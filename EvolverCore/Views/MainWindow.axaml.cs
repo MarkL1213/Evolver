@@ -1,4 +1,3 @@
-using Apache.Arrow;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.Input;
@@ -173,11 +172,11 @@ namespace EvolverCore.Views
                 }
 
 
-                Apache.Arrow.Column c = barTable.Table.Column(barTable.Table.Schema.GetFieldIndex("Time"));
-                ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
-                DateTime fileStartDate = cp.GetValueAt(0);
-                DateTime fileEndDate = cp.GetValueAt(c.Length - 1);
-                Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
+                //Apache.Arrow.Column c = barTable.Table.Column(barTable.Table.Schema.GetFieldIndex("Time"));
+                //ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
+                //DateTime fileStartDate = cp.GetValueAt(0);
+                //DateTime fileEndDate = cp.GetValueAt(c.Length - 1);
+                //Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
 
 
                 if (!ArrowTest_CompareData(series, barTable))

@@ -334,8 +334,6 @@ namespace EvolverCore.Models
 
         public IndicatorState State { get; internal set; } = IndicatorState.New;
 
-
-
         public int CurrentInputIndex { get; internal set; } = -1;
         public int CurrentBarIndex { get; internal set; } = -1;
 
