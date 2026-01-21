@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace EvolverCore.Models.DataV2
@@ -182,13 +183,35 @@ namespace EvolverCore.Models.DataV2
     {
         public DataType DataType { get; }
         public int Count { get; }
+        
+        public int[] Offsets { get; }
+
+        public List<Array> Data { get; }
         public string Name { get; }
+        public Array Series { get; }
 
         public object GetValueAt(int index);
 
-        public System.Array ToArray();
+        public Array ToArray();
+
+        public IDataTableColumn ExportRange(int index, int length);
+        public void AddDataColumn(DataColumn column);
+        public void AddDataColumn(IDataTableColumn column);
+
+        public void SetValues(List<object> values);
 
     }
+
+    public static class DataTableColumnFactory
+    {
+        public static DataTableColumn<T> CopyBlankTableColumn<T>(IDataTableColumn sourceColumn)
+        {
+            DataTableColumn<T> c = new DataTableColumn<T>(sourceColumn.Name, sourceColumn.DataType);
+            return c;
+        }
+    }
+
+
 
     public class DataTableColumn<T> : IDataTableColumn
     {
@@ -198,20 +221,101 @@ namespace EvolverCore.Models.DataV2
             DataType = dataType;
         }
 
-        public List<T> Series { get; private set; } = new List<T>();
+        List<Array> _dataArrays = new List<Array>();
+        int[] _cumulativeOffsets = new int[0];
+        List<T> _series = new List<T>();
+
         public string Name { get; private set; } = string.Empty;
         public DataType DataType { get; private set; } = DataType.Int32;
+        public int Count { get { return RowCount(); } }
 
-        public int Count { get { return Series.Count; } }
+        public int[] Offsets { get { return _cumulativeOffsets; } }
+
+        public List<Array> Data { get { return _dataArrays; } }
+
+        public Array Series { get { return _series.ToArray(); } }
+
+        public void AddDataColumn(DataColumn column)
+        {
+            if (_series.Count > 0) throw new Exception("Target series can not have an un-serialized data chunk.");
+
+            int n = _cumulativeOffsets.Length > 0 ? _cumulativeOffsets[_cumulativeOffsets.Length - 1] : 0;
+            
+            List<int> offsetList = _cumulativeOffsets.ToList<int>();
+            offsetList.Add(n + column.Data.Length);
+            _cumulativeOffsets = offsetList.ToArray();
+            
+            _dataArrays.Add(column.Data);
+        }
+
+        public void AddDataColumn(IDataTableColumn column)
+        {
+            if (_series.Count > 0) throw new Exception("Target series can not have an un-serialized data chunk.");
+
+            int n = _cumulativeOffsets.Length > 0 ? _cumulativeOffsets[_cumulativeOffsets.Length - 1] : 0;
+
+            List<int> offsetList = _cumulativeOffsets.ToList<int>();
+            offsetList.AddRange(column.Offsets.Select(i => i + n));
+            _cumulativeOffsets = offsetList.ToArray();
+          
+            _dataArrays.AddRange(column.Data);
+            _series.AddRange((T[])column.Series);
+        }
+
+        public void InitValues(List<object> values)
+        {
+            Array a = values.ToArray();
+            _dataArrays.Add(a);
+        }
+
+        public IDataTableColumn ExportRange(int index, int length)
+        {
+            IDataTableColumn newCol = DataTableColumnFactory.CopyBlankTableColumn<T>(this);
+
+            List<object> values = new List<object>();
+            for (int i = index; i < index + length; i++)
+                values.Add(GetValueAt(i));
+
+            newCol.SetValues(values);
+            return newCol;
+        }
+
+        public void SetValues(List<object> values)
+        {
+            _series.Clear();
+            _dataArrays.Clear();
+
+            InitValues(values);
+        }
+
+        public int RowCount()
+        {
+            int n = 0;
+            foreach (Array a in _dataArrays) n += a.Length;
+            n += _series.Count;
+            return n;
+        }
+
 
         public object GetValueAt(int index)
         {
-            return Series[index];
+            //determine where index points based on offsets
+            //return offset shifted index from correct array/list
+            int i = Array.BinarySearch(_cumulativeOffsets, index);
+            if (i < 0) i = ~i;
+
+            if (i == _cumulativeOffsets.Length - 1)
+                return i >= 1 ? _series[index - _cumulativeOffsets[i - 1]]! : _series[index]!;
+            else
+            {
+                Array a = _dataArrays[i];
+                return i >= 1 ? a.GetValue(index - _cumulativeOffsets[i - 1])! : a.GetValue(index)!;
+            }
         }
 
         public System.Array ToArray()
         {
-            return Series.ToArray();
+            return _series.ToArray();
         }
     }
 
@@ -219,57 +323,171 @@ namespace EvolverCore.Models.DataV2
     {
         List<IDataTableColumn> _columns;
         ParquetSchema _pSchema;
+        object _lock = new object();
 
         public DataTable(ParquetSchema pSchema)
         {
-            _pSchema = pSchema;
-            _columns = new List<IDataTableColumn>();
-            createColumnsFromParquetSchema(pSchema);
+            lock (_lock)
+            {
+                _pSchema = pSchema;
+                _columns = new List<IDataTableColumn>();
+                createColumnsFromParquetSchema();
+            }
         }
 
-        public ParquetSchema Schema { get { return _pSchema; } }
+        public int RowCount { get { lock (_lock) { return _columns.Count > 0 ? _columns[0].Count : 0; } } }
+
+        public ParquetSchema Schema { get { lock (_lock) { return _pSchema; } } }
 
         public IDataTableColumn? Column(string name)
         {
-            return _columns.FirstOrDefault(c =>  c.Name == name);
+            lock (_lock) { return _columns.FirstOrDefault(c => c.Name == name); }
         }
+
+        private List<IDataTableColumn> Columns { get { return _columns; } }
 
         public DataColumn ExportDataColumn(string name)
         {
-            IDataTableColumn? col = Column(name);
-            if (col == null) throw new ArgumentException();
-            DataField? colField = null;
-
-            foreach (DataField field in _pSchema.DataFields)
+            lock (_lock)
             {
-                if (field.Name == name) { colField = field; break; }
-            }
-            if(colField == null) throw new ArgumentException();
+                IDataTableColumn? col = Column(name);
+                if (col == null) throw new ArgumentException();
+                DataField? colField = null;
 
-            return new DataColumn(colField, col.ToArray());
+                foreach (DataField field in _pSchema.DataFields)
+                {
+                    if (field.Name == name) { colField = field; break; }
+                }
+                if (colField == null) throw new ArgumentException();
+
+                return new DataColumn(colField, col.ToArray());
+            }
         }
 
-        private void createColumnsFromParquetSchema(ParquetSchema pSchema)
+        private void createColumnsFromParquetSchema()
         {
+            lock (_lock)
+            {
+                _columns.Clear();
 
+                foreach (DataField field in _pSchema.DataFields)
+                {
+                    if (field.ClrType == typeof(DateTime))
+                        _columns.Add(new DataTableColumn<DateTime>(field.Name, DataType.DateTime));
+                    else if (field.ClrType == typeof(double))
+                        _columns.Add(new DataTableColumn<double>(field.Name, DataType.Double));
+                    else if (field.ClrType == typeof(long))
+                        _columns.Add(new DataTableColumn<long>(field.Name, DataType.Int64));
+                    else if (field.ClrType == typeof(int))
+                        _columns.Add(new DataTableColumn<int>(field.Name, DataType.Int32));
+                    else if (field.ClrType == typeof(byte))
+                        _columns.Add(new DataTableColumn<byte>(field.Name, DataType.UInt8));
+                    else
+                    {
+                        _columns.Clear();
+                        throw new Exception($"Unhandled parquet column type {field.ClrType.ToString()}");
+                    }
+                }
+            }
+        }
+
+        public bool CompareColumnStructure(DataTable table)
+        {
+            lock (_lock)
+            {
+                if (table._columns.Count != _columns.Count) return false;
+                for (int i = 0; i < table._columns.Count; i++)
+                {
+                    IDataTableColumn c = table._columns[i];
+                    if (c.Name != _columns[i].Name) return false;
+                    if (c.DataType != _columns[i].DataType) return false;
+                }
+
+                return true;
+            }
+        }
+
+        public bool CompareColumnStructure(DataColumn[] columns)
+        {
+            lock (_lock)
+            {
+                if (columns.Length != _columns.Count) return false;
+                for (int i = 0; i < columns.Length; i++)
+                {
+                    DataColumn c = columns[i];
+                    if (c.Field.Name != _columns[i].Name) return false;
+                    switch (_columns[i].DataType)
+                    {
+                        case DataType.DateTime: if (c.Field.ClrType != typeof(DateTime)) return false; break;
+                        case DataType.Int64: if (c.Field.ClrType != typeof(long)) return false; break;
+                        case DataType.Int32: if (c.Field.ClrType != typeof(int)) return false; break;
+                        case DataType.UInt8: if (c.Field.ClrType != typeof(byte)) return false; break;
+                        case DataType.Double: if (c.Field.ClrType != typeof(double)) return false; break;
+                        default: return false;
+                    }
+                }
+                return true;
+            }
         }
 
         public void AddColumnData(DataColumn[] columns)
         {
+            lock (_lock)
+            {
+                if (!CompareColumnStructure(columns)) throw new ArgumentException();
 
+                //TODO: be sure table is aligned to current values
+                //column.last < _series.first and column.first > lastArrary.last
+                //lastArray.last + 1 interval == column.first
+
+
+                for (int i = 0; i < columns.Length; i++)
+                {
+                    _columns[i].AddDataColumn(columns[i]);
+                }
+            }
         }
 
         public void AppendTable(DataTable table)
         {
-            //append table to this
+            lock (_lock)
+            {
+                if (!CompareColumnStructure(table)) throw new ArgumentException();
+
+                //TODO:verify alignment
+
+
+                for (int i = 0; i < _columns.Count; i++)
+                {
+                    _columns[i].AddDataColumn(table._columns[i]);
+                }
+            }
         }
 
-        public DataTable? Slice(int index, int length)
+        internal void SetTable(List<IDataTableColumn> columns)
         {
-            return null;
+            //TODO: implement!
+
         }
 
-        public int RowCount { get { return _columns.Count > 0 ? _columns[0].Count : 0; } }
+        public DataTable Slice(int index, int length)
+        {
+            lock (_lock)
+            {
+                List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
+                DataTable sliceTable = new DataTable(Schema);
+
+                for (int i = 0; i < _columns.Count; i++)
+                {
+                    IDataTableColumn srcColumn = _columns[i];
+                    IDataTableColumn newCol = srcColumn.ExportRange(index, length);
+                    newColumns.Add(newCol);
+                }
+
+                sliceTable.SetTable(newColumns);
+                return sliceTable;
+            }
+        }
     }
 
 
@@ -302,7 +520,7 @@ namespace EvolverCore.Models.DataV2
                 return reader.RowGroupCount;
         }
 
-        public static async Task<ICurrentTable> ReadToTableAsync(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        public static async Task<ICurrentTable> ReadToDataTableAsync(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
             TableType tableType;
 
@@ -358,7 +576,7 @@ namespace EvolverCore.Models.DataV2
 
                 }
 
-                DataTable subTable = await ReadToTableAsync(filePath, tableType, rowGroups);
+                DataTable subTable = await ReadToDataTableAsync(filePath, tableType, rowGroups);
 
                 if (table == null) table = subTable;
                 else table.AppendTable(subTable);
@@ -375,7 +593,7 @@ namespace EvolverCore.Models.DataV2
             }
         }
 
-        private static async Task<DataTable> ReadToTableAsync(string filePath, TableType tableType, int[]? rowGroups = null)
+        private static async Task<DataTable> ReadToDataTableAsync(string filePath, TableType tableType, int[]? rowGroups = null)
         {
             ParquetSchema schema;
             switch (tableType)

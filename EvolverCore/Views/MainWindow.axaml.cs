@@ -163,7 +163,7 @@ namespace EvolverCore.Views
                 BarTable seriesBarTable = DataTableHelpers.ConvertSeriesToBarTable(series);
                 await DataWarehouse.WritePartitionedBars(seriesBarTable.Table, randomInstrument, interval);
 
-                ICurrentTable table = await DataWarehouse.ReadToTableAsync(randomInstrument, interval, startTime, interval.Add(startTime, numBarsToGenerate));
+                ICurrentTable table = await DataWarehouse.ReadToDataTableAsync(randomInstrument, interval, startTime, interval.Add(startTime, numBarsToGenerate));
                 BarTable? barTable = table as BarTable;
                 if (barTable == null)
                 {
@@ -171,12 +171,16 @@ namespace EvolverCore.Views
                     return;
                 }
 
-
-                //Apache.Arrow.Column c = barTable.Table.Column(barTable.Table.Schema.GetFieldIndex("Time"));
-                //ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
-                //DateTime fileStartDate = cp.GetValueAt(0);
-                //DateTime fileEndDate = cp.GetValueAt(c.Length - 1);
-                //Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
+                IDataTableColumn? c = barTable.Table.Column("Time");
+                if (c == null)
+                {
+                    Globals.Instance.Log.LogMessage("", LogLevel.Error);
+                    return;
+                }
+                ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
+                DateTime fileStartDate = cp.GetValueAt(0);
+                DateTime fileEndDate = cp.GetValueAt(c.Count - 1);
+                Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
 
 
                 if (!ArrowTest_CompareData(series, barTable))
