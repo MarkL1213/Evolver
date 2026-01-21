@@ -206,7 +206,7 @@ namespace EvolverCore.Models.DataV2
     {
         public static DataTableColumn<T> CopyBlankTableColumn<T>(IDataTableColumn sourceColumn)
         {
-            DataTableColumn<T> c = new DataTableColumn<T>(sourceColumn.Name, sourceColumn.DataType);
+            DataTableColumn<T> c = new DataTableColumn<T>(sourceColumn.Name, sourceColumn.DataType, sourceColumn.Count);
             return c;
         }
     }
@@ -215,15 +215,16 @@ namespace EvolverCore.Models.DataV2
 
     public class DataTableColumn<T> : IDataTableColumn
     {
-        public DataTableColumn(string name, DataType dataType)
+        public DataTableColumn(string name, DataType dataType,int columnSize)
         {
             Name = name;
             DataType = dataType;
+            _series = new List<T>(columnSize);
         }
 
         List<Array> _dataArrays = new List<Array>();
         int[] _cumulativeOffsets = new int[0];
-        List<T> _series = new List<T>();
+        List<T> _series;
 
         public string Name { get; private set; } = string.Empty;
         public DataType DataType { get; private set; } = DataType.Int32;
@@ -313,9 +314,33 @@ namespace EvolverCore.Models.DataV2
             }
         }
 
+        public void SetValueAt(T value, int index)
+        {
+            int i = Array.BinarySearch(_cumulativeOffsets, index);
+            if (i < 0) i = ~i;
+
+            if (i == _cumulativeOffsets.Length - 1)
+            {
+                if (i >= 1) _series[index - _cumulativeOffsets[i - 1]] = value;
+                else _series[index] = value;
+            }
+            else
+            {
+                Array a = _dataArrays[i];
+                if (i >= 1) a.SetValue(value, index - _cumulativeOffsets[i - 1]);
+                else a.SetValue(value, index);
+            }
+        }
+
         public System.Array ToArray()
         {
             return _series.ToArray();
+        }
+
+        public T this[int index]
+        {
+            get { return (T)GetValueAt(index); }
+            internal set { SetValueAt(value, index); }
         }
     }
 
@@ -325,13 +350,13 @@ namespace EvolverCore.Models.DataV2
         ParquetSchema _pSchema;
         object _lock = new object();
 
-        public DataTable(ParquetSchema pSchema)
+        public DataTable(ParquetSchema pSchema, int columnSize)
         {
             lock (_lock)
             {
                 _pSchema = pSchema;
                 _columns = new List<IDataTableColumn>();
-                createColumnsFromParquetSchema();
+                createColumnsFromParquetSchema(columnSize);
             }
         }
 
@@ -364,7 +389,7 @@ namespace EvolverCore.Models.DataV2
             }
         }
 
-        private void createColumnsFromParquetSchema()
+        private void createColumnsFromParquetSchema(int columnSize)
         {
             lock (_lock)
             {
@@ -373,15 +398,15 @@ namespace EvolverCore.Models.DataV2
                 foreach (DataField field in _pSchema.DataFields)
                 {
                     if (field.ClrType == typeof(DateTime))
-                        _columns.Add(new DataTableColumn<DateTime>(field.Name, DataType.DateTime));
+                        _columns.Add(new DataTableColumn<DateTime>(field.Name, DataType.DateTime, columnSize));
                     else if (field.ClrType == typeof(double))
-                        _columns.Add(new DataTableColumn<double>(field.Name, DataType.Double));
+                        _columns.Add(new DataTableColumn<double>(field.Name, DataType.Double, columnSize));
                     else if (field.ClrType == typeof(long))
-                        _columns.Add(new DataTableColumn<long>(field.Name, DataType.Int64));
+                        _columns.Add(new DataTableColumn<long>(field.Name, DataType.Int64, columnSize));
                     else if (field.ClrType == typeof(int))
-                        _columns.Add(new DataTableColumn<int>(field.Name, DataType.Int32));
+                        _columns.Add(new DataTableColumn<int>(field.Name, DataType.Int32, columnSize));
                     else if (field.ClrType == typeof(byte))
-                        _columns.Add(new DataTableColumn<byte>(field.Name, DataType.UInt8));
+                        _columns.Add(new DataTableColumn<byte>(field.Name, DataType.UInt8, columnSize));
                     else
                     {
                         _columns.Clear();
@@ -464,18 +489,12 @@ namespace EvolverCore.Models.DataV2
             }
         }
 
-        internal void SetTable(List<IDataTableColumn> columns)
-        {
-            //TODO: implement!
-
-        }
-
         public DataTable Slice(int index, int length)
         {
             lock (_lock)
             {
                 List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
-                DataTable sliceTable = new DataTable(Schema);
+                DataTable sliceTable = new DataTable(Schema, length);
 
                 for (int i = 0; i < _columns.Count; i++)
                 {
@@ -484,7 +503,7 @@ namespace EvolverCore.Models.DataV2
                     newColumns.Add(newCol);
                 }
 
-                sliceTable.SetTable(newColumns);
+                sliceTable._columns = newColumns;
                 return sliceTable;
             }
         }
@@ -603,7 +622,7 @@ namespace EvolverCore.Models.DataV2
                 default: throw new ArgumentException("Unrecognized table type.", nameof(tableType));
             }
 
-            if (!File.Exists(filePath)) return new DataTable(schema);
+            if (!File.Exists(filePath)) return new DataTable(schema, 0);
             
             using (ParquetReader reader = await ParquetReader.CreateAsync(filePath, GetParquetProperties()))
             {
@@ -630,7 +649,7 @@ namespace EvolverCore.Models.DataV2
                         rowGroupsToRead[i] = i;
                 }
 
-                DataTable resultTable = new DataTable(schema);
+                DataTable resultTable = new DataTable(schema, 0);
 
                 foreach (int rowGroupIndex in rowGroupsToRead)
                 {
@@ -785,9 +804,28 @@ namespace EvolverCore.Models.DataV2
                 throw new ArgumentException("Series Instrument can not be null.");
 
             ParquetSchema barSchema = Bar.GetSchema();
-            DataTable table = new DataTable(barSchema);
+            DataTable table = new DataTable(barSchema, series.Count);
 
-            //TODO: copy all values from series to table
+            DataTableColumn<DateTime> timeCol = table.Column("Time") as DataTableColumn<DateTime> ?? throw new NullReferenceException();
+            DataTableColumn<double> openCol = table.Column("Open") as DataTableColumn<double> ?? throw new NullReferenceException();
+            DataTableColumn<double> highCol = table.Column("High") as DataTableColumn<double> ?? throw new NullReferenceException();
+            DataTableColumn<double> lowCol = table.Column("Low") as DataTableColumn<double> ?? throw new NullReferenceException();
+            DataTableColumn<double> closeCol = table.Column("Close") as DataTableColumn<double> ?? throw new NullReferenceException();
+            DataTableColumn<long> volumeCol = table.Column("Volume") as DataTableColumn<long> ?? throw new NullReferenceException();
+
+
+
+            for (int i = 0; i < series.Count; i++)
+            {
+                timeCol[i] = series[i].Time;
+                openCol[i] = series[i].Open;
+                highCol[i] = series[i].High;
+                lowCol[i] = series[i].Low;
+                closeCol[i] = series[i].Close;
+                volumeCol[i] = series[i].Volume;
+            }
+
+
 
             return new BarTable(series.Instrument, series.Interval, table);
         }
