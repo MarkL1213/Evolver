@@ -1,0 +1,264 @@
+﻿using EvolverCore.Models.DataV2;
+using IronCompress;
+using Parquet;
+using Parquet.Data;
+using Parquet.Schema;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
+
+namespace EvolverCore.Models
+{
+    public static class DataWarehouse
+    {
+        internal static string GetBarPartitionPath(Instrument instrument, DataInterval interval, DateOnly date)
+        {
+            // Example: bars/AAPL/1min/2026-01-13.parquet
+            string symbol = instrument.Name.Replace("/", "_"); // escape slashes if needed
+            string intervalStr = interval.ToString();
+            return Path.Combine(Globals.Instance.DataDirectory, "bars", symbol, intervalStr, $"{date:yyyy-MM-dd}.parquet");
+        }
+
+        internal static string GetTickPartitionPath(Instrument instrument, DateOnly date)
+        {
+            string symbol = instrument.Name.Replace("/", "_");
+            return Path.Combine(Globals.Instance.DataDirectory, "ticks", symbol, $"{date:yyyy-MM-dd}.parquet");
+        }
+
+        private static ParquetOptions GetParquetProperties()
+        {
+            ParquetOptions options = new ParquetOptions();
+            return options;
+        }
+
+        public static async Task<int> GetRowGroupsCount(string filePath)
+        {
+            using (ParquetReader reader = await ParquetReader.CreateAsync(filePath))
+                return reader.RowGroupCount;
+        }
+
+        public static async Task<ICurrentTable> ReadToDataTableAsync(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        {
+            TableType tableType;
+
+            switch (interval.Type)
+            {
+                case Interval.Tick:
+                    tableType = TableType.Tick;
+                    break;
+                default:
+                    tableType = TableType.Bar;
+                    break;
+            }
+
+            List<string> filesToLoad = new List<string>();
+            DateOnly date = DateOnly.FromDateTime(start);
+            DateOnly endDate = DateOnly.FromDateTime(end);
+
+            while (date <= endDate)
+            {
+                string partitionPath;
+                switch (interval.Type)
+                {
+                    case Interval.Tick:
+                        partitionPath = GetTickPartitionPath(instrument, date);
+                        break;
+                    default:
+                        partitionPath = GetBarPartitionPath(instrument, interval, date);
+                        break;
+                }
+                if (!File.Exists(partitionPath))
+                    throw new Exception($"Missing data file for intrument={instrument.Name} interval={interval.ToString()} date={date.ToString()}");
+
+                filesToLoad.Add(partitionPath);
+                date = date.AddDays(1);
+            }
+            if (filesToLoad.Count == 0)
+                throw new Exception($"No data files found for intrument={instrument.Name} interval={interval.ToString()} start={start.ToString()} end={end.ToString()}");
+
+            DataTable? table = null;
+
+            for (int i = 0; i < filesToLoad.Count; i++)
+            {
+                string filePath = filesToLoad[i];
+
+                //determine which row groups to load on the specified start/end dates (for all others just load all)
+                int[]? rowGroups = null;
+                if (i == 0)
+                {//TODO: on start date, might not want all bars...
+
+                }
+                else if (i == filesToLoad.Count - 1)
+                {//TODO: on end date, might not want all bars...
+
+                }
+
+                DataTable subTable = await ReadToDataTableAsync(filePath, tableType, rowGroups);
+
+                if (table == null) table = subTable;
+                else table.AppendTable(subTable);
+            }
+
+            if (table == null)
+                throw new Exception("Unable to load data.");
+
+            switch (tableType)
+            {
+                case TableType.Bar: return new BarTable(instrument, interval, table);
+                case TableType.Tick: return new TickTable(instrument, table);
+                default: throw new Exception($"Unknown TableType {tableType.ToString()}");
+            }
+        }
+
+        private static async Task<DataTable> ReadToDataTableAsync(string filePath, TableType tableType, int[]? rowGroups = null)
+        {
+            ParquetSchema schema;
+            switch (tableType)
+            {
+                case TableType.Bar: schema = Bar.GetSchema(); break;
+                case TableType.Tick: schema = Tick.GetSchema(); break;
+                default: throw new ArgumentException("Unrecognized table type.", nameof(tableType));
+            }
+
+            if (!File.Exists(filePath)) return new DataTable(schema, 0);
+
+            using (ParquetReader reader = await ParquetReader.CreateAsync(filePath, GetParquetProperties()))
+            {
+                int[] rowGroupsToRead;
+                if (rowGroups != null)
+                {
+                    rowGroupsToRead = new int[rowGroups.Length];
+                    int rowCount = reader.RowGroupCount;
+                    for (int i = 0; i < rowGroups.Length; i++)
+                    {
+                        int rowGroupIndex = rowGroups[i];
+                        rowGroupsToRead[i] = rowGroupIndex;
+                        if (rowGroupIndex < 0 || rowGroupIndex >= rowCount)
+                        {
+                            throw new ArgumentOutOfRangeException(nameof(rowGroups),
+                                $"Row group index {rowGroupIndex} is invalid (file has {rowCount} row groups).");
+                        }
+                    }
+                }
+                else
+                {
+                    rowGroupsToRead = new int[reader.RowGroupCount];
+                    for (int i = 0; i < reader.RowGroupCount; i++)
+                        rowGroupsToRead[i] = i;
+                }
+
+                DataTable resultTable = new DataTable(schema, 0);
+
+                foreach (int rowGroupIndex in rowGroupsToRead)
+                {
+                    using (ParquetRowGroupReader rgReader = reader.OpenRowGroupReader(rowGroupIndex))
+                    {
+                        List<DataColumn> colList = new List<DataColumn>();
+
+                        for (int i = 0; i < schema.DataFields.Length; i++)
+                        {
+                            DataField field = schema.DataFields[i];
+                            DataColumn col = await rgReader.ReadColumnAsync(field);
+
+                            colList.Add(col);
+                        }
+
+                        resultTable.AddColumnData(colList.ToArray());
+                    }
+                }
+
+                return resultTable;
+            }
+        }
+
+        internal static async Task WritePartitionedBars(DataTable table, Instrument instrument, DataInterval interval)
+        {
+            if (table.RowCount == 0) return; // nothing to write
+
+            if (!SchemaHelpers.ValueEqual(table.Schema, Bar.GetSchema()))
+                throw new ArgumentException("Schema mismatch.");
+
+            DataTableColumn<DateTime>? timeColumn = table.Column("Time") as DataTableColumn<DateTime>;
+            if (timeColumn == null) throw new ArgumentException("WritePartitionedBars: unable to write table with no Time column.");
+
+
+            // Group (globalIndex, sliceLength) by DateOnly
+            Dictionary<DateOnly, (int GlobalIndex, int Length)> groups = new Dictionary<DateOnly, (int, int)>();
+            int globalIndex = 0;
+
+
+            for (int j = 0; j < table.RowCount; j++)
+            {
+                DateTime ts = ((DateTime?)timeColumn.GetValueAt(j)) ?? throw new EvolverException("Null Time value.");
+                DateOnly date = DateOnly.FromDateTime(ts);
+
+                if (!groups.TryGetValue(date, out var group))
+                {
+                    group = (globalIndex, 1);
+                    groups.Add(date, group);
+                }
+                else
+                    groups[date] = (group.GlobalIndex, group.Length + 1);
+
+                globalIndex++;
+            }
+
+            // For each date group, create sub-Table and write
+            foreach (KeyValuePair<DateOnly, (int, int)> kvp in groups)
+            {
+                DateOnly date = kvp.Key;
+                (int Index, int Length) group = kvp.Value;
+
+                if (group.Length == 0) continue;
+
+                DataTable subTable = table.Slice(group.Index, group.Length);
+
+                await WriteDataTableAsync(
+                    GetBarPartitionPath(instrument, interval, date),
+                    TableType.Bar,
+                    subTable);
+            }
+        }
+
+        private static async Task WriteDataTableAsync(string filePath, TableType tableType, DataTable table)
+        {
+            ParquetSchema schema;
+            switch (tableType)
+            {
+                case TableType.Bar: schema = Bar.GetSchema(); break;
+                case TableType.Tick: schema = Tick.GetSchema(); break;
+                default: throw new ArgumentException("Unrecognized table type.", nameof(tableType));
+            }
+
+            if (!SchemaHelpers.ValueEqual(table.Schema, schema))
+            {
+                throw new EvolverException("Schema mismatch.");
+            }
+
+            string? dirName = Path.GetDirectoryName(filePath);
+            if (dirName == null)
+                throw new EvolverException();
+
+            Directory.CreateDirectory(dirName);
+            //if (!File.Exists(filePath)) ;
+
+            using (FileStream stream = File.Create(filePath))
+            {
+                using (ParquetWriter writer = await ParquetWriter.CreateAsync(schema, stream, GetParquetProperties()))
+                {
+                    using (ParquetRowGroupWriter rgWriter = writer.CreateRowGroup())
+                    {
+                        (ParquetSchema parquetSchema, DataColumn[] parquetData) = DataTableHelpers.ConvertDataTableToParquet(table);
+
+                        foreach (DataColumn parquetColumn in parquetData)
+                            await rgWriter.WriteColumnAsync(parquetColumn);
+
+                        rgWriter.CompleteValidate();
+                    }
+                }
+            }
+        }
+    }
+}

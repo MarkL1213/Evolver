@@ -210,32 +210,40 @@ namespace EvolverCore.Views
 
             for (int i = 0; i < original.Count; i++)
             {
-                TimeDataBar origBar = original[i];
+                try
+                {
+                    TimeDataBar origBar = original[i];
 
-                if(origBar.Volume != readTable.Volume.GetValueAt(i))
-                {
-                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
-                    return false;
+                    if (origBar.Volume != readTable.Volume.GetValueAt(i))
+                    {
+                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
+                        return false;
+                    }
+                    if (origBar.High != readTable.High.GetValueAt(i))
+                    {
+                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.High}, read {readTable.High.GetValueAt(i)}", LogLevel.Error);
+                        return false;
+                    }
+                    if (origBar.Low != readTable.Low.GetValueAt(i))
+                    {
+                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Low}, read {readTable.Low.GetValueAt(i)}", LogLevel.Error);
+                        return false;
+                    }
+                    if (origBar.Close != readTable.Close.GetValueAt(i))
+                    {
+                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Close}, read {readTable.Close.GetValueAt(i)}", LogLevel.Error);
+                        return false;
+                    }
+                    if (origBar.Volume != readTable.Volume.GetValueAt(i))
+                    {
+                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
+                        return false;
+                    }
                 }
-                if (origBar.High != readTable.High.GetValueAt(i))
+                catch (Exception e)
                 {
-                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.High}, read {readTable.High.GetValueAt(i)}", LogLevel.Error);
-                    return false;
-                }
-                if (origBar.Low != readTable.Low.GetValueAt(i))
-                {
-                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Low}, read {readTable.Low.GetValueAt(i)}", LogLevel.Error);
-                    return false;
-                }
-                if (origBar.Close != readTable.Close.GetValueAt(i))
-                {
-                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Close}, read {readTable.Close.GetValueAt(i)}", LogLevel.Error);
-                    return false;
-                }
-                if (origBar.Volume != readTable.Volume.GetValueAt(i))
-                {
-                    Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
-                    return false;
+                    Globals.Instance.Log.LogMessage($"Exception at index {i}", LogLevel.Error);
+                    Globals.Instance.Log.LogException(e);
                 }
             }
 
