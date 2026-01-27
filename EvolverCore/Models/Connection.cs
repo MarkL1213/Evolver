@@ -8,16 +8,38 @@ namespace EvolverCore.Models
 {
     public enum ConnectionState { Disconnected, Connecting, Connected, Disconnecting, Error};
 
-    public enum DataEvent { Bid, Ask, Last };
+    public enum DataEvent { Bid, Ask, Last, Settlement };
 
     public class ConnectionDataUpdateEventArgs : EventArgs
     {
-        public ConnectionDataUpdateEventArgs(Instrument instrument, DataEvent dataEvent, double value) { Event = dataEvent;Value = value; Instrument = instrument; }
-        public DataEvent Event { get; private set; }
-        public double Value { get; private set; }
-
+        private ConnectionDataUpdateEventArgs(Instrument instrument, DataEvent dataEvent, DateTime time)
+        {
+            Time = time;
+            Event = dataEvent;
+            Instrument = instrument;
+        }
         public Instrument Instrument { get; private set; }
+        public DataEvent Event { get; private set; }
+        public DateTime Time { get; private set; }
+        
+        public double Bid { get; private set; } = 0;
+        public double Ask { get; private set; } = 0;
+        public double Price { get; private set; } = 0;
+        public long Volume { get; private set; } = 0;
 
+        public static ConnectionDataUpdateEventArgs CreateSettlementArgs(Instrument instrument, DateTime time, double price)
+        {
+            ConnectionDataUpdateEventArgs args = new ConnectionDataUpdateEventArgs(instrument, DataEvent.Settlement, time);
+            args.Price = price;
+            return args;
+        }
+        public static ConnectionDataUpdateEventArgs CreateLastArgs(Instrument instrument, DateTime time, double price, long volume)
+        {
+            ConnectionDataUpdateEventArgs args = new ConnectionDataUpdateEventArgs(instrument, DataEvent.Last, time);
+            args.Price = price;
+            args.Volume = volume;
+            return args;
+        }
     }
 
     public class ConnectionStateChangeEventArgs : EventArgs
@@ -128,12 +150,13 @@ namespace EvolverCore.Models
                             /// Fake connection for testing
                             Thread.Sleep(5000);
                             Random r = new Random(DateTime.Now.Second);
-                            double v = r.Next(20, 100);
+                            double p = r.Next(20, 100);
+                            long v = r.Next(100, 1000);
                             Instrument? i = Globals.Instance.InstrumentCollection.Lookup("Random");
                             if (i == null)
                                 Globals.Instance.Log.LogMessage("Connection data stream failed to find Random instrument.", LogLevel.Error);
-                            else 
-                                DataUpdate?.Invoke(this, new ConnectionDataUpdateEventArgs(i, DataEvent.Last, v));
+                            else
+                                DataUpdate?.Invoke(this, ConnectionDataUpdateEventArgs.CreateLastArgs(i, DateTime.Now, p, v));
                             ///////////
                         }
 

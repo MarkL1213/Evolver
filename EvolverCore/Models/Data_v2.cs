@@ -43,13 +43,15 @@ namespace EvolverCore.Models.DataV2
     
     public readonly struct Bar
     {
-        public Bar(DateTime time, double open, double high, double low, double close, long volume)
+        public Bar(DateTime time, double open, double high, double low, double close, double bid, double ask, long volume)
         {
             Time = time;
             Open = open;
             High = high;
             Low = low;
             Close = close;
+            Bid = bid;
+            Ask = ask;
             Volume = volume;
         }
 
@@ -58,6 +60,8 @@ namespace EvolverCore.Models.DataV2
         public double High { get; init; }
         public double Low { get; init; }
         public double Close { get; init; }
+        public double Bid { get; init; }
+        public double Ask { get; init; }
         public long Volume { get; init; }
 
         public static ParquetSchema GetSchema()
@@ -69,6 +73,8 @@ namespace EvolverCore.Models.DataV2
             fields.Add(new DataField("High", typeof(double)));
             fields.Add(new DataField("Low", typeof(double)));
             fields.Add(new DataField("Close", typeof(double)));
+            fields.Add(new DataField("Bid", typeof(double)));
+            fields.Add(new DataField("Ask", typeof(double)));
             fields.Add(new DataField("Volume", typeof(long)));
 
             return new ParquetSchema(fields);

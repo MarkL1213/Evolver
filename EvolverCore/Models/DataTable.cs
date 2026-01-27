@@ -12,41 +12,95 @@ namespace EvolverCore.Models
     {
         public int CurrentIndex { get; }
         public long RowCount { get; }
+
+        public ColumnPointer<DateTime> Time { get; }
+    }
+
+    public enum TableLoadState { NotLoaded, Loading, Loaded, Error };
+
+    internal class DataTableLoadStateChangeArgs : EventArgs
+    {
+        public DataTableLoadStateChangeArgs(TableLoadState state,DataTable? table) { State = state;Table = table; }
+        public DataTable? Table { get; init; }
+        public TableLoadState State { get; init; }
+    }
+
+    internal class BarTableLoadStateChangeArgs : EventArgs
+    {
+        public BarTableLoadStateChangeArgs(TableLoadState state, BarTable? table) { State = state; Table = table; }
+        public BarTable? Table { get; init; }
+        public TableLoadState State { get; init; }
     }
 
     public class BarTable : ICurrentTable
     {
-        public BarTable(Instrument instrument, DataInterval interval, DataTable table)
+        public BarTable(Instrument instrument, DataInterval interval, DataTable? table=null)
         {
             Instrument = instrument;
             Interval = interval;
+            Accumulator = new DataAccumulator(interval);
+
+
             Table = table;
-            CurrentIndex = 0;
-
-            Time = new ColumnPointer<DateTime>(this, Table.Column("Time"));
-            Open = new ColumnPointer<double>(this, Table.Column("Open"));
-            Close = new ColumnPointer<double>(this, Table.Column("Close"));
-            High = new ColumnPointer<double>(this, Table.Column("High"));
-            Low = new ColumnPointer<double>(this, Table.Column("Low"));
-            Volume = new ColumnPointer<long>(this, Table.Column("Volume"));
-
+            Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
+            Open = new ColumnPointer<double>(this, Table?.Column("Open"));
+            Close = new ColumnPointer<double>(this, Table?.Column("Close"));
+            High = new ColumnPointer<double>(this, Table?.Column("High"));
+            Low = new ColumnPointer<double>(this, Table?.Column("Low"));
+            Bid = new ColumnPointer<double>(this, Table?.Column("Bid"));
+            Ask = new ColumnPointer<double>(this, Table?.Column("Ask"));
+            Volume = new ColumnPointer<long>(this, Table?.Column("Volume"));
         }
 
+        internal event EventHandler<BarTableLoadStateChangeArgs>? BarTableLoadStateChange = null;
+
+        internal void OnDataTableLoadStateChange(object? sender,DataTableLoadStateChangeArgs args)
+        {
+            TableLoadState oldState = State;
+            if (args.State == TableLoadState.Loaded)
+            {
+                setTable(args.Table);
+            }
+
+            State = args.State;
+
+            if (State != oldState) BarTableLoadStateChange?.Invoke(this, new BarTableLoadStateChangeArgs(State, this));
+        }
+
+        private void setTable(DataTable? table)
+        {
+            Table = table;
+
+            Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
+            Open = new ColumnPointer<double>(this, Table?.Column("Open"));
+            Close = new ColumnPointer<double>(this, Table?.Column("Close"));
+            High = new ColumnPointer<double>(this, Table?.Column("High"));
+            Low = new ColumnPointer<double>(this, Table?.Column("Low"));
+            Bid = new ColumnPointer<double>(this, Table?.Column("Bid"));
+            Ask = new ColumnPointer<double>(this, Table?.Column("Ask"));
+            Volume = new ColumnPointer<long>(this, Table?.Column("Volume"));
+        }
+
+        public DataAccumulator Accumulator { get; init; }
         public Instrument Instrument { get; init; }
         public DataInterval Interval { get; init; }
-        internal DataTable Table { get; init; }
 
-        public int CurrentIndex { get; private set; }
+        public TableLoadState State { get; private set; } = TableLoadState.NotLoaded;
+        
+        internal DataTable? Table { get; private set; } = null;
 
-        public long RowCount { get { return Table.RowCount; } }
+        public int CurrentIndex { get; private set; } = 0;
+
+        public long RowCount { get { return Table != null ? Table.RowCount : 0; } }
 
         public ColumnPointer<DateTime> Time { get; private set; }
         public ColumnPointer<double> Open { get; private set; }
         public ColumnPointer<double> Close { get; private set; }
         public ColumnPointer<double> High { get; private set; }
         public ColumnPointer<double> Low { get; private set; }
+        public ColumnPointer<double> Bid { get; private set; }
+        public ColumnPointer<double> Ask { get; private set; }
         public ColumnPointer<long> Volume { get; private set; }
-
 
         public void AddColumnTest()
         {
@@ -72,9 +126,43 @@ namespace EvolverCore.Models
 
         public long RowCount { get { return Table.RowCount; } }
 
-        public ColumnPointer<DateTime> Time { get; private set; }
-        public ColumnPointer<byte> Type { get; private set; }
-        public ColumnPointer<double> Value { get; private set; }
+        public ColumnPointer<DateTime> Time { get; init; }
+        public ColumnPointer<byte> Type { get; init; }
+        public ColumnPointer<double> Value { get; init; }
+    }
+
+    public class DataTablePointer
+    {
+        public DataTablePointer(DataTable table, int startOffset, int endOffset)
+        {
+            if (startOffset > endOffset)
+                throw new ArgumentException($"Start offset must be less than or equal to end offset: start={startOffset} end={endOffset}");
+            if (startOffset < 0 || startOffset >= table.RowCount)
+                throw new ArgumentOutOfRangeException(nameof(startOffset));
+            if (endOffset < 0 || endOffset >= table.RowCount)
+                throw new ArgumentOutOfRangeException(nameof(endOffset));
+
+            _table = table;
+            _startOffset = startOffset;
+            _endoffset = endOffset;
+            CurrentBar = 0;
+        }
+
+        public DataTablePointer(DataTable table)
+        {
+            _table = table;
+            _startOffset = 0;
+            _endoffset = _table.RowCount - 1;
+            CurrentBar = 0;
+        }
+
+        int _startOffset;
+        int _endoffset;
+        DataTable _table;
+
+        public int CurrentBar { get; private set; }
+
+        
     }
 
     public class DataTable

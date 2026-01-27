@@ -399,6 +399,11 @@ namespace EvolverCore
         {
             return $"{Value}{Type.ToString()}";
         }
+
+        public static DataInterval? TryParseString(string s)
+        {
+            return null;//FIXME: implement DataInterval? TryParseString(string s)
+        }
     }
 
     public interface IDataPoint

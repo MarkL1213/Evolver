@@ -1,21 +1,25 @@
 ﻿using EvolverCore.Models.DataV2;
+using Parquet.Data;
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
-using Parquet.Data;
+using System.Reflection;
 
 
 namespace EvolverCore.Models
 {
     public enum DataType { Int32, Int64, UInt8, Double, DateTime };
 
+
+
     public class ColumnPointer<T> where T : struct
     {
-        private IDataTableColumn _column;
+        private IDataTableColumn? _column;
         private ICurrentTable _parentTable;
 
 
-        internal ColumnPointer(ICurrentTable parentTable, IDataTableColumn column)
+        internal ColumnPointer(ICurrentTable parentTable, IDataTableColumn? column=null)
         {
             //match T vs column.DataType
 
@@ -23,13 +27,13 @@ namespace EvolverCore.Models
             _parentTable = parentTable;
         }
 
-        public T GetValueAt(int index)
-        {
-            if (index < 0 || index >= _column.Count)
-                throw new ArgumentOutOfRangeException(nameof(index));
+        public T GetValueAt(int index) => (T) _column!.GetValueAt(index);
+        //{
+        //    if (index < 0 || index >= _column!.Count)
+        //        throw new ArgumentOutOfRangeException(nameof(index));
 
-            return (T)_column.GetValueAt(index);
-        }
+        //    return 
+        //}
 
         public T this[int barsAgo]
         {
@@ -39,6 +43,7 @@ namespace EvolverCore.Models
             }
         }
     }
+
     public interface IDataTableColumn
     {
         public DataType DataType { get; }
