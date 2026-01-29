@@ -162,15 +162,11 @@ namespace EvolverCore.Views
                 }
 
                 BarTable seriesBarTable = DataTableHelpers.ConvertSeriesToBarTable(series);
-                await DataWarehouse.WritePartitionedBars(seriesBarTable.Table!, randomInstrument, interval);
+                await DataWarehouse.WritePartitionedBars(seriesBarTable.Table!.RawTable, randomInstrument, interval);
 
-                ICurrentTable table = await DataWarehouse.ReadToDataTableAsync(new CancellationToken(), randomInstrument, interval, startTime, interval.Add(startTime, numBarsToGenerate));
-                BarTable? barTable = table as BarTable;
-                if (barTable == null)
-                {
-                    Globals.Instance.Log.LogMessage("Result ICurrentTable is not of type BarTable.", LogLevel.Error);
-                    return;
-                }
+                DateTime endTime = interval.Add(startTime, numBarsToGenerate);
+                DataTable table = await DataWarehouse.ReadToDataTableAsync(new CancellationToken(), randomInstrument, interval, startTime, endTime);
+                BarTable barTable = new BarTable(randomInstrument, interval, new DataTablePointer(table, startTime, endTime));
 
                 IDataTableColumn? c = barTable.Table!.Column("Time");
                 if (c == null)

@@ -107,9 +107,8 @@ namespace EvolverCore.Models
     public class DataWarehouse : IDisposable
     {
         private DataTableRecordCollection _recordCollection = new DataTableRecordCollection();
-        
-        private Dictionary<string,List<BarTable>> _barTables = new Dictionary<string,List<BarTable>>();
-        private List<TickTable> _tickTables = new List<TickTable>();
+
+        private Dictionary<string, Dictionary<DataInterval, DataTable>> _tables = new Dictionary<string, Dictionary<DataInterval, DataTable>>();
 
         private bool _disposedValue = false;
         private bool _isShutdown = false;
@@ -176,34 +175,33 @@ namespace EvolverCore.Models
             }
             else
             {
-                BarTable? loadedTable = null;
-                if (_barTables.ContainsKey(job.Instrument.Name))
+                DataTable? loadedTable = null;
+                if (_tables.ContainsKey(job.Instrument.Name))
                 {
-                    foreach (BarTable table in _barTables[job.Instrument.Name])
+                    if (_tables[job.Instrument.Name].ContainsKey(job.Interval))
                     {
-                        if (table.Interval == job.Interval && table.MinTime <= job.StartTime && table.MaxTime >= job.EndTime)
-                        {
-                            loadedTable = table;
-                            break;
-                        }
+                        loadedTable = _tables[job.Instrument.Name][job.Interval];
                     }
-                }
-                else
-                {
-                    _barTables.Add(job.Instrument.Name, new List<BarTable>());
                 }
 
                 if (loadedTable == null)
                 {
-                    ICurrentTable? taskTable;
                     try
                     {
-                        taskTable = await DataWarehouse.ReadToDataTableAsync(token, job.Instrument, job.Interval, job.StartTime, job.EndTime);
-                        loadedTable = taskTable as BarTable;
-                        if (loadedTable == null)
-                            throw new InvalidOperationException($"Result table is not a BarTable when reading {job.Interval.ToString()} data for '{job.Instrument.Name}': From={job.StartTime} To={job.EndTime}");
+                        loadedTable = await DataWarehouse.ReadToDataTableAsync(token, job.Instrument, job.Interval, job.StartTime, job.EndTime);
 
-                        _barTables[job.Instrument.Name].Add(loadedTable);
+                        if (_tables.ContainsKey(job.Instrument.Name))
+                        {
+                            if (_tables[job.Instrument.Name].ContainsKey(job.Interval))
+                                _tables[job.Instrument.Name][job.Interval] = loadedTable;
+                            else
+                                _tables[job.Instrument.Name].Add(job.Interval, loadedTable);
+                        }
+                        else
+                        {
+                            _tables.Add(job.Instrument.Name, new Dictionary<DataInterval, DataTable>());
+                            _tables[job.Instrument.Name].Add(job.Interval,loadedTable);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -307,7 +305,7 @@ namespace EvolverCore.Models
                 return reader.RowGroupCount;
         }
 
-        public static async Task<ICurrentTable> ReadToDataTableAsync(CancellationToken token, Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        public static async Task<DataTable> ReadToDataTableAsync(CancellationToken token, Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
             TableType tableType;
 
@@ -363,8 +361,8 @@ namespace EvolverCore.Models
 
             switch (tableType)
             {
-                case TableType.Bar: return new BarTable(instrument, interval, table);
-                case TableType.Tick: return new TickTable(instrument, table);
+                case TableType.Bar: return table;
+                case TableType.Tick: return table;
                 default: throw new Exception($"Unknown TableType {tableType.ToString()}");
             }
         }

@@ -157,7 +157,7 @@ namespace EvolverCore.Models.DataV2
 
 
 
-            return new BarTable(series.Instrument, series.Interval, table);
+            return new BarTable(series.Instrument, series.Interval, new DataTablePointer(table));
         }
 
         internal static (ParquetSchema Schema, DataColumn[] Data) ConvertDataTableToParquet(DataTable table)

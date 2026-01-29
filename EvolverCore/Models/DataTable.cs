@@ -21,14 +21,13 @@ namespace EvolverCore.Models
 
     internal class DataTableLoadStateChangeArgs : EventArgs
     {
-        public DataTableLoadStateChangeArgs(TableLoadState state, DataTable? table)
+        public DataTableLoadStateChangeArgs(TableLoadState state, DataTablePointer? table)
         {
             State = state;
             Table = table;
-
         }
         
-        public DataTable? Table { get; init; }
+        public DataTablePointer? Table { get; init; }
         public TableLoadState State { get; init; }
     }
 
@@ -41,7 +40,7 @@ namespace EvolverCore.Models
 
     public class BarTable : ICurrentTable
     {
-        public BarTable(Instrument instrument, DataInterval interval, DataTable? table=null)
+        public BarTable(Instrument instrument, DataInterval interval, DataTablePointer? table=null)
         {
             Instrument = instrument;
             Interval = interval;
@@ -73,7 +72,7 @@ namespace EvolverCore.Models
             if (State != oldState) BarTableLoadStateChange?.Invoke(this, new BarTableLoadStateChangeArgs(State, this));
         }
 
-        private void setTable(DataTable? table)
+        private void setTable(DataTablePointer? table)
         {
             Table = table;
 
@@ -93,9 +92,9 @@ namespace EvolverCore.Models
 
         public TableLoadState State { get; private set; } = TableLoadState.NotLoaded;
         
-        internal DataTable? Table { get; private set; } = null;
+        internal DataTablePointer? Table { get; private set; } = null;
 
-        public int CurrentIndex { get; private set; } = 0;
+        public int CurrentIndex { get { return Table != null ? Table.CurrentBar : -1; } }
 
         public long RowCount { get { return Table != null ? Table.RowCount : 0; } }
 
@@ -118,22 +117,22 @@ namespace EvolverCore.Models
 
     public class TickTable : ICurrentTable
     {
-        public TickTable(Instrument instrument, DataTable table)
+        public TickTable(Instrument instrument, DataTablePointer? table)
         {
             Instrument = instrument;
             Table = table;
 
-            Time = new ColumnPointer<DateTime>(this, Table.Column("Time"));
-            Type = new ColumnPointer<byte>(this, Table.Column("Type"));
-            Value = new ColumnPointer<double>(this, Table.Column("Value"));
+            Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
+            Type = new ColumnPointer<byte>(this, Table?.Column("Type"));
+            Value = new ColumnPointer<double>(this, Table?.Column("Value"));
         }
 
         public Instrument Instrument { get; init; }
-        public DataTable Table { get; init; }
+        public DataTablePointer? Table { get; init; }
 
-        public int CurrentIndex { get; private set; }
+        public int CurrentIndex { get { return Table != null ? Table.CurrentBar : -1; } }
 
-        public long RowCount { get { return Table.RowCount; } }
+        public long RowCount { get { return Table != null ? Table.RowCount : 0; } }
 
         public ColumnPointer<DateTime> Time { get; init; }
         public ColumnPointer<byte> Type { get; init; }
@@ -142,7 +141,7 @@ namespace EvolverCore.Models
 
     public class DataTablePointer
     {
-        public DataTablePointer(ICurrentTable table, DateTime start, DateTime end)
+        public DataTablePointer(DataTable table, DateTime start, DateTime end)
         {
             if (start > end)
                 throw new ArgumentException($"Start  must be less than or equal to end: start={start} end={end}");
@@ -153,39 +152,38 @@ namespace EvolverCore.Models
             CalculateOffsets(start,end);
         }
 
-        public DataTablePointer(ICurrentTable table)
+        public DataTablePointer(DataTable table)
         {
-
             _table = table;
             CurrentBar = 0;
 
             _startOffset = 0;
-            _startTime = table.Time[0];
-
-            _endoffset = (int)_table.RowCount - 1;
-            _endTime = table.Time[_endoffset];
+            _endOffset = (int)_table.RowCount - 1;
         }
+
 
         internal void CalculateOffsets(DateTime start, DateTime end)
         {
-            _startTime = start;
-            _endTime = end;
-
             //TODO: find indexes of start and end
+        }
+
+        internal DataTable DynamicSlice()
+        {
+            return _table.DynamicSlice();
         }
 
 
         int _startOffset;
-        DateTime _startTime;
+        int _endOffset;
 
-        int _endoffset;
-        DateTime _endTime;
-
-        ICurrentTable _table;
+        DataTable _table;
+        internal DataTable RawTable { get { return  _table; } }
 
         public int CurrentBar { get; private set; }
 
-        
+        public int RowCount { get { return _endOffset - _startOffset; } }
+
+        public IDataTableColumn Column(string columnName) { return _table.Column(columnName); }
     }
 
     public class DataTable
