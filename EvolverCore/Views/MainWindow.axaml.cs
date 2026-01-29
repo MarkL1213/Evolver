@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Threading;
 
 namespace EvolverCore.Views
 {
@@ -161,9 +162,9 @@ namespace EvolverCore.Views
                 }
 
                 BarTable seriesBarTable = DataTableHelpers.ConvertSeriesToBarTable(series);
-                await DataWarehouse.WritePartitionedBars(seriesBarTable.Table, randomInstrument, interval);
+                await DataWarehouse.WritePartitionedBars(seriesBarTable.Table!, randomInstrument, interval);
 
-                ICurrentTable table = await DataWarehouse.ReadToDataTableAsync(randomInstrument, interval, startTime, interval.Add(startTime, numBarsToGenerate));
+                ICurrentTable table = await DataWarehouse.ReadToDataTableAsync(new CancellationToken(), randomInstrument, interval, startTime, interval.Add(startTime, numBarsToGenerate));
                 BarTable? barTable = table as BarTable;
                 if (barTable == null)
                 {
@@ -171,7 +172,7 @@ namespace EvolverCore.Views
                     return;
                 }
 
-                IDataTableColumn? c = barTable.Table.Column("Time");
+                IDataTableColumn? c = barTable.Table!.Column("Time");
                 if (c == null)
                 {
                     Globals.Instance.Log.LogMessage("", LogLevel.Error);

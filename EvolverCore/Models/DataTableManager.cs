@@ -2,6 +2,7 @@
 using Parquet.Data;
 using Parquet.Schema;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -160,145 +161,137 @@ namespace EvolverCore.Models
 
     public class DataTableManager : IDisposable
     {
-        private DataTableRecordCollection _recordCollection = new DataTableRecordCollection();
-        private DataDepGraph _depGraph = new DataDepGraph();
+        DataWarehouse _dataWarehouse = new DataWarehouse();
+
+        private object _handlerLock = new object();
+        private Dictionary<Connection, EventHandler<ConnectionDataUpdateEventArgs>> _connectionDataUpdateHandlers = new Dictionary<Connection, EventHandler<ConnectionDataUpdateEventArgs>>();
+        private BlockingCollection<Action<CancellationToken>> _dataUpdateQueue = new BlockingCollection<Action<CancellationToken>>();
+        private bool _disposedValue = false;
+        private bool _isShutdown = false;
+        private Thread _connectionDataUpdateQueueWorker;
+        private CancellationTokenSource _cts = new CancellationTokenSource();
         
-        List<BarTable> _Tables = new List<BarTable>();
+        internal event EventHandler<InstrumentDataRecord>? DataChange = null;
+        internal event EventHandler? DataUpdateWorkerError = null;
 
-        Thread _tableManagerWorker;
-        bool _wantExit = false;
-        bool _isSleeping = false;
-        private bool disposedValue;
-
-        public event EventHandler<InstrumentDataRecord>? DataChange = null;
 
         internal DataTableManager()
         {
-            _tableManagerWorker = new Thread(indicatorWorker);
-            _tableManagerWorker.Name = "DataManager Indicator Runner";
-            _tableManagerWorker.Start();
-        }
-
-        internal async Task LoadRecords()
-        {
-            await _recordCollection.LoadAvailableInstrumentData();
+            _connectionDataUpdateQueueWorker = new Thread(connectionDataUpdateQueueWorker);
+            _connectionDataUpdateQueueWorker.Name = "DataTableManager Update Worker";
+            _connectionDataUpdateQueueWorker.IsBackground = true;
         }
 
 
-        private void indicatorWorker()
+
+        private void connectionDataUpdateQueueWorker()
         {
+            CancellationToken token = _cts.Token;
+
             try
             {
                 while (true)
                 {
+                    Action<CancellationToken> action;
                     try
                     {
-                        if (_wantExit) break;
-
-                        int queueCount = 0;
-                        //dequeue next job/event
-
-                        if (queueCount == 0)
-                        {
-                            _isSleeping = true;
-                            Thread.MemoryBarrier();
-
-                            Thread.Sleep(Timeout.Infinite);
-                        }
-                        else
-                        {
-                            //do stuff..
-                        }
+                        action = _dataUpdateQueue.Take(token);
                     }
-                    catch (ThreadInterruptedException)
+                    catch (OperationCanceledException) { break; }
+                    catch (InvalidOperationException) { break; }
+
+                    try
                     {
-                        _isSleeping = false;
+                        action(token);
+                    }
+                    catch (Exception e)
+                    {
+                        Globals.Instance.Log.LogMessage("DataTableManager Update Worker event exception:", LogLevel.Error);
+                        Globals.Instance.Log.LogException(e);
                     }
                 }
             }
-            catch (ThreadAbortException)
-            {
-                Globals.Instance.Log.LogMessage("DataManager.indicatorWorker thread abort", LogLevel.Info);
-            }
             catch (Exception e)
             {
-                Globals.Instance.Log.LogMessage("DataManager.indicatorWorker thread exception:", LogLevel.Error);
+                Globals.Instance.Log.LogMessage("DataTableManager Update Worker thread exception:", LogLevel.Error);
                 Globals.Instance.Log.LogException(e);
+
+                DataUpdateWorkerError?.Invoke(this, EventArgs.Empty);
             }
         }
 
-        internal async Task<DataTable> LoadDataAsync(InstrumentDataRecord dataRecord)
+        public void OnConnectionDataUpdate(object? sender, ConnectionDataUpdateEventArgs e, CancellationToken token)
         {
-            //if (dataRecord.InstrumentName == "Random")
-            //{//special handling here...
-            //    Instrument? instrument = Globals.Instance.InstrumentCollection.Lookup("Random");
-            //    if (instrument == null)
-            //        throw new EvolverException($"Unknown Instrument: Random");
-
-            //    await Task.Delay(2000);//<-- fake 2 sec delay for testing 
-
-            //    ///////////////////////////
-            //    TimeSpan span = dataRecord.EndTime - dataRecord.StartTime;
-
-            //    int n = 0;
-            //    if (dataRecord.Interval.Type == Interval.Year)
-            //    {
-            //        n = dataRecord.EndTime.Year - dataRecord.StartTime.Year;
-            //    }
-            //    else if (dataRecord.Interval.Type == Interval.Month)
-            //    {
-            //        n = ((dataRecord.EndTime.Year - dataRecord.StartTime.Year) * 12) +
-            //            dataRecord.EndTime.Month - dataRecord.StartTime.Month;
-            //    }
-            //    else
-            //        n = span / dataRecord.Interval;
-
-            //    InstrumentDataSeries? series = InstrumentDataSeries.RandomSeries(instrument, dataRecord.StartTime, dataRecord.Interval, n);
-            //    if (series == null)
-            //        throw new EvolverException($"Unable to generate random data.");
-            //    ///////////////////////////
-
-
-            //    dataRecord.Data = series;
-            //}
-
-            //return dataRecord;
-
-            return new DataTable(new ParquetSchema(new List<DataField> { }), 0);
+            //TODO: Handle the connection data update event
         }
 
-        public void OnConnectionDataUpdate(object? sender, ConnectionDataUpdateEventArgs e)
+        
+        public void UnsubscribeFromConnection(Connection c)
         {
+            lock (_handlerLock)
+            {
+                if (_connectionDataUpdateHandlers.ContainsKey(c))
+                {
+                    c.DataUpdate -= _connectionDataUpdateHandlers[c];
+                    _connectionDataUpdateHandlers.Remove(c);
+                }
+            }
+        }
 
+        public void SubscribeToConnection(Connection c)
+        {
+            lock (_handlerLock)
+            {
+                if (_isShutdown) return;
+
+                if (!_connectionDataUpdateQueueWorker.IsAlive) _connectionDataUpdateQueueWorker.Start();
+
+                UnsubscribeFromConnection(c);
+
+                EventHandler<ConnectionDataUpdateEventArgs> handler = (sender, args) => { _dataUpdateQueue.Add((token) => OnConnectionDataUpdate(sender, args, token)); };
+                _connectionDataUpdateHandlers.Add(c, handler);
+                c.DataUpdate += handler;
+            }
         }
 
         internal void Shutdown()
         {
-            _wantExit = true;
-            if (_isSleeping && _tableManagerWorker.IsAlive) _tableManagerWorker.Interrupt();
-
-            if (_tableManagerWorker.IsAlive)
+            lock (_handlerLock)
             {
-                if (!_tableManagerWorker.Join(TimeSpan.FromSeconds(3)))
+                _isShutdown = true;
+
+                foreach (Connection c in _connectionDataUpdateHandlers.Keys.ToArray())
+                    UnsubscribeFromConnection(c);
+                _connectionDataUpdateHandlers.Clear();
+            }
+
+            _dataUpdateQueue.CompleteAdding();
+
+            if (_connectionDataUpdateQueueWorker.IsAlive)
+            {
+                _cts.Cancel(); // Trigger cancellation
+                if (!_connectionDataUpdateQueueWorker.Join(TimeSpan.FromSeconds(10)))
                 {
-                    Globals.Instance.Log.LogMessage("DataTableManager.TableManagerWorker failed to shutdown.", LogLevel.Error);
+                    Globals.Instance.Log.LogMessage("DataTableManager Update Worker failed to shutdown.", LogLevel.Error);
+                    //move on, don't care anymore background thread will terminate on exit anyway
                 }
             }
             else
             {
-                Globals.Instance.Log.LogMessage("DataTableManager.TableManagerWorker was already terminated.", LogLevel.Warn);
+                Globals.Instance.Log.LogMessage("DataTableManager Update Worker was already terminated.", LogLevel.Warn);
             }
         }
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue)
+            if (!_disposedValue)
             {
                 if (disposing)
                 {
                     Shutdown();
+                    _cts.Dispose();
                 }
-                disposedValue = true;
+                _disposedValue = true;
             }
         }
 

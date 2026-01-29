@@ -4,15 +4,283 @@ using Parquet;
 using Parquet.Data;
 using Parquet.Schema;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace EvolverCore.Models
 {
-    public static class DataWarehouse
+    internal class DataLoadJobDoneArgs
     {
+        public DataLoadJobDoneArgs(DataLoadJob sourceJob, string errorMessage)
+        {
+            SourceJob = sourceJob;
+            ErrorMessage = errorMessage;
+        }
+
+        public DataLoadJobDoneArgs(DataLoadJob sourceJob, DataTablePointer resultTable)
+        {
+            SourceJob = sourceJob;
+            ResultTable = resultTable;
+        }
+
+        public DataLoadJob SourceJob { get; init; }
+        public DataTablePointer? ResultTable { get; init; } = null;
+
+        public string ErrorMessage { get; init; } = string.Empty;
+
+        public bool HasError { get { return ErrorMessage != string.Empty; } }
+    }
+
+    internal class DataLoadJob
+    {
+        public event EventHandler<DataLoadJobDoneArgs>? JobDone = null;
+
+        public DataLoadJob(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        {
+            Interval = interval;
+            Instrument = instrument;
+            StartTime = start;
+            EndTime = end;
+        }
+
+        public Instrument Instrument { get; init; }
+        public DataInterval Interval { get; init; }
+        public DateTime StartTime { get; init; }
+        public DateTime EndTime { get; init; }
+
+
+        internal void FireJobDone(string errorMessage)
+        {
+            DataLoadJobDoneArgs args = new DataLoadJobDoneArgs(this, errorMessage);
+            JobDone?.Invoke(this, args);
+        }
+
+        internal void FireJobDone(DataTablePointer tablePointer)
+        {
+            DataLoadJobDoneArgs args = new DataLoadJobDoneArgs(this, tablePointer);
+            JobDone?.Invoke(this, args);
+        }
+    }
+
+    internal class DataSaveJobDoneArgs
+    {
+        public DataSaveJobDoneArgs(DataSaveJob sourceJob, string errorMessage)
+        {
+            SourceJob = sourceJob;
+            ErrorMessage = errorMessage;
+        }
+
+        public DataSaveJobDoneArgs(DataSaveJob sourceJob)
+        {
+            SourceJob = sourceJob;
+        }
+
+        public DataSaveJob SourceJob { get; init; }
+        public string ErrorMessage { get; init; } = string.Empty;
+
+        public bool HasError { get { return ErrorMessage != string.Empty; } }
+    }
+
+    internal class DataSaveJob
+    {
+        public event EventHandler<DataSaveJobDoneArgs>? JobDone = null;
+        public DataSaveJob(BarTable table) { Table = table; }
+
+        public BarTable Table { get; init; }
+
+        internal void FireJobDone(string errorMessage)
+        {
+            JobDone?.Invoke(this, new DataSaveJobDoneArgs(this, errorMessage));
+        }
+
+        internal void FireJobDone()
+        {
+            JobDone?.Invoke(this, new DataSaveJobDoneArgs(this));
+        }
+    }
+
+    public class DataWarehouse : IDisposable
+    {
+        private DataTableRecordCollection _recordCollection = new DataTableRecordCollection();
+        
+        private Dictionary<string,List<BarTable>> _barTables = new Dictionary<string,List<BarTable>>();
+        private List<TickTable> _tickTables = new List<TickTable>();
+
+        private bool _disposedValue = false;
+        private bool _isShutdown = false;
+        private Thread _dataStoreWorker;
+        private object _jobQueueLock = new object();
+        private BlockingCollection<Func<CancellationToken, Task>> _dataJobQueue = new BlockingCollection<Func<CancellationToken,Task>>();
+        private CancellationTokenSource _cts = new CancellationTokenSource();
+
+        internal event EventHandler? DataWarehouseWorkerError = null;
+
+        internal DataWarehouse()
+        {
+            _dataStoreWorker = new Thread(dataStoreWorker);
+            _dataStoreWorker.Name = "DataWarehouse Worker";
+        }
+
+        internal async Task LoadRecords()
+        {
+            await _recordCollection.LoadAvailableInstrumentData();
+        }
+
+        internal void EnqueueDataSaveJob(DataSaveJob job)
+        {
+            lock (_dataJobQueue)
+            {
+                if (_isShutdown) return;
+                _dataJobQueue.Add((token) => ExecuteDataSaveJob(token, job));
+            }
+        }
+
+        internal void EnqueueDataLoadJob(DataLoadJob job)
+        {
+            lock (_dataJobQueue)
+            {
+                if (_isShutdown) return;
+                _dataJobQueue.Add((token) => ExecuteDataLoadJob(token, job));
+            }
+        }
+
+        private async Task ExecuteDataSaveJob(CancellationToken token, DataSaveJob job)
+        {
+            try
+            {
+                DataTable subData = job.Table.Table!.DynamicSlice();
+                await DataWarehouse.WritePartitionedBars(subData, job.Table.Instrument, job.Table.Interval);
+            }
+            catch (Exception ex)
+            {
+                Globals.Instance.Log.LogMessage($"Failed to save {job.Table.Interval.ToString()} data for '{job.Table.Instrument.Name}'", LogLevel.Error);
+                Globals.Instance.Log.LogException(ex);
+                
+                job.FireJobDone(ex.Message);
+                return;
+            }
+
+            job.FireJobDone();
+        }
+
+        private async Task ExecuteDataLoadJob(CancellationToken token, DataLoadJob job)
+        {
+            if (job.Interval.Type == Interval.Tick)
+            {
+                throw new NotImplementedException("Tick table data load job not yet implemented.");
+            }
+            else
+            {
+                BarTable? loadedTable = null;
+                if (_barTables.ContainsKey(job.Instrument.Name))
+                {
+                    foreach (BarTable table in _barTables[job.Instrument.Name])
+                    {
+                        if (table.Interval == job.Interval && table.MinTime <= job.StartTime && table.MaxTime >= job.EndTime)
+                        {
+                            loadedTable = table;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    _barTables.Add(job.Instrument.Name, new List<BarTable>());
+                }
+
+                if (loadedTable == null)
+                {
+                    ICurrentTable? taskTable;
+                    try
+                    {
+                        taskTable = await DataWarehouse.ReadToDataTableAsync(token, job.Instrument, job.Interval, job.StartTime, job.EndTime);
+                        loadedTable = taskTable as BarTable;
+                        if (loadedTable == null)
+                            throw new InvalidOperationException($"Result table is not a BarTable when reading {job.Interval.ToString()} data for '{job.Instrument.Name}': From={job.StartTime} To={job.EndTime}");
+
+                        _barTables[job.Instrument.Name].Add(loadedTable);
+                    }
+                    catch (Exception ex)
+                    {
+                        Globals.Instance.Log.LogMessage($"Failed to read {job.Interval.ToString()} data for '{job.Instrument.Name}': From={job.StartTime} To={job.EndTime}", LogLevel.Error);
+                        Globals.Instance.Log.LogException(ex);
+                        job.FireJobDone(ex.Message);
+                        return;
+                    }
+                }
+
+                DataTablePointer resultTable = new DataTablePointer(loadedTable, job.StartTime, job.EndTime);
+                job.FireJobDone(resultTable);
+            }
+           
+        }
+
+        private void dataStoreWorker()
+        {
+            CancellationToken token = _cts.Token;
+
+            try
+            {
+                while (true)
+                {
+                    Func<CancellationToken, Task> action;
+                    try
+                    {
+                        lock (_dataJobQueue)
+                        {
+                            action = _dataJobQueue.Take(token);
+                        }
+                    }
+                    catch (OperationCanceledException) { break; }
+                    catch (InvalidOperationException) { break; }
+
+                    try
+                    {
+                        Task task = action(token);
+                        task.Wait(token);
+                    }
+                    catch (Exception e)
+                    {
+                        Globals.Instance.Log.LogMessage("DataWarehouse Worker event exception:", LogLevel.Error);
+                        Globals.Instance.Log.LogException(e);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Globals.Instance.Log.LogMessage("DataWarehouse Worker thread exception:", LogLevel.Error);
+                Globals.Instance.Log.LogException(e);
+
+                DataWarehouseWorkerError?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        internal void Shutdown()
+        {
+            lock (_dataJobQueue)
+            {
+                _isShutdown = true;
+                _dataJobQueue.CompleteAdding();
+            }
+
+            if (_dataStoreWorker.IsAlive)
+            {
+                _cts.Cancel(); // Trigger cancellation
+                _dataStoreWorker.Join();//wait forever, do NOT interrupt potential disk i/o
+            }
+            else
+            {
+                Globals.Instance.Log.LogMessage("DataWarehouse Worker was already terminated.", LogLevel.Warn);
+            }
+        }
+
+
+        #region static data readers/writers
         internal static string GetBarPartitionPath(Instrument instrument, DataInterval interval, DateOnly date)
         {
             // Example: bars/AAPL/1min/2026-01-13.parquet
@@ -39,7 +307,7 @@ namespace EvolverCore.Models
                 return reader.RowGroupCount;
         }
 
-        public static async Task<ICurrentTable> ReadToDataTableAsync(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        public static async Task<ICurrentTable> ReadToDataTableAsync(CancellationToken token, Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
             TableType tableType;
 
@@ -79,23 +347,12 @@ namespace EvolverCore.Models
                 throw new Exception($"No data files found for intrument={instrument.Name} interval={interval.ToString()} start={start.ToString()} end={end.ToString()}");
 
             DataTable? table = null;
-
+            
             for (int i = 0; i < filesToLoad.Count; i++)
             {
                 string filePath = filesToLoad[i];
 
-                //determine which row groups to load on the specified start/end dates (for all others just load all)
-                int[]? rowGroups = null;
-                if (i == 0)
-                {//TODO: on start date, might not want all bars...
-
-                }
-                else if (i == filesToLoad.Count - 1)
-                {//TODO: on end date, might not want all bars...
-
-                }
-
-                DataTable subTable = await ReadToDataTableAsync(filePath, tableType, rowGroups);
+                DataTable subTable = await ReadToDataTableAsync(filePath, tableType, null);
 
                 if (table == null) table = subTable;
                 else table.AppendTable(subTable);
@@ -259,6 +516,27 @@ namespace EvolverCore.Models
                     }
                 }
             }
+        }
+        #endregion
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    Shutdown();
+                }
+
+                _disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

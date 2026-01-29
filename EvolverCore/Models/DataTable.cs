@@ -1,8 +1,9 @@
-﻿using Parquet.Schema;
+﻿using Parquet.Data;
+using Parquet.Schema;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Parquet.Data;
+using System.Reflection;
 
 namespace EvolverCore.Models
 {
@@ -20,7 +21,13 @@ namespace EvolverCore.Models
 
     internal class DataTableLoadStateChangeArgs : EventArgs
     {
-        public DataTableLoadStateChangeArgs(TableLoadState state,DataTable? table) { State = state;Table = table; }
+        public DataTableLoadStateChangeArgs(TableLoadState state, DataTable? table)
+        {
+            State = state;
+            Table = table;
+
+        }
+        
         public DataTable? Table { get; init; }
         public TableLoadState State { get; init; }
     }
@@ -39,7 +46,6 @@ namespace EvolverCore.Models
             Instrument = instrument;
             Interval = interval;
             Accumulator = new DataAccumulator(interval);
-
 
             Table = table;
             Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
@@ -93,6 +99,9 @@ namespace EvolverCore.Models
 
         public long RowCount { get { return Table != null ? Table.RowCount : 0; } }
 
+        public DateTime MinTime { get { return Table != null ? Time[0] : DateTime.MinValue; }  }
+        public DateTime MaxTime { get { return Table != null ? Time[(int)Table.RowCount - 1] : DateTime.MinValue; }  }
+
         public ColumnPointer<DateTime> Time { get; private set; }
         public ColumnPointer<double> Open { get; private set; }
         public ColumnPointer<double> Close { get; private set; }
@@ -133,32 +142,46 @@ namespace EvolverCore.Models
 
     public class DataTablePointer
     {
-        public DataTablePointer(DataTable table, int startOffset, int endOffset)
+        public DataTablePointer(ICurrentTable table, DateTime start, DateTime end)
         {
-            if (startOffset > endOffset)
-                throw new ArgumentException($"Start offset must be less than or equal to end offset: start={startOffset} end={endOffset}");
-            if (startOffset < 0 || startOffset >= table.RowCount)
-                throw new ArgumentOutOfRangeException(nameof(startOffset));
-            if (endOffset < 0 || endOffset >= table.RowCount)
-                throw new ArgumentOutOfRangeException(nameof(endOffset));
+            if (start > end)
+                throw new ArgumentException($"Start  must be less than or equal to end: start={start} end={end}");
 
             _table = table;
-            _startOffset = startOffset;
-            _endoffset = endOffset;
             CurrentBar = 0;
+
+            CalculateOffsets(start,end);
         }
 
-        public DataTablePointer(DataTable table)
+        public DataTablePointer(ICurrentTable table)
         {
+
             _table = table;
+            CurrentBar = 0;
+
             _startOffset = 0;
-            _endoffset = _table.RowCount - 1;
-            CurrentBar = 0;
+            _startTime = table.Time[0];
+
+            _endoffset = (int)_table.RowCount - 1;
+            _endTime = table.Time[_endoffset];
         }
+
+        internal void CalculateOffsets(DateTime start, DateTime end)
+        {
+            _startTime = start;
+            _endTime = end;
+
+            //TODO: find indexes of start and end
+        }
+
 
         int _startOffset;
+        DateTime _startTime;
+
         int _endoffset;
-        DataTable _table;
+        DateTime _endTime;
+
+        ICurrentTable _table;
 
         public int CurrentBar { get; private set; }
 
@@ -310,12 +333,32 @@ namespace EvolverCore.Models
             }
         }
 
+        public DataTable DynamicSlice()
+        {
+            lock (_lock)
+            {
+                List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
+                
+                DataTable sliceTable = new DataTable(Schema, 0);
+
+                for (int i = 0; i < _columns.Count; i++)
+                {
+                    IDataTableColumn srcColumn = _columns[i];
+                    IDataTableColumn newCol = srcColumn.ExportDynamics();
+                    newColumns.Add(newCol);
+                }
+
+                sliceTable._columns = newColumns;
+                return sliceTable;
+            }
+        }
+
         public DataTable Slice(int index, int length)
         {
             lock (_lock)
             {
                 List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
-                DataTable sliceTable = new DataTable(Schema, length);
+                DataTable sliceTable = new DataTable(Schema, 0);
 
                 for (int i = 0; i < _columns.Count; i++)
                 {

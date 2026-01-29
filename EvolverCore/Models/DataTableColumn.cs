@@ -60,11 +60,11 @@ namespace EvolverCore.Models
         public Array ToArray();
 
         public IDataTableColumn ExportRange(int index, int length);
+        public IDataTableColumn ExportDynamics();
         public void AddDataColumn(DataColumn column);
         public void AddDataColumn(IDataTableColumn column);
 
         public void SetValues(List<object> values);
-
     }
 
     public static class DataTableColumnFactory
@@ -152,6 +152,17 @@ namespace EvolverCore.Models
                 values.Add(GetValueAt(i));
 
             newCol.SetValues(values);
+            return newCol;
+        }
+
+        public IDataTableColumn ExportDynamics()
+        {
+            IDataTableColumn newCol = DataTableColumnFactory.CopyBlankTableColumn<T>(this);
+
+            List<object> values = new List<object>();
+            foreach (object? t in _series)
+                values.Add(t!);
+
             return newCol;
         }
 
