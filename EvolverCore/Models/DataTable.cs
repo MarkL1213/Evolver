@@ -40,11 +40,8 @@ namespace EvolverCore.Models
 
     public class BarTable : ICurrentTable
     {
-        public BarTable(Instrument instrument, DataInterval interval, DataTablePointer? table=null)
+        public BarTable(DataTablePointer? table=null)
         {
-            Instrument = instrument;
-            Interval = interval;
-            Accumulator = new DataAccumulator(interval);
 
             Table = table;
             Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
@@ -86,9 +83,9 @@ namespace EvolverCore.Models
             Volume = new ColumnPointer<long>(this, Table?.Column("Volume"));
         }
 
-        public DataAccumulator Accumulator { get; init; }
-        public Instrument Instrument { get; init; }
-        public DataInterval Interval { get; init; }
+        public DataAccumulator? Accumulator { get { return Table?.RawTable.Accumulator; } }
+        public Instrument? Instrument { get { return Table?.RawTable.Instrument; } }
+        public DataInterval? Interval { get { return Table?.RawTable.Interval; } }
 
         public TableLoadState State { get; private set; } = TableLoadState.NotLoaded;
         
@@ -164,14 +161,25 @@ namespace EvolverCore.Models
 
         internal void CalculateOffsets(DateTime start, DateTime end)
         {
-            //TODO: find indexes of start and end
+            IDataTableColumn? column = Column("Time");
+            DataTableColumn<DateTime>? timeColumn = column as DataTableColumn<DateTime>;
+            if (timeColumn == null)
+                throw new EvolverException("DataTable missing 'Time' column.");
+
+            int startIndex = timeColumn.FindIndex(start);
+            int endIndex = timeColumn.FindIndex(start);
+
+            if(startIndex == -1 || endIndex == -1)
+                throw new EvolverException("Unable to locate start/end time index values.");
+
+            _startOffset = startIndex;
+            _endOffset = endIndex;
         }
 
         internal DataTable DynamicSlice()
         {
             return _table.DynamicSlice();
         }
-
 
         int _startOffset;
         int _endOffset;
@@ -183,7 +191,7 @@ namespace EvolverCore.Models
 
         public int RowCount { get { return _endOffset - _startOffset; } }
 
-        public IDataTableColumn Column(string columnName) { return _table.Column(columnName); }
+        public IDataTableColumn? Column(string columnName) { return _table.Column(columnName); }
     }
 
     public class DataTable
@@ -192,15 +200,25 @@ namespace EvolverCore.Models
         ParquetSchema _pSchema;
         object _lock = new object();
 
-        public DataTable(ParquetSchema pSchema, int columnSize)
+        public DataTable(ParquetSchema pSchema, int columnSize, Instrument instrument, DataInterval interval)
         {
-            lock (_lock)
-            {
-                _pSchema = pSchema;
-                _columns = new List<IDataTableColumn>();
-                createColumnsFromParquetSchema(columnSize);
-            }
+            _pSchema = pSchema;
+            _columns = new List<IDataTableColumn>();
+            Instrument = instrument;
+            Interval = interval;
+
+            Accumulator = new DataAccumulator(this);
+
+            createColumnsFromParquetSchema(columnSize);
         }
+
+
+        public DataAccumulator Accumulator { get; init; }
+        public Instrument Instrument { get; init; }
+        public DataInterval Interval { get; init; }
+
+        public bool IsLive { get; private set; } = false;
+
 
         public int RowCount { get { lock (_lock) { return _columns.Count > 0 ? _columns[0].Count : 0; } } }
 
@@ -336,8 +354,8 @@ namespace EvolverCore.Models
             lock (_lock)
             {
                 List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
-                
-                DataTable sliceTable = new DataTable(Schema, 0);
+
+                DataTable sliceTable = new DataTable(Schema, 0, Instrument, Interval);
 
                 for (int i = 0; i < _columns.Count; i++)
                 {
@@ -356,7 +374,7 @@ namespace EvolverCore.Models
             lock (_lock)
             {
                 List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
-                DataTable sliceTable = new DataTable(Schema, 0);
+                DataTable sliceTable = new DataTable(Schema, 0, Instrument, Interval);
 
                 for (int i = 0; i < _columns.Count; i++)
                 {

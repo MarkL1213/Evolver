@@ -183,7 +183,7 @@ namespace EvolverCore
         public InstrumentDataSliceRecord() { }
         public Instrument Instrument { get; internal set; } = new Instrument();
 
-        public DataInterval Interval { get; internal set; } = new DataInterval() { Type = global::EvolverCore.Interval.Minute, Value = 1 };
+        public DataInterval Interval { get; internal set; } = new DataInterval() { Type = IntervalSpan.Minute, Value = 1 };
 
         public DateTime StartDate { get; internal set; }
 
@@ -276,18 +276,6 @@ namespace EvolverCore
         public DateTime EndDate { get; internal set; }
     }
 
-    public enum Interval
-    {
-        Tick,
-        Second,
-        Minute,
-        Hour,
-        Day,
-        Week,
-        Month,
-        Year
-    }
-
     public enum BarPriceValue
     {
         Open,
@@ -301,109 +289,6 @@ namespace EvolverCore
         HL,
         HLC,
         OHLC
-    }
-
-    public struct DataInterval
-    {
-        public Interval Type;
-        public int Value;
-
-        public DataInterval(Interval type, int value) { Type = type; Value = value; }
-
-        public TimeSpan GetTimeSpan()
-        {
-            switch (Type)
-            {
-                case Interval.Second: return new TimeSpan(0, 0, Value);
-                case Interval.Minute: return new TimeSpan(0, Value, 0);
-                case Interval.Hour: return new TimeSpan(Value, 0, 0);
-                case Interval.Day: return new TimeSpan(Value, 0, 0, 0);
-                case Interval.Week: return new TimeSpan(Value * 7, 0, 0, 0);
-                //case Interval.Month: return dateTime.AddMonths(Value * n);
-                //case Interval.Year: return new TimeSpan(Value, 0, 0, 0); ;
-                default:
-                    throw new EvolverException($"Unknown interval type in interval.Add() : type={Type}");
-            }
-        }
-
-        public DateTime Add(DateTime dateTime, int n)
-        {
-            switch (Type)
-            {
-                case Interval.Second: return dateTime.AddSeconds(Value * n);
-                case Interval.Minute: return dateTime.AddMinutes(Value * n);
-                case Interval.Hour: return dateTime.AddHours(Value * n);
-                case Interval.Day: return dateTime.AddDays(Value * n);
-                case Interval.Week: return dateTime.AddDays(Value * n * 7);
-                case Interval.Month: return dateTime.AddMonths(Value * n);
-                case Interval.Year: return dateTime.AddYears(Value * n);
-                default:
-                    throw new EvolverException($"Unknown interval type in interval.Add() : type={Type}");
-            }
-        }
-
-        public bool IsFactor(DataInterval subInterval)
-        {//is the subInterval and factor of this?
-
-            if (subInterval.Type > Type) return false;
-
-            double thisSpan = GetTimeSpan().TotalSeconds;
-            double subSpan = subInterval.GetTimeSpan().TotalSeconds;
-
-            if ((thisSpan % subSpan) == 0) return true;
-
-            return false;
-        }
-
-        public long Ticks
-        {
-            get
-            {
-                DateTime now = DateTime.Now;
-                DateTime then = Add(now, 1);
-                return (now - then).Ticks;
-            }
-        }
-
-        public static int operator /(TimeSpan span, DataInterval interval)
-        {
-            double n = span / interval.GetTimeSpan();
-
-            return (int)Math.Ceiling(n);
-        }
-
-        public static bool operator !=(DataInterval a, DataInterval b)
-        {
-            return !(a == b);
-        }
-
-        public static bool operator ==(DataInterval a, DataInterval b)
-        {
-            return (a.Type == b.Type && a.Value == b.Value);
-        }
-
-        public override bool Equals(object? obj)
-        {
-            if (obj == null || !(obj is DataInterval)) return false;
-            DataInterval b = (DataInterval)obj;
-            return this == b;
-        }
-
-        public override int GetHashCode()
-        {
-            string s = Type.ToString() + Value.ToString();
-            return s.GetHashCode();
-        }
-
-        public override string ToString()
-        {
-            return $"{Value}{Type.ToString()}";
-        }
-
-        public static DataInterval? TryParseString(string s)
-        {
-            return null;//FIXME: implement DataInterval? TryParseString(string s)
-        }
     }
 
     public interface IDataPoint
@@ -812,7 +697,7 @@ namespace EvolverCore
             InstrumentDataRecord record = new InstrumentDataRecord()
             {
                 InstrumentName = "Random",
-                Interval = new DataInterval(Interval.Second, 1),
+                Interval = new DataInterval(IntervalSpan.Second, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
                 EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
@@ -821,7 +706,7 @@ namespace EvolverCore
             record = new InstrumentDataRecord()
             {
                 InstrumentName = "Random",
-                Interval = new DataInterval(Interval.Minute, 1),
+                Interval = new DataInterval(IntervalSpan.Minute, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
                 EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
@@ -830,7 +715,7 @@ namespace EvolverCore
             record = new InstrumentDataRecord()
             {
                 InstrumentName = "Random",
-                Interval = new DataInterval(Interval.Hour, 1),
+                Interval = new DataInterval(IntervalSpan.Hour, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
                 EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
@@ -839,7 +724,7 @@ namespace EvolverCore
             record = new InstrumentDataRecord()
             {
                 InstrumentName = "Random",
-                Interval = new DataInterval(Interval.Day, 1),
+                Interval = new DataInterval(IntervalSpan.Day, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
                 EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
@@ -848,7 +733,7 @@ namespace EvolverCore
             record = new InstrumentDataRecord()
             {
                 InstrumentName = "Random",
-                Interval = new DataInterval(Interval.Week, 1),
+                Interval = new DataInterval(IntervalSpan.Week, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
                 EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
@@ -857,7 +742,7 @@ namespace EvolverCore
             record = new InstrumentDataRecord()
             {
                 InstrumentName = "Random",
-                Interval = new DataInterval(Interval.Month, 1),
+                Interval = new DataInterval(IntervalSpan.Month, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
                 EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
@@ -866,7 +751,7 @@ namespace EvolverCore
             record = new InstrumentDataRecord()
             {
                 InstrumentName = "Random",
-                Interval = new DataInterval(Interval.Year, 1),
+                Interval = new DataInterval(IntervalSpan.Year, 1),
                 StartTime = new DateTime(2010, 1, 1, 0, 0, 0),
                 EndTime = new DateTime(2026, 1, 1, 0, 0, 0)
             };
@@ -1119,11 +1004,11 @@ namespace EvolverCore
                 TimeSpan span = dataRecord.EndTime - dataRecord.StartTime;
 
                 int n = 0;
-                if (dataRecord.Interval.Type == Interval.Year)
+                if (dataRecord.Interval.Type == IntervalSpan.Year)
                 {
                     n = dataRecord.EndTime.Year - dataRecord.StartTime.Year;
                 }
-                else if (dataRecord.Interval.Type == Interval.Month)
+                else if (dataRecord.Interval.Type == IntervalSpan.Month)
                 {
                     n = ((dataRecord.EndTime.Year - dataRecord.StartTime.Year) * 12) +
                         dataRecord.EndTime.Month - dataRecord.StartTime.Month;

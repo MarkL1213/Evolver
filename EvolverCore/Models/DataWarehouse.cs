@@ -106,8 +106,10 @@ namespace EvolverCore.Models
 
     public class DataWarehouse : IDisposable
     {
+        DataTableManager _tableManager;
         private DataTableRecordCollection _recordCollection = new DataTableRecordCollection();
 
+        private object _tablesLock = new object();
         private Dictionary<string, Dictionary<DataInterval, DataTable>> _tables = new Dictionary<string, Dictionary<DataInterval, DataTable>>();
 
         private bool _disposedValue = false;
@@ -119,15 +121,32 @@ namespace EvolverCore.Models
 
         internal event EventHandler? DataWarehouseWorkerError = null;
 
-        internal DataWarehouse()
+        internal DataWarehouse(DataTableManager tableManager)
         {
             _dataStoreWorker = new Thread(dataStoreWorker);
             _dataStoreWorker.Name = "DataWarehouse Worker";
+            _tableManager = tableManager;
         }
 
         internal async Task LoadRecords()
         {
             await _recordCollection.LoadAvailableInstrumentData();
+        }
+
+        internal void DataUpdate(ConnectionDataUpdateEventArgs args)
+        {//Runs in the context of the connection data update worker
+            lock(_tablesLock)
+            {
+                if (!_tables.ContainsKey(args.Instrument.Name)) return;
+
+                foreach (DataInterval interval in _tables[args.Instrument.Name].Keys)
+                {
+                    DataTable table = _tables[args.Instrument.Name][interval];
+                    if (!table.IsLive) continue;
+
+                    table.Accumulator.AddTick(args.Time, args.Bid, args.Ask, args.Volume);
+                }
+            }
         }
 
         internal void EnqueueDataSaveJob(DataSaveJob job)
@@ -153,7 +172,7 @@ namespace EvolverCore.Models
             try
             {
                 DataTable subData = job.Table.Table!.DynamicSlice();
-                await DataWarehouse.WritePartitionedBars(subData, job.Table.Instrument, job.Table.Interval);
+                await DataWarehouse.WritePartitionedBars(subData);
             }
             catch (Exception ex)
             {
@@ -169,18 +188,21 @@ namespace EvolverCore.Models
 
         private async Task ExecuteDataLoadJob(CancellationToken token, DataLoadJob job)
         {
-            if (job.Interval.Type == Interval.Tick)
+            if (job.Interval.Type == IntervalSpan.Tick)
             {
                 throw new NotImplementedException("Tick table data load job not yet implemented.");
             }
             else
             {
                 DataTable? loadedTable = null;
-                if (_tables.ContainsKey(job.Instrument.Name))
+                lock (_tablesLock)
                 {
-                    if (_tables[job.Instrument.Name].ContainsKey(job.Interval))
+                    if (_tables.ContainsKey(job.Instrument.Name))
                     {
-                        loadedTable = _tables[job.Instrument.Name][job.Interval];
+                        if (_tables[job.Instrument.Name].ContainsKey(job.Interval))
+                        {
+                            loadedTable = _tables[job.Instrument.Name][job.Interval];
+                        }
                     }
                 }
 
@@ -190,17 +212,20 @@ namespace EvolverCore.Models
                     {
                         loadedTable = await DataWarehouse.ReadToDataTableAsync(token, job.Instrument, job.Interval, job.StartTime, job.EndTime);
 
-                        if (_tables.ContainsKey(job.Instrument.Name))
+                        lock (_tablesLock)
                         {
-                            if (_tables[job.Instrument.Name].ContainsKey(job.Interval))
-                                _tables[job.Instrument.Name][job.Interval] = loadedTable;
+                            if (_tables.ContainsKey(job.Instrument.Name))
+                            {
+                                if (_tables[job.Instrument.Name].ContainsKey(job.Interval))
+                                    _tables[job.Instrument.Name][job.Interval] = loadedTable;
+                                else
+                                    _tables[job.Instrument.Name].Add(job.Interval, loadedTable);
+                            }
                             else
+                            {
+                                _tables.Add(job.Instrument.Name, new Dictionary<DataInterval, DataTable>());
                                 _tables[job.Instrument.Name].Add(job.Interval, loadedTable);
-                        }
-                        else
-                        {
-                            _tables.Add(job.Instrument.Name, new Dictionary<DataInterval, DataTable>());
-                            _tables[job.Instrument.Name].Add(job.Interval,loadedTable);
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -311,7 +336,7 @@ namespace EvolverCore.Models
 
             switch (interval.Type)
             {
-                case Interval.Tick:
+                case IntervalSpan.Tick:
                     tableType = TableType.Tick;
                     break;
                 default:
@@ -328,7 +353,7 @@ namespace EvolverCore.Models
                 string partitionPath;
                 switch (interval.Type)
                 {
-                    case Interval.Tick:
+                    case IntervalSpan.Tick:
                         partitionPath = GetTickPartitionPath(instrument, date);
                         break;
                     default:
@@ -350,7 +375,7 @@ namespace EvolverCore.Models
             {
                 string filePath = filesToLoad[i];
 
-                DataTable subTable = await ReadToDataTableAsync(filePath, tableType, null);
+                DataTable subTable = await ReadToDataTableAsync(filePath, tableType, instrument, interval, null);
 
                 if (table == null) table = subTable;
                 else table.AppendTable(subTable);
@@ -367,7 +392,7 @@ namespace EvolverCore.Models
             }
         }
 
-        private static async Task<DataTable> ReadToDataTableAsync(string filePath, TableType tableType, int[]? rowGroups = null)
+        private static async Task<DataTable> ReadToDataTableAsync(string filePath, TableType tableType, Instrument instrument, DataInterval interval, int[]? rowGroups = null)
         {
             ParquetSchema schema;
             switch (tableType)
@@ -377,7 +402,7 @@ namespace EvolverCore.Models
                 default: throw new ArgumentException("Unrecognized table type.", nameof(tableType));
             }
 
-            if (!File.Exists(filePath)) return new DataTable(schema, 0);
+            if (!File.Exists(filePath)) return new DataTable(schema, 0, instrument, interval);
 
             using (ParquetReader reader = await ParquetReader.CreateAsync(filePath, GetParquetProperties()))
             {
@@ -404,7 +429,7 @@ namespace EvolverCore.Models
                         rowGroupsToRead[i] = i;
                 }
 
-                DataTable resultTable = new DataTable(schema, 0);
+                DataTable resultTable = new DataTable(schema, 0, instrument, interval);
 
                 foreach (int rowGroupIndex in rowGroupsToRead)
                 {
@@ -428,7 +453,7 @@ namespace EvolverCore.Models
             }
         }
 
-        internal static async Task WritePartitionedBars(DataTable table, Instrument instrument, DataInterval interval)
+        internal static async Task WritePartitionedBars(DataTable table)
         {
             if (table.RowCount == 0) return; // nothing to write
 
@@ -471,7 +496,7 @@ namespace EvolverCore.Models
                 DataTable subTable = table.Slice(group.Index, group.Length);
 
                 await WriteDataTableAsync(
-                    GetBarPartitionPath(instrument, interval, date),
+                    GetBarPartitionPath(table.Instrument, table.Interval, date),
                     TableType.Bar,
                     subTable);
             }

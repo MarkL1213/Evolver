@@ -8,9 +8,9 @@ namespace EvolverCore.Models
 {
     public class DataAccumulator
     {
-        public DataAccumulator(DataInterval interval)
+        public DataAccumulator(DataTable parentTable)
         {
-            Interval = interval;
+            ParentTable = parentTable;
             FormingBar = null;
         }
 
@@ -18,7 +18,7 @@ namespace EvolverCore.Models
         private DateTime _startTime;
         private object _lock = new object();
 
-        public DataInterval Interval { get; private set; }
+        public DataTable ParentTable { get; private set; }
         public TimeDataBar? FormingBar { get; private set; }
 
         public event EventHandler<TimeDataBar>? BarComplete;
@@ -28,11 +28,11 @@ namespace EvolverCore.Models
             lock (_lock)
             {
                 FormingBar = new TimeDataBar(barTime, 0, 0, 0, 0, 0, 0, 0);
-                _startTime = Interval.Add(FormingBar.Time, -1);
+                _startTime = ParentTable.Interval.Add(FormingBar.Time, -1);
             }
         }
 
-        public bool AddTick()
+        public bool AddTick(DateTime time, double bid, double ask, long volume)
         {
             lock (_lock)
             {
@@ -49,13 +49,13 @@ namespace EvolverCore.Models
             lock (_lock)
             {
                 if (FormingBar == null) return false;
-                if (!Interval.IsFactor(addInterval)) return false;
+                if (!ParentTable.Interval.IsFactor(addInterval)) return false;
                 if (addBar.Time < _startTime) return false;
 
                 if (addBar.Time > FormingBar.Time)
                 {
                     fireBarComplete();
-                    StartBar(Interval.Add(FormingBar.Time,1));
+                    StartBar(ParentTable.Interval.Add(FormingBar.Time,1));
                 }
 
                 FormingBar.Volume += addBar.Volume;

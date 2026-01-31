@@ -272,7 +272,7 @@ internal partial class ChartControl : UserControl
             return;
         }
 
-        DataInterval interval = new DataInterval(Interval.Hour, 1);
+        DataInterval interval = new DataInterval(IntervalSpan.Hour, 1);
         DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
         DateTime endTime = interval.Add(startTime, size);
 

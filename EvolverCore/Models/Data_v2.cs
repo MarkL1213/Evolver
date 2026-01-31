@@ -134,7 +134,7 @@ namespace EvolverCore.Models.DataV2
                 throw new ArgumentException("Series Instrument can not be null.");
 
             ParquetSchema barSchema = Bar.GetSchema();
-            DataTable table = new DataTable(barSchema, series.Count);
+            DataTable table = new DataTable(barSchema, series.Count, series.Instrument, series.Interval);
 
             DataTableColumn<DateTime> timeCol = table.Column("Time") as DataTableColumn<DateTime> ?? throw new NullReferenceException();
             DataTableColumn<double> openCol = table.Column("Open") as DataTableColumn<double> ?? throw new NullReferenceException();
@@ -157,7 +157,7 @@ namespace EvolverCore.Models.DataV2
 
 
 
-            return new BarTable(series.Instrument, series.Interval, new DataTablePointer(table));
+            return new BarTable(new DataTablePointer(table));
         }
 
         internal static (ParquetSchema Schema, DataColumn[] Data) ConvertDataTableToParquet(DataTable table)

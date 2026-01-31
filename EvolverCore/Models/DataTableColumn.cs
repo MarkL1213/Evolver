@@ -227,12 +227,24 @@ namespace EvolverCore.Models
         {
             List<T> allData = new List<T>();
 
-            for(int i=0;i< Count;i++)
-            {
-                allData.Add((T)GetValueAt(i));
-            }
+            for (int i = 0; i < Count; i++) { allData.Add((T)GetValueAt(i)); }
 
             return allData.ToArray();
+        }
+
+        public int FindIndex(T item) { return FindIndexRecursive(item, 0, RowCount()); }
+
+        private int FindIndexRecursive(T item, int start, int end)
+        {
+            int mid = (end - start) / 2 + start;
+            T value = (T)GetValueAt(mid);
+            if (value.Equals(item)) return mid;
+            
+            IComparable? itemComparable = item as IComparable;
+            if(itemComparable == null) return -1;
+
+            if (itemComparable.CompareTo(value) < 0) return FindIndexRecursive(item, start, mid - 1);
+            else return FindIndexRecursive(item, mid + 1, end);
         }
 
         public T this[int index]

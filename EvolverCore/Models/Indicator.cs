@@ -478,7 +478,7 @@ namespace EvolverCore.Models
                     else if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && Inputs.Count > 0)
                         return Inputs[0].Indicator.Interval;
                 }
-                return new DataInterval(EvolverCore.Interval.Hour, 1);
+                return new DataInterval(IntervalSpan.Hour, 1);
             }
         }
 

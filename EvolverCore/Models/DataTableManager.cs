@@ -161,7 +161,7 @@ namespace EvolverCore.Models
 
     public class DataTableManager : IDisposable
     {
-        DataWarehouse _dataWarehouse = new DataWarehouse();
+        DataWarehouse _dataWarehouse;
 
         private object _handlerLock = new object();
         private Dictionary<Connection, EventHandler<ConnectionDataUpdateEventArgs>> _connectionDataUpdateHandlers = new Dictionary<Connection, EventHandler<ConnectionDataUpdateEventArgs>>();
@@ -177,6 +177,8 @@ namespace EvolverCore.Models
 
         internal DataTableManager()
         {
+            _dataWarehouse = new DataWarehouse(this);
+
             _connectionDataUpdateQueueWorker = new Thread(connectionDataUpdateQueueWorker);
             _connectionDataUpdateQueueWorker.Name = "DataTableManager Update Worker";
             _connectionDataUpdateQueueWorker.IsBackground = true;
@@ -223,6 +225,7 @@ namespace EvolverCore.Models
         public void OnConnectionDataUpdate(object? sender, ConnectionDataUpdateEventArgs e, CancellationToken token)
         {
             //TODO: Handle the connection data update event
+            _dataWarehouse.DataUpdate(e);
         }
 
         

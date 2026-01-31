@@ -41,7 +41,7 @@
         <Border DockPanel.Dock="Top" Height="32" BorderBrush="Black" BorderThickness="0,0,0,1">
         <Menu Name="MainMenu">
             <MenuItem Header="_File">
-                <MenuItem Name="ArrowTestItem" Header="Arrow Tests" />
+                <MenuItem Name="RunTestItem" Header="Run Tests" />
                 <MenuItem Name="NewChartItem" Header="new Chart" />
                 <MenuItem Name="RemoveChartItem" Header="remove Chart" />
                 <MenuItem Name="NewLogWindow" Header="log window" />

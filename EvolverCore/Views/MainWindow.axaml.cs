@@ -12,6 +12,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Threading;
+using EvolverCore.Tests;
 
 namespace EvolverCore.Views
 {
@@ -46,7 +47,7 @@ namespace EvolverCore.Views
                 vm.AvailableLayouts.CollectionChanged -= RefreshAvailableLayouts;
             }
 
-            ArrowTestItem.Command = new AsyncRelayCommand(ArrowTestItemCommand);
+            RunTestItem.Command = new AsyncRelayCommand(TestItemCommand);
             ExitMenuItem.Command = new RelayCommand(ExitMenuItemCommand);
             NewLogWindow.Command = vm == null ? null : vm.NewLogDocumentCommand;
             NewChartItem.Command = vm == null ? null : vm.NewChartDocumentCommand;
@@ -139,17 +140,23 @@ namespace EvolverCore.Views
             vm.CurrentLayout = layout;
         }
 
-        private async Task ArrowTestItemCommand()
+        private async Task TestItemCommand()
         {
             try
             {
+                if(!DataIntervalTests.RunAll())
+                {
+                    Globals.Instance.Log.LogMessage("DataInteralTest.RunAll failed.", LogLevel.Error);
+                    return;
+                }
+
                 Instrument? randomInstrument = Globals.Instance.InstrumentCollection.Lookup("Random");
                 if (randomInstrument == null)
                 {
                     Globals.Instance.Log.LogMessage("Random instrument not found.", LogLevel.Error);
                     return;
                 }
-                DataInterval interval = new DataInterval(Interval.Hour, 1);
+                DataInterval interval = new DataInterval(IntervalSpan.Hour, 1);
                 DateTime startTime = DateTime.Now;
                 int numBarsToGenerate = 72;
                 int seed = 69;
@@ -162,16 +169,16 @@ namespace EvolverCore.Views
                 }
 
                 BarTable seriesBarTable = DataTableHelpers.ConvertSeriesToBarTable(series);
-                await DataWarehouse.WritePartitionedBars(seriesBarTable.Table!.RawTable, randomInstrument, interval);
+                await DataWarehouse.WritePartitionedBars(seriesBarTable.Table!.RawTable);
 
                 DateTime endTime = interval.Add(startTime, numBarsToGenerate);
                 DataTable table = await DataWarehouse.ReadToDataTableAsync(new CancellationToken(), randomInstrument, interval, startTime, endTime);
-                BarTable barTable = new BarTable(randomInstrument, interval, new DataTablePointer(table, startTime, endTime));
+                BarTable barTable = new BarTable(new DataTablePointer(table, startTime, endTime));
 
                 IDataTableColumn? c = barTable.Table!.Column("Time");
                 if (c == null)
                 {
-                    Globals.Instance.Log.LogMessage("", LogLevel.Error);
+                    Globals.Instance.Log.LogMessage("No time column found.", LogLevel.Error);
                     return;
                 }
                 ColumnPointer<DateTime> cp = new ColumnPointer<DateTime>(barTable, c);
@@ -179,8 +186,7 @@ namespace EvolverCore.Views
                 DateTime fileEndDate = cp.GetValueAt(c.Count - 1);
                 Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
 
-
-                if (!ArrowTest_CompareData(series, barTable))
+                if (!Test_CompareData(series, barTable))
                 {
                     Globals.Instance.Log.LogMessage("Test compare failed.", LogLevel.Error);
                     return;
@@ -197,7 +203,7 @@ namespace EvolverCore.Views
 
         }
 
-        private bool ArrowTest_CompareData(InstrumentDataSeries original, BarTable readTable)
+        private bool Test_CompareData(InstrumentDataSeries original, BarTable readTable)
         {
             if (original.Count != readTable.RowCount)
             {

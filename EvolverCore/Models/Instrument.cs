@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.Xml.Serialization;
 
-namespace EvolverCore
+
+namespace EvolverCore.Models
 {
     public enum InstrumentType
     {
@@ -69,7 +70,7 @@ namespace EvolverCore
     {
         public string InstrumentName { get; internal set; } = string.Empty;
 
-        public DataInterval Interval { get; internal set; } = new DataInterval(EvolverCore.Interval.Minute, 1);
+        public DataInterval Interval { get; internal set; } = new DataInterval(IntervalSpan.Minute, 1);
         public DateTime StartTime { get; internal set; }
         public DateTime EndTime { get; internal set; }
 

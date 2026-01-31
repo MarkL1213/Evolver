@@ -399,12 +399,12 @@ public partial class ChartPanel : Decorator
     {
         return interval.Type switch
         {
-            Interval.Second => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, (dt.Second / 10) * 10),
-            Interval.Minute => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, (dt.Minute / 5) * 5, 0),
-            Interval.Hour => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, 0, 0),
-            Interval.Day => new DateTime(dt.Year, dt.Month, dt.Day),
-            Interval.Week => dt.Date.AddDays(-(int)dt.DayOfWeek), // Monday start
-            Interval.Month => new DateTime(dt.Year, dt.Month, 1),
+            IntervalSpan.Second => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, (dt.Second / 10) * 10),
+            IntervalSpan.Minute => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, (dt.Minute / 5) * 5, 0),
+            IntervalSpan.Hour => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, 0, 0),
+            IntervalSpan.Day => new DateTime(dt.Year, dt.Month, dt.Day),
+            IntervalSpan.Week => dt.Date.AddDays(-(int)dt.DayOfWeek), // Monday start
+            IntervalSpan.Month => new DateTime(dt.Year, dt.Month, 1),
             _ => dt.Date
         };
     }
@@ -415,13 +415,13 @@ public partial class ChartPanel : Decorator
         // Determine base tick interval from data interval
         TimeSpan baseInterval = interval.Type switch
         {
-            Interval.Second => TimeSpan.FromSeconds(Math.Max(10, interval.Value * 6)), // e.g., 1s bars to ticks every 10s
-            Interval.Minute => TimeSpan.FromMinutes(Math.Max(1, interval.Value * 5)),   // 1m to every 5m, 5m to every 25m
-            Interval.Hour => TimeSpan.FromHours(Math.Max(1, interval.Value * 4)),
-            Interval.Day => TimeSpan.FromDays(Math.Max(1, interval.Value * 7)),      // 1d to weekly ticks
-            Interval.Week => TimeSpan.FromDays(30),                                  // Weekly to monthly
-            Interval.Month => TimeSpan.FromDays(90),                                  // Monthly to quarterly
-            Interval.Year => TimeSpan.FromDays(365 * 10),                                  // Yearly to decade
+            IntervalSpan.Second => TimeSpan.FromSeconds(Math.Max(10, interval.Value * 6)), // e.g., 1s bars to ticks every 10s
+            IntervalSpan.Minute => TimeSpan.FromMinutes(Math.Max(1, interval.Value * 5)),   // 1m to every 5m, 5m to every 25m
+            IntervalSpan.Hour => TimeSpan.FromHours(Math.Max(1, interval.Value * 4)),
+            IntervalSpan.Day => TimeSpan.FromDays(Math.Max(1, interval.Value * 7)),      // 1d to weekly ticks
+            IntervalSpan.Week => TimeSpan.FromDays(30),                                  // Weekly to monthly
+            IntervalSpan.Month => TimeSpan.FromDays(90),                                  // Monthly to quarterly
+            IntervalSpan.Year => TimeSpan.FromDays(365 * 10),                                  // Yearly to decade
             _ => TimeSpan.FromDays(1)
         };
 
@@ -824,7 +824,7 @@ public partial class ChartPanel : Decorator
         IndicatorViewModel? ivm = dataComponent?.Properties as IndicatorViewModel;
         DataInterval dataInterval;
         if (dataComponent == null || ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0)
-            dataInterval = new DataInterval(Interval.Hour, 2);
+            dataInterval = new DataInterval(IntervalSpan.Hour, 2);
         else
             dataInterval = ivm.Indicator.Interval;
 
