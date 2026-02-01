@@ -11,6 +11,7 @@ using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace EvolverCore.Models
 {
@@ -22,14 +23,14 @@ namespace EvolverCore.Models
             ErrorMessage = errorMessage;
         }
 
-        public DataLoadJobDoneArgs(DataLoadJob sourceJob, DataTablePointer resultTable)
+        public DataLoadJobDoneArgs(DataLoadJob sourceJob, BarTable resultTable)
         {
             SourceJob = sourceJob;
             ResultTable = resultTable;
         }
 
         public DataLoadJob SourceJob { get; init; }
-        public DataTablePointer? ResultTable { get; init; } = null;
+        public BarTable? ResultTable { get; init; } = null;
 
         public string ErrorMessage { get; init; } = string.Empty;
 
@@ -60,9 +61,9 @@ namespace EvolverCore.Models
             JobDone?.Invoke(this, args);
         }
 
-        internal void FireJobDone(DataTablePointer tablePointer)
+        internal void FireJobDone(BarTable table)
         {
-            DataLoadJobDoneArgs args = new DataLoadJobDoneArgs(this, tablePointer);
+            DataLoadJobDoneArgs args = new DataLoadJobDoneArgs(this, table);
             JobDone?.Invoke(this, args);
         }
     }
@@ -110,7 +111,8 @@ namespace EvolverCore.Models
         private DataTableRecordCollection _recordCollection = new DataTableRecordCollection();
 
         private object _tablesLock = new object();
-        private Dictionary<string, Dictionary<DataInterval, DataTable>> _tables = new Dictionary<string, Dictionary<DataInterval, DataTable>>();
+        private Dictionary<string, Dictionary<DataInterval, BarTable>> _barTables = new Dictionary<string, Dictionary<DataInterval, BarTable>>();
+        private Dictionary<string, Dictionary<DataInterval, BarTablePointer>> _pointerTables = new Dictionary<string, Dictionary<DataInterval, BarTablePointer>>();
 
         private bool _disposedValue = false;
         private bool _isShutdown = false;
@@ -137,21 +139,21 @@ namespace EvolverCore.Models
         {//Runs in the context of the connection data update worker
             lock(_tablesLock)
             {
-                if (!_tables.ContainsKey(args.Instrument.Name)) return;
+                if (!_barTables.ContainsKey(args.Instrument.Name)) return;
 
-                foreach (DataInterval interval in _tables[args.Instrument.Name].Keys)
+                foreach (DataInterval interval in _pointerTables[args.Instrument.Name].Keys)
                 {
-                    DataTable table = _tables[args.Instrument.Name][interval];
+                    BarTable table = _barTables[args.Instrument.Name][interval];
                     if (!table.IsLive) continue;
 
-                    table.Accumulator.AddTick(args.Time, args.Bid, args.Ask, args.Volume);
+                    table.AddTick(args.Time, args.Bid, args.Ask, args.Volume);
                 }
             }
         }
 
         internal void EnqueueDataSaveJob(DataSaveJob job)
         {
-            lock (_dataJobQueue)
+            lock (_jobQueueLock)
             {
                 if (_isShutdown) return;
                 _dataJobQueue.Add((token) => ExecuteDataSaveJob(token, job));
@@ -160,7 +162,7 @@ namespace EvolverCore.Models
 
         internal void EnqueueDataLoadJob(DataLoadJob job)
         {
-            lock (_dataJobQueue)
+            lock (_jobQueueLock)
             {
                 if (_isShutdown) return;
                 _dataJobQueue.Add((token) => ExecuteDataLoadJob(token, job));
@@ -194,14 +196,14 @@ namespace EvolverCore.Models
             }
             else
             {
-                DataTable? loadedTable = null;
+                BarTable? loadedTable = null;
                 lock (_tablesLock)
                 {
-                    if (_tables.ContainsKey(job.Instrument.Name))
+                    if (_barTables.ContainsKey(job.Instrument.Name))
                     {
-                        if (_tables[job.Instrument.Name].ContainsKey(job.Interval))
+                        if (_barTables[job.Instrument.Name].ContainsKey(job.Interval))
                         {
-                            loadedTable = _tables[job.Instrument.Name][job.Interval];
+                            loadedTable = _barTables[job.Instrument.Name][job.Interval];
                         }
                     }
                 }
@@ -214,17 +216,17 @@ namespace EvolverCore.Models
 
                         lock (_tablesLock)
                         {
-                            if (_tables.ContainsKey(job.Instrument.Name))
+                            if (_barTables.ContainsKey(job.Instrument.Name))
                             {
-                                if (_tables[job.Instrument.Name].ContainsKey(job.Interval))
-                                    _tables[job.Instrument.Name][job.Interval] = loadedTable;
+                                if (_barTables[job.Instrument.Name].ContainsKey(job.Interval))
+                                    _barTables[job.Instrument.Name][job.Interval] = loadedTable;
                                 else
-                                    _tables[job.Instrument.Name].Add(job.Interval, loadedTable);
+                                    _barTables[job.Instrument.Name].Add(job.Interval, loadedTable);
                             }
                             else
                             {
-                                _tables.Add(job.Instrument.Name, new Dictionary<DataInterval, DataTable>());
-                                _tables[job.Instrument.Name].Add(job.Interval, loadedTable);
+                                _barTables.Add(job.Instrument.Name, new Dictionary<DataInterval, BarTable>());
+                                _barTables[job.Instrument.Name].Add(job.Interval, loadedTable);
                             }
                         }
                     }
@@ -237,8 +239,7 @@ namespace EvolverCore.Models
                     }
                 }
 
-                DataTablePointer resultTable = new DataTablePointer(loadedTable, job.StartTime, job.EndTime);
-                job.FireJobDone(resultTable);
+                job.FireJobDone(loadedTable);
             }
            
         }
@@ -254,7 +255,7 @@ namespace EvolverCore.Models
                     Func<CancellationToken, Task> action;
                     try
                     {
-                        lock (_dataJobQueue)
+                        lock (_jobQueueLock)
                         {
                             action = _dataJobQueue.Take(token);
                         }
@@ -330,7 +331,7 @@ namespace EvolverCore.Models
                 return reader.RowGroupCount;
         }
 
-        public static async Task<DataTable> ReadToDataTableAsync(CancellationToken token, Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        public static async Task<BarTable> ReadToDataTableAsync(CancellationToken token, Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
             TableType tableType;
 
@@ -386,8 +387,8 @@ namespace EvolverCore.Models
 
             switch (tableType)
             {
-                case TableType.Bar: return table;
-                case TableType.Tick: return table;
+                case TableType.Bar: return new BarTable(table);
+                //case TableType.Tick: return table;
                 default: throw new Exception($"Unknown TableType {tableType.ToString()}");
             }
         }
@@ -402,7 +403,7 @@ namespace EvolverCore.Models
                 default: throw new ArgumentException("Unrecognized table type.", nameof(tableType));
             }
 
-            if (!File.Exists(filePath)) return new DataTable(schema, 0, instrument, interval);
+            if (!File.Exists(filePath)) return new DataTable(schema, 0, tableType, instrument, interval);
 
             using (ParquetReader reader = await ParquetReader.CreateAsync(filePath, GetParquetProperties()))
             {
@@ -429,7 +430,7 @@ namespace EvolverCore.Models
                         rowGroupsToRead[i] = i;
                 }
 
-                DataTable resultTable = new DataTable(schema, 0, instrument, interval);
+                DataTable resultTable = new DataTable(schema, 0, tableType, instrument, interval);
 
                 foreach (int rowGroupIndex in rowGroupsToRead)
                 {

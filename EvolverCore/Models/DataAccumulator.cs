@@ -1,88 +1,89 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿//using System;
+//using System.Collections.Generic;
+//using System.Linq;
+//using System.Text;
+//using System.Threading.Tasks;
 
-namespace EvolverCore.Models
-{
-    public class DataAccumulator
-    {
-        public DataAccumulator(DataTable parentTable)
-        {
-            ParentTable = parentTable;
-            FormingBar = null;
-        }
+//namespace EvolverCore.Models
+//{
+//    public class DataAccumulator
+//    {
+//        public DataAccumulator(DataTable parentTable)
+//        {
+//            ParentTable = parentTable;
+//        }
 
-        //private DateTime _endTime;
-        private DateTime _startTime;
-        private object _lock = new object();
+//        public DataTable ParentTable { get; private set; }
 
-        public DataTable ParentTable { get; private set; }
-        public TimeDataBar? FormingBar { get; private set; }
+//        public void StartBar(DateTime barTime)
+//        {
+//            ParentTable.StartNewRow(barTime);
+//        }
 
-        public event EventHandler<TimeDataBar>? BarComplete;
+//        public bool AddTick(DateTime time, double bid, double ask, long volume)
+//        {
+//            DateTime tickBarTime = ParentTable.Interval.GetBarTime(time);
+//            bool fireComplete = false;
+//            DateTime newBarTime = DateTime.MinValue;
+//            lock (_lock)
+//            {
+//                if (FormingBar == null) return false;
 
-        public void StartBar(DateTime barTime)
-        {
-            lock (_lock)
-            {
-                FormingBar = new TimeDataBar(barTime, 0, 0, 0, 0, 0, 0, 0);
-                _startTime = ParentTable.Interval.Add(FormingBar.Time, -1);
-            }
-        }
+//                if (FormingBar.Time != tickBarTime)
+//                {
+//                    fireComplete = true;
+//                    newBarTime = ParentTable.Interval.Add(FormingBar.Time, 1);
+//                }
+//            }
 
-        public bool AddTick(DateTime time, double bid, double ask, long volume)
-        {
-            lock (_lock)
-            {
-                if (FormingBar == null) return false;
+//            if (fireComplete)
+//            {
+//                fireBarClose();
+//                StartBar(newBarTime);
+//            }
 
-                //TODO implement tick add
+//            lock (_lock)
+//            {
+//                //TODO add values to bar
+//            }
 
-                return false;
-            }
-        }
+//            if (fireComplete)
+//            {
+//                //TODO fire BarOpen
+//            }
 
-        public bool AddBar(TimeDataBar addBar, DataInterval addInterval)
-        {
-            lock (_lock)
-            {
-                if (FormingBar == null) return false;
-                if (!ParentTable.Interval.IsFactor(addInterval)) return false;
-                if (addBar.Time < _startTime) return false;
+//            //TODO fire TickDataEvent
 
-                if (addBar.Time > FormingBar.Time)
-                {
-                    fireBarComplete();
-                    StartBar(ParentTable.Interval.Add(FormingBar.Time,1));
-                }
+//            return true;
 
-                FormingBar.Volume += addBar.Volume;
-                FormingBar.Close = addBar.Close;
+//        }
 
-                if (FormingBar.High == 0 || addBar.High > FormingBar.High) FormingBar.High = addBar.High;
-                if (FormingBar.Low == 0 || addBar.Low < FormingBar.Low) FormingBar.Low = addBar.Low;
-                if (FormingBar.Open == 0) FormingBar.Open = addBar.Open;
+//        public bool AddBar(TimeDataBar addBar, DataInterval addInterval)
+//        {
+//            lock (_lock)
+//            {
+//                if (FormingBar == null) return false;
+//                if (!ParentTable.Interval.IsFactor(addInterval)) return false;
+//                if (addBar.Time < _startTime) return false;
 
-                if (FormingBar.Bid == 0 || addBar.Bid > FormingBar.Bid) FormingBar.Bid = addBar.Bid;
-                if (FormingBar.Ask == 0 || addBar.Ask < FormingBar.Ask) FormingBar.Ask = addBar.Ask;
+//                if (addBar.Time > FormingBar.Time)
+//                {
+//                    fireBarClose();
+//                    StartBar(ParentTable.Interval.Add(FormingBar.Time,1));
+//                }
 
-                return true;
-            }
-        }
+//                FormingBar.Volume += addBar.Volume;
+//                FormingBar.Close = addBar.Close;
 
-        private void fireBarComplete()
-        {
-            TimeDataBar completedBar;
-            lock (_lock)
-            {
-                if (FormingBar == null) return;
-                completedBar = FormingBar;
-                FormingBar = null;
-            }
+//                if (FormingBar.High == 0 || addBar.High > FormingBar.High) FormingBar.High = addBar.High;
+//                if (FormingBar.Low == 0 || addBar.Low < FormingBar.Low) FormingBar.Low = addBar.Low;
+//                if (FormingBar.Open == 0) FormingBar.Open = addBar.Open;
 
-            BarComplete?.Invoke(this, completedBar);
-        }
-    }
-}
+//                if (FormingBar.Bid == 0 || addBar.Bid > FormingBar.Bid) FormingBar.Bid = addBar.Bid;
+//                if (FormingBar.Ask == 0 || addBar.Ask < FormingBar.Ask) FormingBar.Ask = addBar.Ask;
+
+//                return true;
+//            }
+//        }
+//    }
+//}

@@ -9,94 +9,263 @@ namespace EvolverCore.Models
 {
     public enum TableType : byte { Bar, Tick };
 
-    public interface ICurrentTable
-    {
-        public int CurrentIndex { get; }
-        public long RowCount { get; }
+    //public interface ICurrentTable
+    //{
+    //    public int CurrentIndex { get; }
+    //    public long RowCount { get; }
 
-        public ColumnPointer<DateTime> Time { get; }
-    }
+    //    public bool IsLive { get; }
+
+    //    public void AddTick(DateTime time, double bid, double ask, long volume);
+
+    //    public ColumnPointer<DateTime> Time { get; }
+    //}
 
     public enum TableLoadState { NotLoaded, Loading, Loaded, Error };
 
-    internal class DataTableLoadStateChangeArgs : EventArgs
-    {
-        public DataTableLoadStateChangeArgs(TableLoadState state, DataTablePointer? table)
-        {
-            State = state;
-            Table = table;
-        }
+    //internal class DataTableLoadStateChangeArgs : EventArgs
+    //{
+    //    public DataTableLoadStateChangeArgs(TableLoadState state, DataTable? table)
+    //    {
+    //        State = state;
+    //        Table = table;
+    //    }
         
-        public DataTablePointer? Table { get; init; }
+    //    public DataTable? Table { get; init; }
+    //    public TableLoadState State { get; init; }
+    //}
+
+    internal class BarTablePointerLoadStateChangeArgs : EventArgs
+    {
+        public BarTablePointerLoadStateChangeArgs(TableLoadState state, BarTablePointer? table) { State = state; Table = table; }
+        public BarTablePointer? Table { get; init; }
         public TableLoadState State { get; init; }
     }
 
-    internal class BarTableLoadStateChangeArgs : EventArgs
+    public class BarTable
     {
-        public BarTableLoadStateChangeArgs(TableLoadState state, BarTable? table) { State = state; Table = table; }
-        public BarTable? Table { get; init; }
-        public TableLoadState State { get; init; }
-    }
-
-    public class BarTable : ICurrentTable
-    {
-        public BarTable(DataTablePointer? table=null)
-        {
-
-            Table = table;
-            Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
-            Open = new ColumnPointer<double>(this, Table?.Column("Open"));
-            Close = new ColumnPointer<double>(this, Table?.Column("Close"));
-            High = new ColumnPointer<double>(this, Table?.Column("High"));
-            Low = new ColumnPointer<double>(this, Table?.Column("Low"));
-            Bid = new ColumnPointer<double>(this, Table?.Column("Bid"));
-            Ask = new ColumnPointer<double>(this, Table?.Column("Ask"));
-            Volume = new ColumnPointer<long>(this, Table?.Column("Volume"));
-        }
-
-        internal event EventHandler<BarTableLoadStateChangeArgs>? BarTableLoadStateChange = null;
-
-        internal void OnDataTableLoadStateChange(object? sender,DataTableLoadStateChangeArgs args)
-        {
-            TableLoadState oldState = State;
-            if (args.State == TableLoadState.Loaded)
-            {
-                setTable(args.Table);
-            }
-
-            State = args.State;
-
-            if (State != oldState) BarTableLoadStateChange?.Invoke(this, new BarTableLoadStateChangeArgs(State, this));
-        }
-
-        private void setTable(DataTablePointer? table)
+        public BarTable(DataTable table)
         {
             Table = table;
 
-            Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
-            Open = new ColumnPointer<double>(this, Table?.Column("Open"));
-            Close = new ColumnPointer<double>(this, Table?.Column("Close"));
-            High = new ColumnPointer<double>(this, Table?.Column("High"));
-            Low = new ColumnPointer<double>(this, Table?.Column("Low"));
-            Bid = new ColumnPointer<double>(this, Table?.Column("Bid"));
-            Ask = new ColumnPointer<double>(this, Table?.Column("Ask"));
-            Volume = new ColumnPointer<long>(this, Table?.Column("Volume"));
+            DataTableColumn<DateTime>? timeCol = Table!.Column("Time") as DataTableColumn<DateTime>;
+            if (timeCol == null)
+                throw new ArgumentException("BarTable source table does not contain a 'Time' column.");
+            Time = timeCol;
+
+            DataTableColumn<double>? openCol = Table!.Column("Open") as DataTableColumn<double>;
+            if (openCol == null)
+                throw new ArgumentException("BarTable source table does not contain a 'Open' column.");
+            Open = openCol;
+
+            DataTableColumn<double>? closeCol = Table!.Column("Close") as DataTableColumn<double>;
+            if (closeCol == null)
+                throw new ArgumentException("BarTable source table does not contain a 'Close' column.");
+            Close = closeCol;
+
+            DataTableColumn<double>? highCol = Table!.Column("High") as DataTableColumn<double>;
+            if (highCol == null)
+                throw new ArgumentException("BarTable source table does not contain a 'High' column.");
+            High = highCol;
+
+            DataTableColumn<double>? lowCol = Table!.Column("Low") as DataTableColumn<double>;
+            if (lowCol == null)
+                throw new ArgumentException("BarTable source table does not contain a 'Low' column.");
+            Low = lowCol;
+
+            DataTableColumn<double>? bidCol = Table!.Column("Bid") as DataTableColumn<double>;
+            if (bidCol == null)
+                throw new ArgumentException("BarTable source table does not contain a 'Bid' column.");
+            Bid = bidCol;
+
+            DataTableColumn<double>? askCol = Table!.Column("Ask") as DataTableColumn<double>;
+            if (askCol == null)
+                throw new ArgumentException("BarTable source table does not contain a 'Ask' column.");
+            Ask = askCol;
+
+            DataTableColumn<long>? volumeCol = Table!.Column("Volume") as DataTableColumn<long>;
+            if (volumeCol == null)
+                throw new ArgumentException("BarTable source table does not contain a 'Volume' column.");
+            Volume = volumeCol;
         }
 
-        public DataAccumulator? Accumulator { get { return Table?.RawTable.Accumulator; } }
-        public Instrument? Instrument { get { return Table?.RawTable.Instrument; } }
-        public DataInterval? Interval { get { return Table?.RawTable.Interval; } }
+        public Instrument? Instrument { get { return Table?.Instrument; } }
+        public DataInterval? Interval { get { return Table?.Interval; } }
 
-        public TableLoadState State { get; private set; } = TableLoadState.NotLoaded;
-        
-        internal DataTablePointer? Table { get; private set; } = null;
-
-        public int CurrentIndex { get { return Table != null ? Table.CurrentBar : -1; } }
+        internal DataTable Table { get; init; }
 
         public long RowCount { get { return Table != null ? Table.RowCount : 0; } }
 
         public DateTime MinTime { get { return Table != null ? Time[0] : DateTime.MinValue; }  }
         public DateTime MaxTime { get { return Table != null ? Time[(int)Table.RowCount - 1] : DateTime.MinValue; }  }
+
+        public DataTableColumn<DateTime> Time { get; private set; }
+        public DataTableColumn<double> Open { get; private set; }
+        public DataTableColumn<double> Close { get; private set; }
+        public DataTableColumn<double> High { get; private set; }
+        public DataTableColumn<double> Low { get; private set; }
+        public DataTableColumn<double> Bid { get; private set; }
+        public DataTableColumn<double> Ask { get; private set; }
+        public DataTableColumn<long> Volume { get; private set; }
+
+        public bool IsLive { get; private set; } = false;
+
+
+        public void AddTick(DateTime time, double bid, double ask, long volume)
+        {//Runs in the context of the connection data update worker
+
+        }
+        public void StartNewRow(DateTime time)
+        {//Runs in the context of the connection data update worker
+
+        }
+    }
+
+    //public class TickTable
+    //{
+    //    public TickTable(Instrument instrument, DataTable? table)
+    //    {
+    //        Instrument = instrument;
+    //        Table = table;
+
+    //        Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
+    //        Type = new ColumnPointer<byte>(this, Table?.Column("Type"));
+    //        Value = new ColumnPointer<double>(this, Table?.Column("Value"));
+    //    }
+
+    //    public Instrument Instrument { get; init; }
+    //    public DataTable? Table { get; init; }
+
+    //    public int CurrentIndex { get; private set; } = -1;
+
+    //    public long RowCount { get { return Table != null ? Table.RowCount : 0; } }
+
+    //    public ColumnPointer<DateTime> Time { get; init; }
+    //    public ColumnPointer<byte> Type { get; init; }
+    //    public ColumnPointer<double> Value { get; init; }
+
+    //    public bool IsLive { get; private set; } = false;
+
+    //    public void AddTick(DateTime time, double bid, double ask, long volume)
+    //    {//Runs in the context of the connection data update worker
+
+    //    }
+    //    public void StartNewRow(DateTime time)
+    //    {//Runs in the context of the connection data update worker
+
+    //    }
+    //}
+
+    public class BarTablePointer
+    {
+        public BarTablePointer(BarTable table, DateTime start, DateTime end)
+        {
+            if (start > end)
+                throw new ArgumentException($"Start  must be less than or equal to end: start={start} end={end}");
+
+            _table = table;
+            CurrentBar = 0;
+            State = TableLoadState.Loaded;
+
+            Time = new ColumnPointer<DateTime>(this, table.Time);
+            Open = new ColumnPointer<double>(this, table.Open);
+            Close = new ColumnPointer<double>(this, table.Close);
+            High = new ColumnPointer<double>(this, table.High);
+            Low = new ColumnPointer<double>(this, table.Low);
+            Bid = new ColumnPointer<double>(this, table.Bid);
+            Ask = new ColumnPointer<double>(this, table.Ask);
+            Volume = new ColumnPointer<long>(this, table.Volume);
+
+            CalculateOffsets(start, end);
+        }
+
+        public BarTablePointer(BarTable? table)
+        {
+            _table = table;
+            CurrentBar = 0;
+
+            if (_table != null) State = TableLoadState.Loaded;
+
+            Time = new ColumnPointer<DateTime>(this, table?.Time);
+            Open = new ColumnPointer<double>(this, table?.Open);
+            Close = new ColumnPointer<double>(this, table?.Close);
+            High = new ColumnPointer<double>(this, table?.High);
+            Low = new ColumnPointer<double>(this, table?.Low);
+            Bid = new ColumnPointer<double>(this, table?.Bid);
+            Ask = new ColumnPointer<double>(this, table?.Ask);
+            Volume = new ColumnPointer<long>(this, table?.Volume);
+
+            _startOffset = 0;
+            _endOffset = _table == null ? 0 : (int)_table.RowCount - 1;
+        }
+
+        public TableLoadState State { get; private set; } = TableLoadState.NotLoaded;
+
+        internal event EventHandler<BarTablePointerLoadStateChangeArgs>? LoadStateChange = null;
+
+        private string _errorMessage = string.Empty;
+
+        internal void OnDataTableLoaded(object? sender, DataLoadJobDoneArgs args)
+        {
+            TableLoadState oldState = State;
+
+            if (!args.HasError)
+            {
+                setTable(args.ResultTable, args.SourceJob.StartTime, args.SourceJob.EndTime);
+                State = TableLoadState.Loaded;
+            }
+            else
+            {
+                _errorMessage = args.ErrorMessage;
+                State = TableLoadState.Error;
+            }
+
+            if (State != oldState) LoadStateChange?.Invoke(this, new BarTablePointerLoadStateChangeArgs(State, this));
+        }
+
+        private void setTable(BarTable? table, DateTime start, DateTime end)
+        {
+            _table = table;
+
+            Time = new ColumnPointer<DateTime>(this, table?.Time);
+            Open = new ColumnPointer<double>(this, table?.Open);
+            Close = new ColumnPointer<double>(this, table?.Close);
+            High = new ColumnPointer<double>(this, table?.High);
+            Low = new ColumnPointer<double>(this, table?.Low);
+            Bid = new ColumnPointer<double>(this, table?.Bid);
+            Ask = new ColumnPointer<double>(this, table?.Ask);
+            Volume = new ColumnPointer<long>(this, table?.Volume);
+
+            if (_table == null)
+            {
+                _startOffset = 0;
+                _endOffset = 0;
+            }
+            else
+                CalculateOffsets(start, end);
+        }
+
+
+        internal void CalculateOffsets(DateTime start, DateTime end)
+        {
+            int startIndex = Time.RawFindIndex(start);
+            int endIndex = Time.RawFindIndex(end);
+
+            if (startIndex == -1 || endIndex == -1)
+                throw new EvolverException("Unable to locate start/end time index values.");
+
+            _startOffset = startIndex;
+            _endOffset = endIndex;
+        }
+
+        int _startOffset;
+        int _endOffset;
+
+        BarTable? _table;
+
+        public int CurrentBar { get; private set; }
+
+        public int RowCount { get { return _endOffset - _startOffset; } }
 
         public ColumnPointer<DateTime> Time { get; private set; }
         public ColumnPointer<double> Open { get; private set; }
@@ -106,92 +275,6 @@ namespace EvolverCore.Models
         public ColumnPointer<double> Bid { get; private set; }
         public ColumnPointer<double> Ask { get; private set; }
         public ColumnPointer<long> Volume { get; private set; }
-
-        public void AddColumnTest()
-        {
-        }
-    }
-
-    public class TickTable : ICurrentTable
-    {
-        public TickTable(Instrument instrument, DataTablePointer? table)
-        {
-            Instrument = instrument;
-            Table = table;
-
-            Time = new ColumnPointer<DateTime>(this, Table?.Column("Time"));
-            Type = new ColumnPointer<byte>(this, Table?.Column("Type"));
-            Value = new ColumnPointer<double>(this, Table?.Column("Value"));
-        }
-
-        public Instrument Instrument { get; init; }
-        public DataTablePointer? Table { get; init; }
-
-        public int CurrentIndex { get { return Table != null ? Table.CurrentBar : -1; } }
-
-        public long RowCount { get { return Table != null ? Table.RowCount : 0; } }
-
-        public ColumnPointer<DateTime> Time { get; init; }
-        public ColumnPointer<byte> Type { get; init; }
-        public ColumnPointer<double> Value { get; init; }
-    }
-
-    public class DataTablePointer
-    {
-        public DataTablePointer(DataTable table, DateTime start, DateTime end)
-        {
-            if (start > end)
-                throw new ArgumentException($"Start  must be less than or equal to end: start={start} end={end}");
-
-            _table = table;
-            CurrentBar = 0;
-
-            CalculateOffsets(start,end);
-        }
-
-        public DataTablePointer(DataTable table)
-        {
-            _table = table;
-            CurrentBar = 0;
-
-            _startOffset = 0;
-            _endOffset = (int)_table.RowCount - 1;
-        }
-
-
-        internal void CalculateOffsets(DateTime start, DateTime end)
-        {
-            IDataTableColumn? column = Column("Time");
-            DataTableColumn<DateTime>? timeColumn = column as DataTableColumn<DateTime>;
-            if (timeColumn == null)
-                throw new EvolverException("DataTable missing 'Time' column.");
-
-            int startIndex = timeColumn.FindIndex(start);
-            int endIndex = timeColumn.FindIndex(start);
-
-            if(startIndex == -1 || endIndex == -1)
-                throw new EvolverException("Unable to locate start/end time index values.");
-
-            _startOffset = startIndex;
-            _endOffset = endIndex;
-        }
-
-        internal DataTable DynamicSlice()
-        {
-            return _table.DynamicSlice();
-        }
-
-        int _startOffset;
-        int _endOffset;
-
-        DataTable _table;
-        internal DataTable RawTable { get { return  _table; } }
-
-        public int CurrentBar { get; private set; }
-
-        public int RowCount { get { return _endOffset - _startOffset; } }
-
-        public IDataTableColumn? Column(string columnName) { return _table.Column(columnName); }
     }
 
     public class DataTable
@@ -200,26 +283,22 @@ namespace EvolverCore.Models
         ParquetSchema _pSchema;
         object _lock = new object();
 
-        public DataTable(ParquetSchema pSchema, int columnSize, Instrument instrument, DataInterval interval)
+        public DataTable(ParquetSchema pSchema, int columnSize, TableType type, Instrument instrument, DataInterval interval)
         {
             _pSchema = pSchema;
             _columns = new List<IDataTableColumn>();
             Instrument = instrument;
             Interval = interval;
-
-            Accumulator = new DataAccumulator(this);
+            TableType = type;
 
             createColumnsFromParquetSchema(columnSize);
         }
 
 
-        public DataAccumulator Accumulator { get; init; }
         public Instrument Instrument { get; init; }
         public DataInterval Interval { get; init; }
 
-        public bool IsLive { get; private set; } = false;
-
-
+        public TableType TableType { get; init; }
         public int RowCount { get { lock (_lock) { return _columns.Count > 0 ? _columns[0].Count : 0; } } }
 
         public ParquetSchema Schema { get { lock (_lock) { return _pSchema; } } }
@@ -355,7 +434,7 @@ namespace EvolverCore.Models
             {
                 List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
 
-                DataTable sliceTable = new DataTable(Schema, 0, Instrument, Interval);
+                DataTable sliceTable = new DataTable(Schema, 0,TableType, Instrument, Interval);
 
                 for (int i = 0; i < _columns.Count; i++)
                 {
@@ -374,7 +453,7 @@ namespace EvolverCore.Models
             lock (_lock)
             {
                 List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
-                DataTable sliceTable = new DataTable(Schema, 0, Instrument, Interval);
+                DataTable sliceTable = new DataTable(Schema, 0, TableType, Instrument, Interval);
 
                 for (int i = 0; i < _columns.Count; i++)
                 {

@@ -15,11 +15,11 @@ namespace EvolverCore.Models
 
     public class ColumnPointer<T> where T : struct
     {
-        private IDataTableColumn? _column;
-        private ICurrentTable _parentTable;
+        private DataTableColumn<T>? _column;
+        private BarTablePointer _parentTable;
 
 
-        internal ColumnPointer(ICurrentTable parentTable, IDataTableColumn? column=null)
+        internal ColumnPointer(BarTablePointer parentTable, DataTableColumn<T>? column=null)
         {
             //match T vs column.DataType
 
@@ -35,11 +35,19 @@ namespace EvolverCore.Models
         //    return 
         //}
 
+        public int RawFindIndex(T item)
+        {
+            DataTableColumn<T>? dataColumn = _column as DataTableColumn<T>;
+            if (dataColumn == null) return -1;
+
+            return dataColumn.FindIndex(item);
+        }
+
         public T this[int barsAgo]
         {
             get
             {
-                return GetValueAt(_parentTable.CurrentIndex - barsAgo);
+                return GetValueAt(_parentTable.CurrentBar - barsAgo);
             }
         }
     }
@@ -55,7 +63,7 @@ namespace EvolverCore.Models
         public string Name { get; }
         public Array Series { get; }
 
-        public object GetValueAt(int index);
+        //public object GetValueAt(int index);
 
         public Array ToArray();
 
@@ -183,7 +191,7 @@ namespace EvolverCore.Models
         }
 
 
-        public object GetValueAt(int index)
+        public T GetValueAt(int index)
         {
             //determine where index points based on offsets
             //return offset shifted index from correct array/list
@@ -196,7 +204,7 @@ namespace EvolverCore.Models
             else
             {
                 Array a = _dataArrays[i];
-                    return i >= 1 ? a.GetValue(index - _cumulativeOffsets[i - 1])! : a.GetValue(index)!;
+                    return i >= 1 ? (T)a.GetValue(index - _cumulativeOffsets[i - 1])! : (T)a.GetValue(index)!;
             }
         }
 

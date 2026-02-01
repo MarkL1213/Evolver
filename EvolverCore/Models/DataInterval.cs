@@ -105,6 +105,13 @@ namespace EvolverCore.Models
             }
         }
 
+        public DateTime GetBarTime(DateTime time)
+        {
+            //FIXME: determine what bar time this tick belongs to...
+
+            return new DateTime();
+        }
+
 
         #region rounding
 
