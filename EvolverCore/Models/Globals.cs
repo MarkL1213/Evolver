@@ -35,26 +35,29 @@ namespace EvolverCore
         {
             _sessionHoursCollection = new SessionHoursCollection();
             _instrumentCollection = new InstrumentCollection();
-            _dataManager = new DataManager();
+            //_dataManager = new DataManager();
+            _dataTableManager = new DataTableManager();
             _connections = new ConnectionCollection();
             _log = new Log();
         }
 
-        internal void Load()
+        internal async void Load()
         {
             LoadProperties();
 
-            //_sessionHoursCollection.Load();
 
             _instrumentCollection.LoadRandomInstrument();
-            _dataManager.LoadRandomInstrumentRecords();
+            //_dataManager.LoadRandomInstrumentRecords();
+
+            await _dataTableManager.DataWarehouse.LoadRecords();
         }
 
 
         ConnectionCollection _connections;
         SessionHoursCollection _sessionHoursCollection;
         InstrumentCollection _instrumentCollection;
-        DataManager _dataManager;
+        //DataManager _dataManager;
+        DataTableManager _dataTableManager;
         Log _log;
 
         public string LogFileName { get; } = "D:\\Evolver\\Evolver.log";
@@ -72,7 +75,9 @@ namespace EvolverCore
 
         public InstrumentCollection InstrumentCollection { get { return _instrumentCollection; } }
 
-        internal DataManager DataManager { get { return _dataManager; } }
+        //internal DataManager DataManager { get { return _dataManager; } }
+
+        internal DataTableManager DataTableManager { get { return _dataTableManager; } }
 
         internal Log Log { get { return _log; } }
 

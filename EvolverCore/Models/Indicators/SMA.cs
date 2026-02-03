@@ -24,7 +24,7 @@ namespace EvolverCore.Models.Indicators
             plotProperties.Name = "SMA";
             plotProperties.PlotLineBrush = Brushes.Red;
 
-            Outputs.Add(new OutputPlot("SMA", plotProperties, PlotStyle.Line));
+            AddOutput(new OutputPlot("SMA", plotProperties, PlotStyle.Line));
         }
 
         double _sum = 0;
@@ -33,13 +33,13 @@ namespace EvolverCore.Models.Indicators
         {
             if (SourceRecord!.SourceType == CalculationSource.BarData)
             {
-                BarPricePoint p = new BarPricePoint(Bars[0][0], Properties.PriceField);
-                _sum += p.Y;
+                double p = Bars[0].CalculatePriceField(0, Properties.PriceField);
+                _sum += p;
 
                 if (CurrentBarIndex + 1 >= Properties.Period)
                 {
-                    BarPricePoint oldP = new BarPricePoint(Bars[0][Properties.Period - 1], Properties.PriceField);
-                    _sum -= oldP.Y;
+                    double oldP = Bars[0].CalculatePriceField(Properties.Period - 1, Properties.PriceField);
+                    _sum -= oldP;
 
                     Outputs[0][0] = _sum / Properties.Period;
                 }

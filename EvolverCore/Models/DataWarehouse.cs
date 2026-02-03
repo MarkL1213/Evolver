@@ -1,6 +1,4 @@
-﻿using EvolverCore.Models.DataV2;
-using IronCompress;
-using Parquet;
+﻿using Parquet;
 using Parquet.Data;
 using Parquet.Schema;
 using System;
@@ -112,7 +110,6 @@ namespace EvolverCore.Models
 
         private object _tablesLock = new object();
         private Dictionary<string, Dictionary<DataInterval, BarTable>> _barTables = new Dictionary<string, Dictionary<DataInterval, BarTable>>();
-        private Dictionary<string, Dictionary<DataInterval, BarTablePointer>> _pointerTables = new Dictionary<string, Dictionary<DataInterval, BarTablePointer>>();
 
         private bool _disposedValue = false;
         private bool _isShutdown = false;
@@ -141,7 +138,7 @@ namespace EvolverCore.Models
             {
                 if (!_barTables.ContainsKey(args.Instrument.Name)) return;
 
-                foreach (DataInterval interval in _pointerTables[args.Instrument.Name].Keys)
+                foreach (DataInterval interval in _barTables[args.Instrument.Name].Keys)
                 {
                     BarTable table = _barTables[args.Instrument.Name][interval];
                     if (!table.IsLive) continue;
@@ -178,7 +175,7 @@ namespace EvolverCore.Models
             }
             catch (Exception ex)
             {
-                Globals.Instance.Log.LogMessage($"Failed to save {job.Table.Interval.ToString()} data for '{job.Table.Instrument.Name}'", LogLevel.Error);
+                Globals.Instance.Log.LogMessage($"Failed to save {job.Table.Interval} data for '{job.Table.Instrument!.Name}'", LogLevel.Error);
                 Globals.Instance.Log.LogException(ex);
                 
                 job.FireJobDone(ex.Message);
@@ -304,6 +301,17 @@ namespace EvolverCore.Models
         }
 
 
+        internal BarTablePointer CreateTablePointer(Instrument instrument, DataInterval interval, DateTime start, DateTime end, bool isLive = false)
+        {
+            //FIXME: create a new BarTablePointer 
+
+            //try to create from cache if possible.
+
+            //if not create pointer in loading state and enqueue load job, wired to the pointer.
+            throw new NotImplementedException();
+        }
+
+
         #region static data readers/writers
         internal static string GetBarPartitionPath(Instrument instrument, DataInterval interval, DateOnly date)
         {
@@ -393,7 +401,7 @@ namespace EvolverCore.Models
             }
         }
 
-        private static async Task<DataTable> ReadToDataTableAsync(string filePath, TableType tableType, Instrument instrument, DataInterval interval, int[]? rowGroups = null)
+        private static async Task<DataTable> ReadToDataTableAsync(string filePath, TableType tableType, Instrument instrument, DataInterval interval, int[]? rowGroups = null, CancellationToken cancelToken = default)
         {
             ParquetSchema schema;
             switch (tableType)
@@ -405,7 +413,7 @@ namespace EvolverCore.Models
 
             if (!File.Exists(filePath)) return new DataTable(schema, 0, tableType, instrument, interval);
 
-            using (ParquetReader reader = await ParquetReader.CreateAsync(filePath, GetParquetProperties()))
+            using (ParquetReader reader = await ParquetReader.CreateAsync(filePath, GetParquetProperties(), cancelToken))
             {
                 int[] rowGroupsToRead;
                 if (rowGroups != null)
@@ -441,7 +449,7 @@ namespace EvolverCore.Models
                         for (int i = 0; i < schema.DataFields.Length; i++)
                         {
                             DataField field = schema.DataFields[i];
-                            DataColumn col = await rgReader.ReadColumnAsync(field);
+                            DataColumn col = await rgReader.ReadColumnAsync(field, cancelToken);
 
                             colList.Add(col);
                         }
@@ -454,7 +462,7 @@ namespace EvolverCore.Models
             }
         }
 
-        internal static async Task WritePartitionedBars(DataTable table)
+        internal static async Task WritePartitionedBars(DataTable table, CancellationToken cancelToken=default)
         {
             if (table.RowCount == 0) return; // nothing to write
 
@@ -499,11 +507,11 @@ namespace EvolverCore.Models
                 await WriteDataTableAsync(
                     GetBarPartitionPath(table.Instrument, table.Interval, date),
                     TableType.Bar,
-                    subTable);
+                    subTable, cancelToken);
             }
         }
 
-        private static async Task WriteDataTableAsync(string filePath, TableType tableType, DataTable table)
+        private static async Task WriteDataTableAsync(string filePath, TableType tableType, DataTable table, CancellationToken cancelToken=default)
         {
             ParquetSchema schema;
             switch (tableType)
@@ -525,21 +533,25 @@ namespace EvolverCore.Models
             Directory.CreateDirectory(dirName);
             //if (!File.Exists(filePath)) ;
 
-            using (FileStream stream = File.Create(filePath))
+            string tempPath = filePath + ".tmp";
+
+            using (FileStream stream = File.Create(tempPath))
             {
-                using (ParquetWriter writer = await ParquetWriter.CreateAsync(schema, stream, GetParquetProperties()))
+                using (ParquetWriter writer = await ParquetWriter.CreateAsync(schema, stream, GetParquetProperties(), false, cancelToken))
                 {
                     using (ParquetRowGroupWriter rgWriter = writer.CreateRowGroup())
                     {
                         (ParquetSchema parquetSchema, DataColumn[] parquetData) = DataTableHelpers.ConvertDataTableToParquet(table);
 
                         foreach (DataColumn parquetColumn in parquetData)
-                            await rgWriter.WriteColumnAsync(parquetColumn);
+                            await rgWriter.WriteColumnAsync(parquetColumn, cancelToken);
 
                         rgWriter.CompleteValidate();
                     }
                 }
             }
+
+            File.Move(tempPath, filePath, overwrite: true);
         }
         #endregion
 

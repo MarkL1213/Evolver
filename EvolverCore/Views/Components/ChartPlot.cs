@@ -136,18 +136,18 @@ namespace EvolverCore.Views
             IndicatorViewModel? vm = Properties.Indicator;
             if (vm == null || vm.Indicator == null) return 0;
 
-            IEnumerable<(IDataPoint, int)> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
-            return vBars.Count() > 0 ? vBars.Min(p => p.Item1.Y) : 0;
+            ColumnPointer<double> vBars = vm.Indicator.SliceOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
+
+            return vBars.Count > 0 ? vBars.Min() : 0;
         }
         public double MaxY(DateTime rangeMin, DateTime rangeMax)
         {
             IndicatorViewModel? vm = Properties.Indicator;
             if (vm == null || vm.Indicator == null) return 100;
 
-            IEnumerable<(IDataPoint, int)> vBars = vm.Indicator.SelectOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
+            ColumnPointer<double> vBars = vm.Indicator.SliceOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
 
-            //return vBars.Count() > 0 ? vBars.Max(p => new BarPricePoint(p as TimeDataBar, Properties.PriceField).Y) : 100;
-            return vBars.Count() > 0 ? vBars.Max(p => p.Item1.Y) : 100;
+            return vBars.Count > 0 ? vBars.Max() : 100;
         }
 
         public void Render(DrawingContext context)
@@ -170,38 +170,38 @@ namespace EvolverCore.Views
             Indicator indicator = ivm.Indicator;
             int plotIndex = Properties.PlotIndex;
 
-            List<(IDataPoint, int)> visibleDataPoints = indicator.SelectOutputPointsInRange(
-                    vm.XAxis.Min, vm.XAxis.Max, plotIndex, skipLeadingNaN: true).ToList();
+            (int minVisibleIndex, int  maxVisibleIndex) = indicator.IndexOfOutputPointsInRange(vm.XAxis.Min, vm.XAxis.Max, plotIndex);
 
-            List<Point> visibleScreenPoints = visibleDataPoints
-                .Select(p => new Point(
-                    ChartPanel.MapXToScreen(vm.XAxis, p.Item1.X, bounds),
-                    ChartPanel.MapYToScreen(vm.YAxis, p.Item1.Y, bounds)))
-                .ToList();
+            List<Point> visibleScreenPoints = new List<Point>();
+            List<int> visibleScreenIndexes = new List<int>();
+            for (int i = minVisibleIndex; i <= maxVisibleIndex; i++)
+            {
+                visibleScreenPoints.Add(new Point(
+                    ChartPanel.MapXToScreen(vm.XAxis, indicator.Bars[0].Time.GetValueAt(i), bounds),
+                    ChartPanel.MapYToScreen(vm.YAxis, indicator.Outputs[plotIndex].GetValueAt(i), bounds)));
+                visibleScreenIndexes.Add(i);
+            }
 
             if (visibleScreenPoints.Count() < 2) return;
 
-            //////////////
-            //FIXME : optimize this to pre-select the visible range only
-            List<PlotProperties> propertiesList = indicator.Outputs[plotIndex].Properties.ToList();
-            //////////////
+            List<PlotProperties> propertiesList = indicator.Plots[plotIndex].Properties.GetRange(minVisibleIndex, maxVisibleIndex - minVisibleIndex);
 
             int n = 0;
             for (int i = 0; i < visibleScreenPoints.Count-1; i++)
             {
-                if (!double.IsNaN(visibleDataPoints[i].Item1.Y)) { n = i; break; }
+                if (!double.IsNaN(indicator.Outputs[plotIndex].GetValueAt(visibleScreenIndexes[i]))) { n = i; break; }
             }
 
             var currentBatch = new List<Point> { visibleScreenPoints[n] };
-            var currentProp = propertiesList[visibleDataPoints[n].Item2];
+            var currentProp = propertiesList[n];
             var currentPen = currentProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
 
             for (int i = n+1; i < visibleScreenPoints.Count; i++)
             {
                 // The segment being added is from (i-1) to i, styled by prop at (i-1)
-                PlotProperties segProp = propertiesList[visibleDataPoints[i - 1].Item2];
+                PlotProperties segProp = propertiesList[i - 1];
 
-                if (double.IsNaN(visibleDataPoints[i].Item1.Y))
+                if (double.IsNaN(indicator.Outputs[plotIndex].GetValueAt(visibleScreenIndexes[i])))
                 {//draw the current batch an skip
                     if (currentBatch.Count >= 2)
                     {
@@ -220,7 +220,7 @@ namespace EvolverCore.Views
                 if (currentBatch.Count == 0)
                 {//skip forward until we get 2 valid points...
                     currentBatch.Add(visibleScreenPoints[i]);
-                    currentProp = propertiesList[visibleDataPoints[i].Item2];
+                    currentProp = propertiesList[visibleScreenIndexes[i]];
                     currentPen = currentProp.CreateLinePen();
                     continue;
                 }
@@ -277,41 +277,38 @@ namespace EvolverCore.Views
 
             double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * indicator.Interval.Ticks / 2)); // auto-scale width
 
-            List<(IDataPoint, int)> visiblePoints = indicator.SelectOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max, plotIndex).ToList();
-
-            //////////////
-            //FIXME : optimize this to pre-select the visible range only
-            List<PlotProperties> propertiesList = indicator.Outputs[plotIndex].Properties.ToList();
-            //////////////
+            (int minVisibleIndex, int maxVisibleIndex) = indicator.IndexOfOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max, plotIndex);
+            List<PlotProperties> propertiesList = indicator.Plots[plotIndex].Properties.GetRange(minVisibleIndex,maxVisibleIndex);
 
 
+            DataTableColumn<double> outputColumn = indicator.Outputs[plotIndex];
             int n = 0;
-            for (int i = 0; i < visiblePoints.Count - 1; i++)
+            for (int i = 0; i < propertiesList.Count - 1; i++)
             {
-                if (!double.IsNaN(visiblePoints[i].Item1.Y)) { n = i; break; }
+                if (!double.IsNaN(outputColumn.GetValueAt(i + minVisibleIndex))) { n = i; break; }
             }
 
             // Start the first batch with the first bar (point 0)
-            var currentBatch = new List<IDataPoint> { visiblePoints[n].Item1 };
-            var currentProp = propertiesList[visiblePoints[n].Item2];
+            var currentBatch = new List<int> { n };
+            var currentProp = propertiesList[n];
             var currentPen = currentProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
             var currentFill = currentProp.PlotFillBrush;
 
 
 
-            for (int i = n+1; i < visiblePoints.Count; i++)
+            for (int i = n+1; i < propertiesList.Count; i++)
             {
-                PlotProperties nextBarProp = propertiesList[visiblePoints[i].Item2];
+                PlotProperties nextBarProp = propertiesList[i];
 
-                if (double.IsNaN(visiblePoints[n].Item1.Y))
+                if (double.IsNaN(outputColumn.GetValueAt(i + minVisibleIndex)))
                 {
                     if (currentBatch.Count > 0)
                     {
-                        foreach (IDataPoint dataPoint in currentBatch)
+                        foreach (int minOffset in currentBatch)
                         {
-                            double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
+                            double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, indicator.Bars[0].Time.GetValueAt(minOffset + minVisibleIndex), bounds);
                             double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
-                            double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
+                            double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, outputColumn.GetValueAt(minOffset + minVisibleIndex), bounds);
 
                             var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
 
@@ -327,17 +324,17 @@ namespace EvolverCore.Views
 
                 if (currentProp.ValueEquals(nextBarProp))
                 {
-                    currentBatch.Add(visiblePoints[i].Item1);
+                    currentBatch.Add(i);
                 }
                 else
                 {
                     if (currentBatch.Count > 0)
                     {
-                        foreach (IDataPoint dataPoint in currentBatch)
+                        foreach (int minOffset in currentBatch)
                         {
-                            double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
+                            double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, indicator.Bars[0].Time.GetValueAt(minOffset + minVisibleIndex), bounds);
                             double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
-                            double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
+                            double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, outputColumn.GetValueAt(minOffset + minVisibleIndex), bounds);
 
                             var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
 
@@ -348,7 +345,7 @@ namespace EvolverCore.Views
 
 
                     currentBatch.Clear();
-                    currentBatch.Add(visiblePoints[i].Item1);
+                    currentBatch.Add(i);
                     currentProp = nextBarProp;
                     currentPen = nextBarProp.CreateLinePen();//FIXME : optimize create pen calls to use cached values where possible
                     currentFill = nextBarProp.PlotFillBrush;
@@ -357,11 +354,11 @@ namespace EvolverCore.Views
 
             if (currentBatch.Count > 0)
             {
-                foreach (IDataPoint dataPoint in currentBatch)
+                foreach (int minOffset in currentBatch)
                 {
-                    double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, dataPoint.X, bounds);
+                    double xCenter = ChartPanel.MapXToScreen(panelVM.XAxis, indicator.Bars[0].Time.GetValueAt(minOffset + minVisibleIndex), bounds);
                     double zeroY = ChartPanel.MapYToScreen(panelVM.YAxis, 0, bounds);
-                    double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, dataPoint.Y, bounds);
+                    double volumeY = ChartPanel.MapYToScreen(panelVM.YAxis, outputColumn.GetValueAt(minOffset + minVisibleIndex), bounds);
 
                     var rect = new Rect(xCenter - halfBarWidth, volumeY, halfBarWidth * 2.0, zeroY - volumeY);
 
@@ -390,25 +387,29 @@ namespace EvolverCore.Views
 
             ChartPanel panel = Parent.Parent;
 
-            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * Properties.Indicator.Indicator.Interval.Ticks / 2)); // auto-scale width
+            double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * indicator.Interval.Ticks / 2)); // auto-scale width
 
-            IEnumerable<IDataPoint> visiblePoints = Properties.Indicator.Indicator.SelectInputPointsInRange(xAxis.Min, xAxis.Max);
+            (int minVisibleIndex,int maxVisibleIndex) = indicator.IndexOfSourcePointsInRange(xAxis.Min, xAxis.Max);
 
-            foreach (var dataPoint in visiblePoints)
+            BarTablePointer bars = indicator.Bars[0];
+
+            for (int i=minVisibleIndex;i<=maxVisibleIndex;i++)
             {
-                TimeDataBar? bar = dataPoint as TimeDataBar;
-                if (bar == null) continue;
+                DateTime time = bars.Time.GetValueAt(i);
+                if (time < xAxis.Min || time > xAxis.Max) continue;
 
-                if (bar.Time < xAxis.Min || bar.Time > xAxis.Max) continue;
+                double xCenter = (time - xAxis.Min).Ticks * pixelsPerTick;
 
-                double xCenter = (bar.Time - xAxis.Min).Ticks * pixelsPerTick;
+                double highY = bounds.Height - (bars.High.GetValueAt(i) - yAxis.Min) / yRange * bounds.Height;
+                double lowY = bounds.Height - (bars.Low.GetValueAt(i) - yAxis.Min) / yRange * bounds.Height;
 
-                double highY = bounds.Height - (bar.High - yAxis.Min) / yRange * bounds.Height;
-                double lowY = bounds.Height - (bar.Low - yAxis.Min) / yRange * bounds.Height;
-                double openY = bounds.Height - (bar.Open - yAxis.Min) / yRange * bounds.Height;
-                double closeY = bounds.Height - (bar.Close - yAxis.Min) / yRange * bounds.Height;
+                double open = bars.Open.GetValueAt(i);
+                double close = bars.Close.GetValueAt(i);
 
-                bool isBull = bar.Close >= bar.Open;
+                double openY = bounds.Height - (open - yAxis.Min) / yRange * bounds.Height;
+                double closeY = bounds.Height - (close - yAxis.Min) / yRange * bounds.Height;
+
+                bool isBull = close >= open;
                 var bodyBrush = isBull ? plotVM.CandleUpColor : plotVM.CandleDownColor;
                 _cachedWickPen ??= new Pen(plotVM.WickColor, plotVM.WickThickness, plotVM.WickDashStyle);
                 _cachedCandleOutlinePen ??= new Pen(plotVM.CandleOutlineColor, plotVM.CandleOutlineThickness, plotVM.CandleOutlineDashStyle);

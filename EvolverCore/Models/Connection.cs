@@ -301,11 +301,11 @@ namespace EvolverCore.Models
             if (connection == null) return;
 
             if (connection.State == ConnectionState.Connected)
-                connection.DataUpdate += Globals.Instance.DataManager.OnConnectionDataUpdate;
+                Globals.Instance.DataTableManager.SubscribeToConnection(connection);
 
             if (connection.State == ConnectionState.Disconnected || connection.State == ConnectionState.Error)
             {
-                connection.DataUpdate -= Globals.Instance.DataManager.OnConnectionDataUpdate;
+                Globals.Instance.DataTableManager.UnsubscribeFromConnection(connection);
                 if (!connection.WantConnect)
                 {
                     Connection c;

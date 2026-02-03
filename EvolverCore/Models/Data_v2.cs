@@ -10,7 +10,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 
-namespace EvolverCore.Models.DataV2
+namespace EvolverCore.Models
 {
     public enum TickType : byte { Bid, Ask };
 
@@ -77,7 +77,7 @@ namespace EvolverCore.Models.DataV2
             fields.Add(new DataField("Ask", typeof(double)));
             fields.Add(new DataField("Volume", typeof(long)));
 
-            return new ParquetSchema(fields);
+             return new ParquetSchema(fields);
         }
     }
 
@@ -128,33 +128,33 @@ namespace EvolverCore.Models.DataV2
         }
 
         //Ideally this is temporary as the transition progresses. Ultimately only DataTable should be the norm and Series objects will get refactored.
-        public static BarTable ConvertSeriesToBarTable(InstrumentDataSeries series)
-        {
-            if (series.Instrument == null)
-                throw new ArgumentException("Series Instrument can not be null.");
+        //public static BarTable ConvertSeriesToBarTable(InstrumentDataSeries series)
+        //{
+        //    if (series.Instrument == null)
+        //        throw new ArgumentException("Series Instrument can not be null.");
 
-            ParquetSchema barSchema = Bar.GetSchema();
-            DataTable table = new DataTable(barSchema, series.Count, TableType.Bar, series.Instrument, series.Interval);
+        //    ParquetSchema barSchema = Bar.GetSchema();
+        //    DataTable table = new DataTable(barSchema, series.Count, TableType.Bar, series.Instrument, series.Interval);
 
-            DataTableColumn<DateTime> timeCol = table.Column("Time") as DataTableColumn<DateTime> ?? throw new NullReferenceException();
-            DataTableColumn<double> openCol = table.Column("Open") as DataTableColumn<double> ?? throw new NullReferenceException();
-            DataTableColumn<double> highCol = table.Column("High") as DataTableColumn<double> ?? throw new NullReferenceException();
-            DataTableColumn<double> lowCol = table.Column("Low") as DataTableColumn<double> ?? throw new NullReferenceException();
-            DataTableColumn<double> closeCol = table.Column("Close") as DataTableColumn<double> ?? throw new NullReferenceException();
-            DataTableColumn<long> volumeCol = table.Column("Volume") as DataTableColumn<long> ?? throw new NullReferenceException();
+        //    DataTableColumn<DateTime> timeCol = table.Column("Time") as DataTableColumn<DateTime> ?? throw new NullReferenceException();
+        //    DataTableColumn<double> openCol = table.Column("Open") as DataTableColumn<double> ?? throw new NullReferenceException();
+        //    DataTableColumn<double> highCol = table.Column("High") as DataTableColumn<double> ?? throw new NullReferenceException();
+        //    DataTableColumn<double> lowCol = table.Column("Low") as DataTableColumn<double> ?? throw new NullReferenceException();
+        //    DataTableColumn<double> closeCol = table.Column("Close") as DataTableColumn<double> ?? throw new NullReferenceException();
+        //    DataTableColumn<long> volumeCol = table.Column("Volume") as DataTableColumn<long> ?? throw new NullReferenceException();
 
-            for (int i = 0; i < series.Count; i++)
-            {
-                timeCol[i] = series[i].Time;
-                openCol[i] = series[i].Open;
-                highCol[i] = series[i].High;
-                lowCol[i] = series[i].Low;
-                closeCol[i] = series[i].Close;
-                volumeCol[i] = series[i].Volume;
-            }
+        //    for (int i = 0; i < series.Count; i++)
+        //    {
+        //        timeCol[i] = series[i].Time;
+        //        openCol[i] = series[i].Open;
+        //        highCol[i] = series[i].High;
+        //        lowCol[i] = series[i].Low;
+        //        closeCol[i] = series[i].Close;
+        //        volumeCol[i] = series[i].Volume;
+        //    }
 
-            return new BarTable(table);
-        }
+        //    return new BarTable(table);
+        //}
 
         internal static (ParquetSchema Schema, DataColumn[] Data) ConvertDataTableToParquet(DataTable table)
         {

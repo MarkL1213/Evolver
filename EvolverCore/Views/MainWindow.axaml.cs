@@ -2,7 +2,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.Input;
 using EvolverCore.Models;
-using EvolverCore.Models.DataV2;
 using EvolverCore.ViewModels;
 using NP.Ava.UniDock;
 using NP.UniDockService;
@@ -48,6 +47,7 @@ namespace EvolverCore.Views
             }
 
             RunTestItem.Command = new AsyncRelayCommand(TestItemCommand);
+            //RunTestItem.Command = new RelayCommand(TestItemCommand);
             ExitMenuItem.Command = new RelayCommand(ExitMenuItemCommand);
             NewLogWindow.Command = vm == null ? null : vm.NewLogDocumentCommand;
             NewChartItem.Command = vm == null ? null : vm.NewChartDocumentCommand;
@@ -157,34 +157,27 @@ namespace EvolverCore.Views
                     return;
                 }
                 DataInterval interval = new DataInterval(IntervalSpan.Hour, 1);
-                DateTime startTime = DateTime.Now;
+                DateTime startTime = DateTime.UtcNow;
                 int numBarsToGenerate = 72;
                 int seed = 69;
 
-                InstrumentDataSeries? series = InstrumentDataSeries.RandomSeries(randomInstrument, startTime, interval, numBarsToGenerate, seed);
-                if (series == null)
-                {
-                    Globals.Instance.Log.LogMessage("Unable to generate random data.", LogLevel.Error);
-                    return;
-                }
-
-                BarTable seriesBarTable = DataTableHelpers.ConvertSeriesToBarTable(series);
-                await DataWarehouse.WritePartitionedBars(seriesBarTable.Table!);
+                BarTable originalBarTable = BarTable.GenerateRandomData(randomInstrument, interval, startTime, numBarsToGenerate, seed);
+                await DataWarehouse.WritePartitionedBars(originalBarTable.Table!);
 
                 DateTime endTime = interval.Add(startTime, numBarsToGenerate);
-                BarTable barTable = await DataWarehouse.ReadToDataTableAsync(new CancellationToken(), randomInstrument, interval, startTime, endTime);
+                BarTable readbackbarTable = await DataWarehouse.ReadToDataTableAsync(new CancellationToken(), randomInstrument, interval, startTime, endTime);
 
-                DateTime fileStartDate = barTable.Time.GetValueAt(0);
-                DateTime fileEndDate = barTable.Time.GetValueAt((int)barTable.RowCount - 1);
-                Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate}", LogLevel.Info);
+                DateTime fileStartDate = readbackbarTable.Time.GetValueAt(0);
+                DateTime fileEndDate = readbackbarTable.Time.GetValueAt((int)readbackbarTable.RowCount - 1);
+                Globals.Instance.Log.LogMessage($"FullTable: Start={fileStartDate} End={fileEndDate} Rows={readbackbarTable.RowCount}", LogLevel.Info);
 
-                if (!Test_CompareData(series, barTable))
-                {
-                    Globals.Instance.Log.LogMessage("Test compare failed.", LogLevel.Error);
-                    return;
-                }
-                else
-                    Globals.Instance.Log.LogMessage("Test compare passed.", LogLevel.Error);
+                //if (!Test_CompareData(series, barTable))
+                //{
+                //    Globals.Instance.Log.LogMessage("Test compare failed.", LogLevel.Error);
+                //    return;
+                //}
+                //else
+                //    Globals.Instance.Log.LogMessage("Test compare passed.", LogLevel.Error);
             }
             catch (Exception ex)
             {
@@ -193,55 +186,55 @@ namespace EvolverCore.Views
 
         }
 
-        private bool Test_CompareData(InstrumentDataSeries original, BarTable readTable)
-        {
-            if (original.Count != readTable.RowCount)
-            {
-                Globals.Instance.Log.LogMessage($"Row count mismatch: original {original.Count}, read {readTable.RowCount}",LogLevel.Error);
-                return false;
-            }
+        //private bool Test_CompareData(InstrumentDataSeries original, BarTable readTable)
+        //{
+        //    if (original.Count != readTable.RowCount)
+        //    {
+        //        Globals.Instance.Log.LogMessage($"Row count mismatch: original {original.Count}, read {readTable.RowCount}",LogLevel.Error);
+        //        return false;
+        //    }
 
-            for (int i = 0; i < original.Count; i++)
-            {
-                try
-                {
-                    TimeDataBar origBar = original[i];
+        //    for (int i = 0; i < original.Count; i++)
+        //    {
+        //        try
+        //        {
+        //            TimeDataBar origBar = original[i];
 
-                    if (origBar.Open != (double)readTable.Open.GetValueAt(i))
-                    {
-                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
-                        return false;
-                    }
-                    if (origBar.High != (double)readTable.High.GetValueAt(i))
-                    {
-                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.High}, read {readTable.High.GetValueAt(i)}", LogLevel.Error);
-                        return false;
-                    }
-                    if (origBar.Low != (double)readTable.Low.GetValueAt(i))
-                    {
-                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Low}, read {readTable.Low.GetValueAt(i)}", LogLevel.Error);
-                        return false;
-                    }
-                    if (origBar.Close != (double)readTable.Close.GetValueAt(i))
-                    {
-                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Close}, read {readTable.Close.GetValueAt(i)}", LogLevel.Error);
-                        return false;
-                    }
-                    if (origBar.Volume != (double)readTable.Volume.GetValueAt(i))
-                    {
-                        Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
-                        return false;
-                    }
-                }
-                catch (Exception e)
-                {
-                    Globals.Instance.Log.LogMessage($"Exception at index {i}", LogLevel.Error);
-                    Globals.Instance.Log.LogException(e);
-                }
-            }
+        //            if (origBar.Open != (double)readTable.Open.GetValueAt(i))
+        //            {
+        //                Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
+        //                return false;
+        //            }
+        //            if (origBar.High != (double)readTable.High.GetValueAt(i))
+        //            {
+        //                Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.High}, read {readTable.High.GetValueAt(i)}", LogLevel.Error);
+        //                return false;
+        //            }
+        //            if (origBar.Low != (double)readTable.Low.GetValueAt(i))
+        //            {
+        //                Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Low}, read {readTable.Low.GetValueAt(i)}", LogLevel.Error);
+        //                return false;
+        //            }
+        //            if (origBar.Close != (double)readTable.Close.GetValueAt(i))
+        //            {
+        //                Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Close}, read {readTable.Close.GetValueAt(i)}", LogLevel.Error);
+        //                return false;
+        //            }
+        //            if (origBar.Volume != (double)readTable.Volume.GetValueAt(i))
+        //            {
+        //                Globals.Instance.Log.LogMessage($"Mismatch at index {i}: original {origBar.Volume}, read {readTable.Volume.GetValueAt(i)}", LogLevel.Error);
+        //                return false;
+        //            }
+        //        }
+        //        catch (Exception e)
+        //        {
+        //            Globals.Instance.Log.LogMessage($"Exception at index {i}", LogLevel.Error);
+        //            Globals.Instance.Log.LogException(e);
+        //        }
+        //    }
 
-            return true;
-        }
+        //    return true;
+        //}
 
         private void ExitMenuItemCommand()
         {

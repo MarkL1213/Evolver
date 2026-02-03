@@ -8,17 +8,17 @@ namespace EvolverCore.Views
 
         public override double MinY()
         {
-            if (SnapPoints.Count == 0) CalculateSnapPoints();
-            if (SnapPoints.Count == 0) return 0;
+            if (SnapPoints == null || SnapPoints.RowCount == 0) CalculateSnapPoints();
+            if (SnapPoints == null || SnapPoints.RowCount == 0) return 0;
 
-            return SnapPoints.Min(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.Low; else return 0; });
+            return SnapPoints.Low.Min();
         }
         public override double MaxY()
         {
-            if (SnapPoints.Count == 0) CalculateSnapPoints();
-            if (SnapPoints.Count == 0) return 100;
+            if (SnapPoints == null || SnapPoints.RowCount == 0) CalculateSnapPoints();
+            if (SnapPoints == null || SnapPoints.RowCount == 0) return 100;
 
-            return SnapPoints.Max(b => { TimeDataBar? x = b as TimeDataBar; if (x != null) return x.High; else return 100; });
+            return SnapPoints.High.Max();
         }
     }
 }

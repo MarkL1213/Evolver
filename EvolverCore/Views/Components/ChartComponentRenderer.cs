@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.Media;
 using EvolverCore.ViewModels;
+using EvolverCore.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -82,21 +83,19 @@ namespace EvolverCore.Views.Components
         public virtual double MaxY() { return 100; }
 
 
-        private List<IDataPoint> _snapPoints = new List<IDataPoint>();
-        public List<IDataPoint> SnapPoints { get { return _snapPoints; } }
+        private BarTablePointer? _snapPoints = null;
+        public BarTablePointer? SnapPoints { get { return _snapPoints; } }
 
         public virtual void CalculateSnapPoints()
         {
-            SnapPoints.Clear();
-
             ChartPanelViewModel? panelVM = Parent.DataContext as ChartPanelViewModel;
             if (panelVM == null || panelVM.XAxis == null) return;
 
             IndicatorViewModel? ivm = Properties as IndicatorViewModel;
             if (ivm == null || ivm.Indicator == null || ivm.Indicator.InputElementCount() == 0) return;
 
-            IEnumerable<IDataPoint> v = ivm.Indicator.SelectInputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max);
-            SnapPoints.AddRange(v.ToList());
+
+            _snapPoints = ivm.Indicator.SliceSourcePointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max);
         }
 
         public virtual void UpdateVisualRange(DateTime rangeMin, DateTime rangeMax) { }

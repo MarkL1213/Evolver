@@ -4,6 +4,7 @@ using EvolverCore.Views;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace EvolverCore.Models
 {
@@ -17,6 +18,41 @@ namespace EvolverCore.Models
         ShutDown
     }
 
+    public enum CalculationSource
+    {
+        BarData,
+        IndicatorPlot
+    }
+
+    public enum BarPriceValue
+    {
+        Open,
+        High,
+        Low,
+        Close,
+        Volume,
+        Bid,
+        Ask,
+        OC,
+        HL,
+        HLC,
+        OHLC
+    }
+
+    [Serializable]
+    public class IndicatorDataSourceRecord
+    {
+        public CalculationSource SourceType { get; internal set; } = CalculationSource.BarData;
+
+        public Indicator? SourceIndicator { get; internal set; }
+        public int SourcePlotIndex { get; internal set; } = -1;
+
+        public BarTablePointer? SourceBarData { get; internal set; } = null;
+
+        public DateTime StartDate { get; internal set; }
+
+        public DateTime EndDate { get; internal set; }
+    }
 
     public class PlotProperties
     {
@@ -141,6 +177,8 @@ namespace EvolverCore.Models
 
         public List<PlotProperties> ToList() { return _properties.ToList(); }
 
+        public List<PlotProperties> GetRange(int index, int count) { return _properties.GetRange(index, count); }
+
         public void Add(PlotProperties prop) { _properties.Add(prop); }
 
         public PlotProperties this[int barsAgo]
@@ -173,6 +211,7 @@ namespace EvolverCore.Models
         {
             DefaultProperties = new PlotProperties();
             Properties = new PlotPropertyCollection(this);
+            //Series = new DataTableColumn<double>("", DataType.Double, 0);
         }
         public OutputPlot(string name, PlotProperties defaultProperties, PlotStyle style)
         {
@@ -180,45 +219,46 @@ namespace EvolverCore.Models
             DefaultProperties = defaultProperties;
             Style = style;
             Properties = new PlotPropertyCollection(this);
+            //Series = new DataTableColumn<double>(name, DataType.Double, 0);
         }
 
         public string Name { get; internal set; } = string.Empty;
         public PlotPropertyCollection Properties { get; }
-        public TimeDataSeries Series { get; internal set; } = new TimeDataSeries();
+        //public DataTableColumn<double> Series { get; internal set; } 
 
         public PlotStyle Style { get; set; } = PlotStyle.Line;
         internal PlotProperties DefaultProperties { get; set; }
         public int CurrentBarIndex { get; internal set; } = -1;
 
-        public TimeDataPoint GetValueAt(int index)
-        {
-            if (Series == null || index >= Series.Count || index < 0)
-                throw new EvolverException("OutputPlot GetValueAt() index out of range.");
+        //public double GetValueAt(int index)
+        //{
+        //    if (Series == null || index >= Series.Count || index < 0)
+        //        throw new EvolverException("OutputPlot GetValueAt() index out of range.");
 
-            return Series.GetValueAt(index);
-        }
+        //    return Series.GetValueAt(index);
+        //}
 
-        public double this[int barsAgo]
-        {
-            get
-            {
-                int n = CurrentBarIndex - barsAgo;
+        //public double this[int barsAgo]
+        //{
+        //    get
+        //    {
+        //        int n = CurrentBarIndex - barsAgo;
 
-                if (n > Series.Count || n < 0)
-                    throw new EvolverException("OutputPlot get[barsAgo] out of range.");
+        //        if (n > Series.Count || n < 0)
+        //            throw new EvolverException("OutputPlot get[barsAgo] out of range.");
 
-                return Series[n].Value;
-            }
-            set
-            {
-                int n = CurrentBarIndex - barsAgo;
+        //        return Series.GetValueAt(n);
+        //    }
+        //    set
+        //    {
+        //        int n = CurrentBarIndex - barsAgo;
 
-                if (n > Series.Count || n < 0)
-                    throw new EvolverException("OutputPlot set[barsAgo] out of range.");
+        //        if (n > Series.Count || n < 0)
+        //            throw new EvolverException("OutputPlot set[barsAgo] out of range.");
 
-                Series[n].Value = value;
-            }
-        }
+        //        Series.SetValueAt(value, n);
+        //    }
+        //}
     }
 
     public class InputIndicator
@@ -232,17 +272,19 @@ namespace EvolverCore.Models
 
         public bool CurrentIsEnd()
         {
-            OutputPlot oPlot = Indicator.Outputs[PlotIndex];
-            if (oPlot.Series == null) return false;
+            DataTableColumn<double>? series = Indicator.Outputs.Column(Indicator.Plots[PlotIndex].Name) as DataTableColumn<double>;
+            if (series == null) return false;
 
-            return CurrentBarIndex == oPlot.Series.Count - 1;
+            return CurrentBarIndex == series.Count - 1;
         }
-        public TimeDataPoint GetValueAt(int index)
+        public double GetValueAt(int index)
         {
-            TimeDataSeries series = Indicator.Outputs[PlotIndex].Series;
+            DataTableColumn<double>? series = Indicator.Outputs.Column(Indicator.Plots[PlotIndex].Name) as DataTableColumn<double>;
+            if (series == null)
+                throw new EvolverException("InputIndicator output series is not a double.");
 
             if (index >= series.Count || index < 0)
-                throw new EvolverException("InputIndicator GetValueAt() index out of range.");
+                    throw new EvolverException("InputIndicator GetValueAt() index out of range.");
 
             return series.GetValueAt(index);
         }
@@ -251,71 +293,75 @@ namespace EvolverCore.Models
         {
             get
             {
-                TimeDataSeries series = Indicator.Outputs[PlotIndex].Series;
+                DataTableColumn<double>? series = Indicator.Outputs.Column(Indicator.Plots[PlotIndex].Name) as DataTableColumn<double>;
+                if (series == null)
+                    throw new EvolverException("InputIndicator output series is not a double.");
+
                 int n = CurrentBarIndex - barsAgo;
 
                 if (n > series.Count || n < 0)
                     throw new EvolverException("InputIndicator get[barsAgo] out of range.");
 
-                return series[n].Value;
+                return series.GetValueAt(n);
             }
             set
             {
-                TimeDataSeries series = Indicator.Outputs[PlotIndex].Series;
+                DataTableColumn<double>? series = Indicator.Outputs.Column(Indicator.Plots[PlotIndex].Name) as DataTableColumn<double>;
+                if (series == null)
+                    throw new EvolverException("InputIndicator output series is not a double.");
+
                 int n = CurrentBarIndex - barsAgo;
 
                 if (n > series.Count || n < 0)
                     throw new EvolverException("InputIndicator set[barsAgo] out of range.");
 
-                series[n].Value = value;
-            }
-        }
-
-
-    }
-
-    public class BarsPointer
-    {
-        public BarsPointer(InstrumentDataSlice slice) { Slice = slice; }
-        public InstrumentDataSlice Slice { get; internal set; }
-        public int CurrentBarIndex { get; internal set; } = -1;
-
-        public InstrumentDataSliceRecord Record { get { return Slice.Record; } }
-        public int Count { get { return Slice.Count; } }
-        public DataLoadState LoadState { get { return Slice.LoadState; } }
-        public DateTime MinTime(int lastCount) { return Slice.MinTime(lastCount); }
-        public DateTime MaxTime(int lastCount) { return Slice.MaxTime(lastCount); }
-
-        public bool CurrentIsEnd()
-        {
-            return CurrentBarIndex == Slice.Count - 1;
-        }
-
-        public IEnumerable<TimeDataBar> Where(Func<TimeDataBar, bool> predicate)
-        {
-            return Slice.Where(predicate);
-        }
-
-        public TimeDataBar GetValueAt(int i)
-        {
-            return Slice.GetValueAt(i);
-        }
-
-        public TimeDataBar this[int barsAgo]
-        {
-            get
-            {
-                int n = CurrentBarIndex - barsAgo;
-                return Slice.GetValueAt(n);
-            }
-            set
-            {
-
-                int n = CurrentBarIndex - barsAgo;
-                Slice.SetValueAt(value, n);
+                series.SetValueAt(value,n);
             }
         }
     }
+
+    //public class BarsPointer
+    //{
+    //    public BarsPointer(InstrumentDataSlice slice) { Slice = slice; }
+    //    public InstrumentDataSlice Slice { get; internal set; }
+    //    public int CurrentBarIndex { get; internal set; } = -1;
+
+    //    public InstrumentDataSliceRecord Record { get { return Slice.Record; } }
+    //    public int Count { get { return Slice.Count; } }
+    //    public DataLoadState LoadState { get { return Slice.LoadState; } }
+    //    public DateTime MinTime(int lastCount) { return Slice.MinTime(lastCount); }
+    //    public DateTime MaxTime(int lastCount) { return Slice.MaxTime(lastCount); }
+
+    //    public bool CurrentIsEnd()
+    //    {
+    //        return CurrentBarIndex == Slice.Count - 1;
+    //    }
+
+    //    public IEnumerable<TimeDataBar> Where(Func<TimeDataBar, bool> predicate)
+    //    {
+    //        return Slice.Where(predicate);
+    //    }
+
+    //    public TimeDataBar GetValueAt(int i)
+    //    {
+    //        return Slice.GetValueAt(i);
+    //    }
+
+    //    public TimeDataBar this[int barsAgo]
+    //    {
+    //        get
+    //        {
+    //            int n = CurrentBarIndex - barsAgo;
+    //            return Slice.GetValueAt(n);
+    //        }
+    //        set
+    //        {
+
+    //            int n = CurrentBarIndex - barsAgo;
+    //            Slice.SetValueAt(value, n);
+    //        }
+    //    }
+    //}
 
     [Serializable]
     public class IndicatorProperties
@@ -347,16 +393,19 @@ namespace EvolverCore.Models
 
         ////////////////
         // these should all map into the slice (maybe even be slice properties that are just wrapped here)
-        public List<BarsPointer> Bars { get; internal set; } = new List<BarsPointer>();
+        public List<BarTablePointer> Bars { get; internal set; } = new List<BarTablePointer>();
         public List<InputIndicator> Inputs { get; internal set; } = new List<InputIndicator>();
-        public List<OutputPlot> Outputs { get; internal set; } = new List<OutputPlot>();
+        public DataTableBase Outputs { get; internal set; } = new DataTableBase();
+        public List<OutputPlot> Plots { get; internal set; } = new List<OutputPlot>();
+
+
         //////////////////
         internal void SetSourceData(IndicatorDataSourceRecord sourceRecord)
         {
             _sourceRecord = sourceRecord;
             if (_sourceRecord.SourceBarData != null && _sourceRecord.SourceType == CalculationSource.BarData)
             {
-                Bars.Add(new BarsPointer(_sourceRecord.SourceBarData));
+                Bars.Add(_sourceRecord.SourceBarData);
                 if (DataChanged != null) DataChanged(this, EventArgs.Empty);
             }
             if (_sourceRecord.SourceIndicator != null && _sourceRecord.SourceType == CalculationSource.IndicatorPlot)
@@ -372,7 +421,7 @@ namespace EvolverCore.Models
 
             if (!WaitingForDataLoad)
             {
-                Globals.Instance.DataManager.IndicatorReadyToRun(this);
+                //Globals.Instance.DataManager.IndicatorReadyToRun(this);
             }
         }
 
@@ -380,47 +429,85 @@ namespace EvolverCore.Models
         {
             if (_sourceRecord == null) { return; }
 
-            InstrumentDataSlice? sourceInstrumentSlice = sender as InstrumentDataSlice;
-            if (sourceInstrumentSlice != null) sourceInstrumentSlice.DataLoaded -= OnSourceDataLoaded;
+            //InstrumentDataSlice? sourceInstrumentSlice = sender as InstrumentDataSlice;
+            //if (sourceInstrumentSlice != null) sourceInstrumentSlice.DataLoaded -= OnSourceDataLoaded;
 
-            if (_sourceRecord.SourceBarData != null)
-            {
-                Bars.Add(new BarsPointer(_sourceRecord.SourceBarData));
-                if (DataChanged != null) DataChanged(this, EventArgs.Empty);
-            }
+            //if (_sourceRecord.SourceBarData != null)
+            //{
+            //    Bars.Add(_sourceRecord.SourceBarData);
+            //    if (DataChanged != null) DataChanged(this, EventArgs.Empty);
+            //}
 
             if (!WaitingForDataLoad)
             {
-                Globals.Instance.DataManager.IndicatorReadyToRun(this);
+                //Globals.Instance.DataManager.IndicatorReadyToRun(this);
             }
         }
 
-        internal IEnumerable<IDataPoint> SelectInputPointsInRange(DateTime min, DateTime max)
+        public void AddOutput(OutputPlot output)// new OutputPlot("EMA", plotProperties, PlotStyle.Line))
+        {
+            Outputs.AddColumn(output.Name);
+            Plots.Add(output);
+        }
+
+
+        internal BarTablePointer SliceSourcePointsInRange(DateTime min, DateTime max)
         {
             if (_sourceRecord != null)
             {
-                if (_sourceRecord.SourceType == CalculationSource.BarData && Bars.Count > 0)
-                    return Bars[0].Where(p => p.Time >= min && p.Time <= max).ToList();
-                else if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && Inputs.Count > 0)
-                    return Inputs[0].Indicator.SelectOutputPointsInRange(min, max, Inputs[0].PlotIndex).Select(tuple => tuple.Item1).ToList();
+                return Bars[0].Slice(min, max);
             }
 
-            return Enumerable.Empty<IDataPoint>();
+            throw new EvolverException("No source defined.");
         }
+
+        internal (int min, int max) IndexOfSourcePointsInRange(DateTime min, DateTime max)
+        {
+            int minIndex = Bars[0].Time.FindIndex(min);
+            int maxIndex = Bars[0].Time.FindIndex(max);
+
+            if (minIndex == -1 || maxIndex == -1)
+                throw new IndexOutOfRangeException("Unable to slice min/max out of range.");
+
+            return (minIndex, maxIndex);
+        }
+
 
         object _outputLock = new object();
 
-        internal IEnumerable<(IDataPoint, int)> SelectOutputPointsInRange(DateTime min, DateTime max, int plotIndex, bool skipLeadingNaN = false)
+        internal ColumnPointer<double> SliceOutputPointsInRange(DateTime min, DateTime max, int plotIndex)
         {
-            if (plotIndex < 0 || plotIndex >= Outputs.Count) return Enumerable.Empty<(IDataPoint, int)>();
+            if (plotIndex < 0 || plotIndex >= Plots.Count) throw new EvolverException("Invalid plot index.");
 
             lock (_outputLock)
             {
-                return Outputs[plotIndex].Series
-                        .Select((item, index) => (item!, index))
-                        .Where(tuple => tuple.Item1.X >= min && tuple.Item1.X <= max)
-                        .Select(t => ((IDataPoint)t.Item1, t.Item2))
-                        .ToList();
+                int minIndex = Bars[0].Time.FindIndex(min);
+                int maxIndex = Bars[0].Time.FindIndex(max);
+
+                if (minIndex == -1 || maxIndex == -1)
+                    throw new IndexOutOfRangeException("Unable to slice min/max out of range.");
+
+                DataTableColumn<double>? column = Outputs.Columns[plotIndex] as DataTableColumn<double>;
+                if (column == null)
+                    throw new EvolverException("");
+
+                return  column.Slice(minIndex, maxIndex);
+            }
+        }
+
+        internal (int min, int max) IndexOfOutputPointsInRange(DateTime min, DateTime max, int plotIndex)
+        {
+            if (plotIndex < 0 || plotIndex >= Plots.Count) throw new EvolverException("Invalid plot index.");
+
+            lock (_outputLock)
+            {
+                int minIndex = Bars[0].Time.FindIndex(min);
+                int maxIndex = Bars[0].Time.FindIndex(max);
+
+                if (minIndex == -1 || maxIndex == -1)
+                    throw new IndexOutOfRangeException("Unable to slice min/max out of range.");
+
+                return (minIndex, maxIndex);
             }
         }
 
@@ -451,7 +538,7 @@ namespace EvolverCore.Models
             if (_sourceRecord != null)
             {
                 if (_sourceRecord.SourceType == CalculationSource.BarData && Bars.Count > 0)
-                    return Bars[0].Count;
+                    return Bars[0].RowCount;
                 else if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && Inputs.Count > 0)
                     return Inputs[0].Indicator.OutputElementCount(Inputs[0].PlotIndex);
             }
@@ -462,8 +549,9 @@ namespace EvolverCore.Models
         {
             lock (_outputLock)
             {
-                if (plotIndex < 0 || plotIndex >= Outputs.Count) return 0;
-                return Outputs[plotIndex].Series.Count;
+                if (plotIndex < 0 || plotIndex >= Plots.Count) return 0;
+
+                return Outputs.Columns[plotIndex].Count;
             }
         }
 
@@ -474,7 +562,7 @@ namespace EvolverCore.Models
                 if (_sourceRecord != null)
                 {
                     if (_sourceRecord.SourceType == CalculationSource.BarData && Bars.Count > 0)
-                        return Bars[0].Record.Interval;
+                        return Bars[0].Interval;
                     else if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && Inputs.Count > 0)
                         return Inputs[0].Indicator.Interval;
                 }
@@ -486,9 +574,9 @@ namespace EvolverCore.Models
         {
             get
             {
-                foreach (BarsPointer bars in Bars)
+                foreach (BarTablePointer bars in Bars)
                 {
-                    if (bars.LoadState != DataLoadState.Loaded) return true;
+                    if (bars.State != TableLoadState.Loaded) return true;
                 }
                 foreach (InputIndicator input in Inputs)
                 {
@@ -503,21 +591,21 @@ namespace EvolverCore.Models
         {
             CurrentBarIndex = -1;
             CurrentBarsIndex = -1;
-            foreach (BarsPointer bars in Bars)
+            foreach (BarTablePointer bars in Bars)
             {
-                bars.CurrentBarIndex = -1;
+                bars.ResetCurrentBar();
             }
             foreach (InputIndicator input in Inputs)
             {
                 input.CurrentBarIndex = -1;
             }
-            lock (_outputLock)
-            {
-                foreach (OutputPlot output in Outputs)
-                {
-                    output.CurrentBarIndex = -1;
-                }
-            }
+            //lock (_outputLock)
+            //{
+            //    foreach (OutputPlot output in Outputs)
+            //    {
+            //        output.CurrentBarIndex = -1;
+            //    }
+            //}
         }
 
         internal void Startup()
@@ -526,109 +614,109 @@ namespace EvolverCore.Models
             Configure();
         }
 
-        internal void RunHistory()
-        {
-            State = IndicatorState.History;
-            resetCurrentBars();
+        //internal void RunHistory()
+        //{
+        //    State = IndicatorState.History;
+        //    resetCurrentBars();
 
-            if (IsDataOnly) return;
+        //    if (IsDataOnly) return;
 
-            while (true)
-            {
-                bool moreHistory = false;
-                foreach (BarsPointer bars in Bars)
-                {
-                    if (!bars.CurrentIsEnd()) { moreHistory = true; break; }
-                }
-                if (!moreHistory)
-                {
-                    foreach (InputIndicator input in Inputs)
-                    {
-                        if (!input.CurrentIsEnd()) { moreHistory = true; break; }
-                    }
-                }
+        //    while (true)
+        //    {
+        //        bool moreHistory = false;
+        //        foreach (BarTablePointer bars in Bars)
+        //        {
+        //            if (!bars.CurrentIsEnd()) { moreHistory = true; break; }
+        //        }
+        //        if (!moreHistory)
+        //        {
+        //            foreach (InputIndicator input in Inputs)
+        //            {
+        //                if (!input.CurrentIsEnd()) { moreHistory = true; break; }
+        //            }
+        //        }
 
-                if (moreHistory)
-                {
-                    lock (_outputLock)
-                    {
-                        runHistoryNextData();
-                    }
-                }
-                else
-                    break;
-            }
+        //        if (moreHistory)
+        //        {
+        //            lock (_outputLock)
+        //            {
+        //                runHistoryNextData();
+        //            }
+        //        }
+        //        else
+        //            break;
+        //    }
 
-            if (DataChanged != null) DataChanged(this, EventArgs.Empty);
-        }
+        //    if (DataChanged != null) DataChanged(this, EventArgs.Empty);
+        //}
 
-        private void runHistoryNextData()
-        {
-            if (_sourceRecord == null)
-                throw new EvolverException("Attempting to run a sourceless indicator.");
+        //private void runHistoryNextData()
+        //{
+        //    if (_sourceRecord == null)
+        //        throw new EvolverException("Attempting to run a sourceless indicator.");
 
-            //next input:
-            int inputIndex = -1;
-            int barsIndex = -1;
-            DateTime nextDataTime = DateTime.MaxValue;
-            for (int i = 0; i < Bars.Count; i++)
-            {
-                DateTime x = Bars[i].GetValueAt(Bars[i].CurrentBarIndex + 1).Time;
-                if (x < nextDataTime)
-                {
-                    barsIndex = i;
-                    nextDataTime = x;
-                }
-            }
-            for (int i = 0; i < Inputs.Count; i++)
-            {
-                DateTime x = Inputs[i].Indicator.Outputs[Inputs[i].PlotIndex].GetValueAt(Inputs[i].CurrentBarIndex + 1).Time;
-                if (x < nextDataTime)
-                {
-                    inputIndex = i;
-                    barsIndex = -1;
-                    nextDataTime = x;
-                }
-            }
+        //    //next input:
+        //    int inputIndex = -1;
+        //    int barsIndex = -1;
+        //    DateTime nextDataTime = DateTime.MaxValue;
+        //    for (int i = 0; i < Bars.Count; i++)
+        //    {
+        //        DateTime x = Bars[i].Time.GetValueAt(Bars[i].CurrentBar + 1);
+        //        if (x < nextDataTime)
+        //        {
+        //            barsIndex = i;
+        //            nextDataTime = x;
+        //        }
+        //    }
+        //    for (int i = 0; i < Inputs.Count; i++)
+        //    {
+        //        DateTime x = Inputs[i].Indicator.Outputs[Inputs[i].PlotIndex].GetValueAt(Inputs[i].CurrentBarIndex + 1).Time;
+        //        if (x < nextDataTime)
+        //        {
+        //            inputIndex = i;
+        //            barsIndex = -1;
+        //            nextDataTime = x;
+        //        }
+        //    }
 
-            if (inputIndex >= 0)
-            {
-                Inputs[inputIndex].CurrentBarIndex++;
-                CurrentBarIndex = -1;
-                CurrentBarsIndex = -1;
-                CurrentInputsIndex = inputIndex;
-                CurrentInputIndex = Inputs[inputIndex].CurrentBarIndex;
-                if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && inputIndex == 0)
-                {
-                    foreach (OutputPlot outputPlot in Outputs)
-                    {
-                        outputPlot.CurrentBarIndex++;
-                        outputPlot.Series.Add(new TimeDataPoint(nextDataTime, double.NaN));
-                        outputPlot.Properties.Add(new PlotProperties(outputPlot.DefaultProperties));
-                    }
-                }
-            }
-            else if (barsIndex >= 0)
-            {
-                Bars[barsIndex].CurrentBarIndex++;
-                CurrentBarsIndex = barsIndex;
-                CurrentBarIndex = Bars[barsIndex].CurrentBarIndex;
-                CurrentInputsIndex = -1;
-                CurrentInputIndex = -1;
+        //    if (inputIndex >= 0)
+        //    {
+        //        Inputs[inputIndex].CurrentBarIndex++;
+        //        CurrentBarIndex = -1;
+        //        CurrentBarsIndex = -1;
+        //        CurrentInputsIndex = inputIndex;
+        //        CurrentInputIndex = Inputs[inputIndex].CurrentBarIndex;
+        //        if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && inputIndex == 0)
+        //        {
+        //            foreach (OutputPlot outputPlot in Outputs)
+        //            {
+        //                outputPlot.CurrentBarIndex++;
+        //                outputPlot.Series.Add(new TimeDataPoint(nextDataTime, double.NaN));
+        //                outputPlot.Properties.Add(new PlotProperties(outputPlot.DefaultProperties));
+        //            }
+        //        }
+        //    }
+        //    else if (barsIndex >= 0)
+        //    {
+        //        Bars[barsIndex].IncrementCurrentBar();
+        //        CurrentBarsIndex = barsIndex;
+        //        CurrentBarIndex = Bars[barsIndex].CurrentBar;
+        //        CurrentInputsIndex = -1;
+        //        CurrentInputIndex = -1;
 
-                if (_sourceRecord.SourceType == CalculationSource.BarData && barsIndex == 0)
-                {
-                    foreach (OutputPlot outputPlot in Outputs)
-                    {
-                        outputPlot.CurrentBarIndex++;
-                        outputPlot.Series.Add(new TimeDataPoint(nextDataTime, double.NaN));
-                        outputPlot.Properties.Add(new PlotProperties(outputPlot.DefaultProperties));
-                    }
-                }
-            }
+        //        if (_sourceRecord.SourceType == CalculationSource.BarData && barsIndex == 0)
+        //        {
+        //            foreach (OutputPlot outputPlot in Outputs)
+        //            {
+        //                outputPlot.CurrentBarIndex++;
+        //                outputPlot.Series.Add(new TimeDataPoint(nextDataTime, double.NaN));
+        //                outputPlot.Properties.Add(new PlotProperties(outputPlot.DefaultProperties));
+        //            }
+        //        }
+        //    }
 
-            OnDataUpdate();
-        }
+        //    OnDataUpdate();
+        //}
 
 
         public virtual void Configure()

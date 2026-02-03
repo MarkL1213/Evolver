@@ -14,17 +14,17 @@ namespace EvolverCore.Models.Indicators
         {
             PlotProperties plotProperties = new PlotProperties();
             OutputPlot oplot = new OutputPlot("Volume", plotProperties, PlotStyle.Bar);
-            Outputs.Add(oplot);
+            AddOutput(oplot);
         }
 
         public override void OnDataUpdate()
         {
             if (CurrentBarIndex % 5 == 0)
             {
-                Outputs[0].Properties[0].PlotFillBrush = Brushes.Orange;
+                Plots[0].Properties[0].PlotFillBrush = Brushes.Orange;
             }
 
-            Outputs[0][0] = Bars[0][0].Volume;
+            Outputs[0][0] = Bars[0].Volume[0];
         }
 
     }

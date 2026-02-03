@@ -63,15 +63,17 @@ namespace EvolverCore.Models
 
             DirectoryInfo barDataDir = new DirectoryInfo(Path.Combine(Globals.Instance.DataDirectory, "bars"));
 
+            if (!barDataDir.Exists) return;
+
             IEnumerable<DirectoryInfo> instrumentDirs = barDataDir.EnumerateDirectories();
             foreach (DirectoryInfo instrumentDir in instrumentDirs)
             {
                 IEnumerable<DirectoryInfo> intervalDirs = instrumentDir.EnumerateDirectories();
 
-                string instrumentKey = instrumentDir.Name;//FIXME: this probably needs some path extraction
+                string instrumentKey = instrumentDir.Name;
                 Instrument? instrument = Globals.Instance.InstrumentCollection.Lookup(instrumentKey);
                 if (instrument == null)
-                    throw new EvolverException("");
+                    throw new EvolverException($"Unable to lookup instrument from folder name {instrumentKey}.");
 
                 Dictionary<string, List<InstrumentDataRecord_v2>> intervalDict;
                 if (newRecords.ContainsKey(instrumentKey))
@@ -86,10 +88,10 @@ namespace EvolverCore.Models
                 {
                     IEnumerable<FileInfo> files = intervalDir.EnumerateFiles("*.parquet");
 
-                    string intervalKey = intervalDir.Name;//FIXME: this probably needs some path extraction
+                    string intervalKey = intervalDir.Name;
                     DataInterval? interval = DataInterval.TryParseString(intervalKey);
                     if (!interval.HasValue)
-                        throw new EvolverException("");
+                        throw new EvolverException($"Unable to parse interval folder name {intervalKey} in the instrument {instrumentKey} folder.");
 
                     List<InstrumentDataRecord_v2> dataRecords;
                     if (intervalDict.ContainsKey(intervalKey))
@@ -138,14 +140,15 @@ namespace EvolverCore.Models
             for (int rg = 0; rg < reader.RowGroupCount; rg++)
             {
                 using ParquetRowGroupReader groupReader = reader.OpenRowGroupReader(rg);
+
                 DataColumnStatistics? stats = groupReader.GetStatistics(timestampField);
                 if (stats == null)
                     throw new EvolverException($"In data file {filePath} there are no statistics available for 'Time' column");
 
-                DateTime? min = (DateTime?)stats.MinValue; // Cast based on your type
+                DateTime? min = (DateTime?)stats.MinValue;
                 DateTime? max = (DateTime?)stats.MaxValue;
 
-                if (!min.HasValue || !max.HasValue)
+                if (!min.HasValue || min == DateTime.MinValue || !max.HasValue || max == DateTime.MinValue)
                     throw new EvolverException($"In data file {filePath} 'Time' column statistics missing one or both Min/Max values.");
 
                 overallMin = min < overallMin ? (DateTime)min : overallMin;
@@ -162,6 +165,7 @@ namespace EvolverCore.Models
     public class DataTableManager : IDisposable
     {
         DataWarehouse _dataWarehouse;
+        DataDepGraph _dataDepGraph;
 
         private object _handlerLock = new object();
         private Dictionary<Connection, EventHandler<ConnectionDataUpdateEventArgs>> _connectionDataUpdateHandlers = new Dictionary<Connection, EventHandler<ConnectionDataUpdateEventArgs>>();
@@ -171,13 +175,16 @@ namespace EvolverCore.Models
         private Thread _connectionDataUpdateQueueWorker;
         private CancellationTokenSource _cts = new CancellationTokenSource();
         
-        internal event EventHandler<InstrumentDataRecord>? DataChange = null;
+        //internal event EventHandler<InstrumentDataRecord>? DataChange = null;
         internal event EventHandler? DataUpdateWorkerError = null;
 
+        internal DataWarehouse DataWarehouse { get { return _dataWarehouse; } }
+        internal DataDepGraph DepGraph { get { return _dataDepGraph; } }
 
         internal DataTableManager()
         {
             _dataWarehouse = new DataWarehouse(this);
+            _dataDepGraph = new DataDepGraph();
 
             _connectionDataUpdateQueueWorker = new Thread(connectionDataUpdateQueueWorker);
             _connectionDataUpdateQueueWorker.Name = "DataTableManager Update Worker";
@@ -292,6 +299,7 @@ namespace EvolverCore.Models
                 if (disposing)
                 {
                     Shutdown();
+                    _dataWarehouse.Shutdown();
                     _cts.Dispose();
                 }
                 _disposedValue = true;

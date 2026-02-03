@@ -260,9 +260,9 @@ public partial class ChartPanel : Decorator
                     TimeSpan totalSpan = _vm.XAxis.Max - _vm.XAxis.Min;
                     DateTime mouseTime = _vm.XAxis.Min + TimeSpan.FromTicks((long)(xFraction * totalSpan.Ticks));
 
-                    if (dataComponent.SnapPoints.Count == 0)
+                    if (dataComponent.SnapPoints == null || dataComponent.SnapPoints.RowCount == 0)
                         dataComponent.CalculateSnapPoints();
-                    if (dataComponent.SnapPoints.Count == 0)
+                    if (dataComponent.SnapPoints == null || dataComponent.SnapPoints.RowCount == 0)
                     {//No visible data, fallback to free mode
                         _vm.CrosshairTime = _vm.XAxis.Min + TimeSpan.FromTicks((long)(xFraction * totalSpan.Ticks));
 
@@ -273,21 +273,27 @@ public partial class ChartPanel : Decorator
                         return;
                     }
 
-                    TimeDataBar? nearestBar = dataComponent.SnapPoints
-                        .OrderBy(b => Math.Abs((b.X - mouseTime).Ticks))
-                        .First() as TimeDataBar;
+                    int nearestIndex = dataComponent.SnapPoints.Time.GetNearestIndex(mouseTime);
 
-                    if (nearestBar != null)
+
+                    if (nearestIndex != -1)
                     {
-                        _vm.CrosshairTime = nearestBar.Time;
+                        _vm.CrosshairTime = dataComponent.SnapPoints.Time.GetValueAt(nearestIndex);
 
                         //..get y coords for each price..then order by and pick first
                         List<PriceCoordPair> yPairs = new List<PriceCoordPair>();
 
-                        yPairs.Add(new PriceCoordPair(nearestBar.Open, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Open, Bounds), "O:"));
-                        yPairs.Add(new PriceCoordPair(nearestBar.High, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.High, Bounds), "H:"));
-                        yPairs.Add(new PriceCoordPair(nearestBar.Low, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Low, Bounds), "L:"));
-                        yPairs.Add(new PriceCoordPair(nearestBar.Close, ChartPanel.MapYToScreen(_vm.YAxis, nearestBar.Close, Bounds), "C:"));
+                        double v = dataComponent.SnapPoints.Open.GetValueAt(nearestIndex);
+                        yPairs.Add(new PriceCoordPair(v, ChartPanel.MapYToScreen(_vm.YAxis, v, Bounds), "O:"));
+
+                        v = dataComponent.SnapPoints.High.GetValueAt(nearestIndex);
+                        yPairs.Add(new PriceCoordPair(v, ChartPanel.MapYToScreen(_vm.YAxis, v, Bounds), "H:"));
+
+                        v = dataComponent.SnapPoints.Low.GetValueAt(nearestIndex);
+                        yPairs.Add(new PriceCoordPair(v, ChartPanel.MapYToScreen(_vm.YAxis, v, Bounds), "L:"));
+
+                        v = dataComponent.SnapPoints.Close.GetValueAt(nearestIndex);
+                        yPairs.Add(new PriceCoordPair(v, ChartPanel.MapYToScreen(_vm.YAxis, v, Bounds), "C:"));
 
                         PriceCoordPair nearestPair = yPairs
                              .OrderBy(b => Math.Abs((b.YCoord - currentPos.Y)))

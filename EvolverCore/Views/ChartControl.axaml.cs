@@ -168,7 +168,7 @@ internal partial class ChartControl : UserControl
         smaProperties.PriceField = BarPriceValue.Close;
         smaProperties.Period = 14;
 
-        SMA? vi = Globals.Instance.DataManager.CreateIndicator(typeof(SMA), smaProperties, _volIndicator, CalculationSource.IndicatorPlot, 0) as SMA;
+        SMA? vi = Globals.Instance.DataTableManager.DepGraph.CreateIndicator(typeof(SMA), smaProperties, _volIndicator, CalculationSource.IndicatorPlot, 0) as SMA;
         if (vi == null)
         {
             Globals.Instance.Log.LogMessage("Failed to create indicator: SMA", LogLevel.Error);
@@ -197,7 +197,7 @@ internal partial class ChartControl : UserControl
         smaProperties.PriceField = BarPriceValue.Close;
         smaProperties.Period = 14;
 
-        SMA? vi = Globals.Instance.DataManager.CreateIndicator(typeof(SMA), smaProperties, ivm.Indicator, CalculationSource.BarData) as SMA;
+        SMA? vi = Globals.Instance.DataTableManager.DepGraph.CreateIndicator(typeof(SMA), smaProperties, ivm.Indicator, CalculationSource.BarData) as SMA;
         if (vi == null)
         {
             Globals.Instance.Log.LogMessage("Failed to create indicator: SMA", LogLevel.Error);
@@ -233,7 +233,7 @@ internal partial class ChartControl : UserControl
 
         IndicatorProperties properties = new IndicatorProperties();
 
-        Volume? vi = Globals.Instance.DataManager.CreateIndicator(typeof(Volume), properties, ivm.Indicator, CalculationSource.BarData) as Volume;
+        Volume? vi = Globals.Instance.DataTableManager.DepGraph.CreateIndicator(typeof(Volume), properties, ivm.Indicator, CalculationSource.BarData) as Volume;
         if (vi == null)
         {
             Globals.Instance.Log.LogMessage("Failed to create indicator: Volume", LogLevel.Error);
@@ -276,7 +276,7 @@ internal partial class ChartControl : UserControl
         DateTime startTime = new DateTime(2020, 1, 1, 8, 0, 0);
         DateTime endTime = interval.Add(startTime, size);
 
-        Indicator? indicator = Globals.Instance.DataManager.CreateDataIndicator(instrument, interval, startTime, endTime);
+        Indicator? indicator = Globals.Instance.DataTableManager.DepGraph.CreateDataIndicator(instrument, interval, startTime, endTime);
         if (indicator == null)
         {
             Globals.Instance.Log.LogMessage("Unable to create data indicator.", LogLevel.Error);

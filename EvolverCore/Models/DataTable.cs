@@ -1,7 +1,9 @@
 ﻿using Parquet.Data;
+using Parquet.File.Values.Primitives;
 using Parquet.Schema;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Reflection;
 
@@ -96,8 +98,8 @@ namespace EvolverCore.Models
 
         public long RowCount { get { return Table != null ? Table.RowCount : 0; } }
 
-        public DateTime MinTime { get { return Table != null ? Time[0] : DateTime.MinValue; }  }
-        public DateTime MaxTime { get { return Table != null ? Time[(int)Table.RowCount - 1] : DateTime.MinValue; }  }
+        public DateTime MinTime { get { return Table != null ? Time.GetValueAt(0) : DateTime.MinValue; } }
+        public DateTime MaxTime { get { return Table != null ? Time.GetValueAt((int)Table.RowCount - 1) : DateTime.MinValue; } }
 
         public DataTableColumn<DateTime> Time { get; private set; }
         public DataTableColumn<double> Open { get; private set; }
@@ -118,6 +120,41 @@ namespace EvolverCore.Models
         public void StartNewRow(DateTime time)
         {//Runs in the context of the connection data update worker
 
+        }
+
+
+        internal static BarTable GenerateRandomData(Instrument randomInstrument, DataInterval interval, DateTime startTime, int size, int seed)
+        {
+            DataTable dt = new DataTable(Bar.GetSchema(), size, TableType.Bar, randomInstrument, interval);
+            BarTable bt = new BarTable(dt);
+            //add random data to dt here...
+            Random r = new Random(seed);
+            DateTime start = startTime;
+
+            int lastClose = -1;
+            for (int i = 0; i < size; i++)
+            {
+                int open = lastClose == -1 ? r.Next(10, 100) : lastClose;
+                int close = r.Next(10, 100);
+                int volume = r.Next(100, 1000);
+                int high = open > close ? open + r.Next(0, 15) : close + r.Next(0, 15);
+                int low = open > close ? close - r.Next(0, 15) : open - r.Next(0, 15);
+
+                bt.Time.SetValueAt(start, i);
+                bt.Open.SetValueAt(open, i);
+                bt.Close.SetValueAt(close, i);
+                bt.High.SetValueAt(high, i);
+                bt.Low.SetValueAt(low, i);
+                bt.Volume.SetValueAt(volume, i);
+
+                bt.Bid.SetValueAt(open, i);
+                bt.Ask.SetValueAt(open, i);
+
+                lastClose = close;
+                start = interval.Add(start, 1);
+            }
+
+            return bt;
         }
     }
 
@@ -158,14 +195,17 @@ namespace EvolverCore.Models
 
     public class BarTablePointer
     {
-        public BarTablePointer(BarTable table, DateTime start, DateTime end)
+        public BarTablePointer(BarTable table, Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
             if (start > end)
                 throw new ArgumentException($"Start  must be less than or equal to end: start={start} end={end}");
 
             _table = table;
-            CurrentBar = 0;
+            CurrentBar = -1;
             State = TableLoadState.Loaded;
+            Instrument = instrument;
+            Interval = interval;
+
 
             Time = new ColumnPointer<DateTime>(this, table.Time);
             Open = new ColumnPointer<double>(this, table.Open);
@@ -179,10 +219,12 @@ namespace EvolverCore.Models
             CalculateOffsets(start, end);
         }
 
-        public BarTablePointer(BarTable? table)
+        public BarTablePointer(BarTable? table, Instrument instrument, DataInterval interval)
         {
             _table = table;
-            CurrentBar = 0;
+            CurrentBar = -1;
+            Instrument = instrument;
+            Interval = interval;
 
             if (_table != null) State = TableLoadState.Loaded;
 
@@ -195,9 +237,12 @@ namespace EvolverCore.Models
             Ask = new ColumnPointer<double>(this, table?.Ask);
             Volume = new ColumnPointer<long>(this, table?.Volume);
 
-            _startOffset = 0;
-            _endOffset = _table == null ? 0 : (int)_table.RowCount - 1;
+            StartOffset = 0;
+            EndOffset = _table == null ? 0 : (int)_table.RowCount - 1;
         }
+
+        public Instrument Instrument { get; private set; }
+        public DataInterval Interval { get; private set; }
 
         public TableLoadState State { get; private set; } = TableLoadState.NotLoaded;
 
@@ -226,6 +271,7 @@ namespace EvolverCore.Models
         private void setTable(BarTable? table, DateTime start, DateTime end)
         {
             _table = table;
+            CurrentBar = -1;
 
             Time = new ColumnPointer<DateTime>(this, table?.Time);
             Open = new ColumnPointer<double>(this, table?.Open);
@@ -238,13 +284,66 @@ namespace EvolverCore.Models
 
             if (_table == null)
             {
-                _startOffset = 0;
-                _endOffset = 0;
+                StartOffset = 0;
+                EndOffset = 0;
             }
             else
+            {
+                Instrument = _table.Instrument!;
+                Interval = (DataInterval)_table.Interval!;
+
                 CalculateOffsets(start, end);
+            }
         }
 
+        internal void ResetCurrentBar() { CurrentBar = -1; }
+        internal bool CurrentIsEnd() { return CurrentBar == EndOffset; }
+        internal void IncrementCurrentBar() { CurrentBar++; }
+
+        public DateTime MinTime(int lastCount)
+        {
+            if (RowCount == 0) return DateTime.MinValue;
+
+            DateTime result = DateTime.MaxValue;
+            int n = 1;
+            for (int i = EndOffset; i >= StartOffset; i--)
+            {
+                if (n++ > lastCount) return result;
+                if (Time.GetValueAt(i) < result) result = Time.GetValueAt(i);
+            }
+
+            return result;
+        }
+        public DateTime MaxTime(int lastCount)
+        {
+            if (RowCount == 0) return DateTime.MaxValue;
+
+            DateTime result = DateTime.MinValue;
+            int n = 1;
+            for (int i = EndOffset; i >= StartOffset; i--)
+            {
+                if (n++ > lastCount) return result;
+                if (Time.GetValueAt(i) > result) result = Time.GetValueAt(i);
+            }
+
+            return result;
+        }
+
+        public double CalculatePriceField(int barsAgo, BarPriceValue priceField)
+        {
+            //FIXME : CalculatePriceField(int barsAgo, BarPriceValue priceField)
+            return 0;
+        }
+
+        public BarTablePointer Slice(DateTime min, DateTime max)
+        {
+            if (_table == null) throw new NullReferenceException("Unable to slice non-existing table.");
+
+            if (min < Time[0] || max > Time[(int)_table.RowCount - 1])
+                throw new ArgumentOutOfRangeException("Slice dates out of range.");
+
+            return new BarTablePointer(_table, _table.Instrument!, (DataInterval)_table.Interval!, min, max);
+        }
 
         internal void CalculateOffsets(DateTime start, DateTime end)
         {
@@ -254,18 +353,18 @@ namespace EvolverCore.Models
             if (startIndex == -1 || endIndex == -1)
                 throw new EvolverException("Unable to locate start/end time index values.");
 
-            _startOffset = startIndex;
-            _endOffset = endIndex;
+            StartOffset = startIndex;
+            EndOffset = endIndex;
         }
 
-        int _startOffset;
-        int _endOffset;
+        internal int StartOffset { get; private set; }
+        internal int EndOffset { get; private set; }
 
         BarTable? _table;
 
         public int CurrentBar { get; private set; }
 
-        public int RowCount { get { return _endOffset - _startOffset; } }
+        public int RowCount { get { return EndOffset - StartOffset; } }
 
         public ColumnPointer<DateTime> Time { get; private set; }
         public ColumnPointer<double> Open { get; private set; }
@@ -277,16 +376,49 @@ namespace EvolverCore.Models
         public ColumnPointer<long> Volume { get; private set; }
     }
 
-    public class DataTable
+    public class DataTableBase
     {
-        List<IDataTableColumn> _columns;
+        internal List<IDataTableColumn> Columns { get; set; } = new List<IDataTableColumn>();
+        private object _lock = new object();
+        internal DataTableBase() { }
+
+        public IDataTableColumn? Column(string name)
+        {
+            lock (_lock) { return Columns.FirstOrDefault(c => c.Name == name); }
+        }
+
+        public int RowCount { get { lock (_lock) { return Columns.Count > 0 ? Columns[0].Count : 0; } } }
+
+        public void AddColumn(string name)
+        {
+            int size = 0;
+            if (Columns.Count > 0) size = Columns[0].Count;
+
+            Columns.Add(new DataTableColumn<double>(name, DataType.Double, size));
+        }
+
+        public DataTableColumn<double> this[int colIndex]
+        {
+            get
+            {
+                DataTableColumn<double>? c = Columns[colIndex] as DataTableColumn<double>;
+                if (c == null)
+                    throw new EvolverException("DataTableBase column is not of type double.");
+                return c;
+            }
+        }
+    }
+
+    public class DataTable : DataTableBase
+    {
+        //List<IDataTableColumn> _columns;
         ParquetSchema _pSchema;
         object _lock = new object();
 
-        public DataTable(ParquetSchema pSchema, int columnSize, TableType type, Instrument instrument, DataInterval interval)
+        public DataTable(ParquetSchema pSchema, int columnSize, TableType type, Instrument instrument, DataInterval interval) : base()
         {
             _pSchema = pSchema;
-            _columns = new List<IDataTableColumn>();
+            //_columns = new List<IDataTableColumn>();
             Instrument = instrument;
             Interval = interval;
             TableType = type;
@@ -294,21 +426,12 @@ namespace EvolverCore.Models
             createColumnsFromParquetSchema(columnSize);
         }
 
-
         public Instrument Instrument { get; init; }
         public DataInterval Interval { get; init; }
 
         public TableType TableType { get; init; }
-        public int RowCount { get { lock (_lock) { return _columns.Count > 0 ? _columns[0].Count : 0; } } }
-
+        
         public ParquetSchema Schema { get { lock (_lock) { return _pSchema; } } }
-
-        public IDataTableColumn? Column(string name)
-        {
-            lock (_lock) { return _columns.FirstOrDefault(c => c.Name == name); }
-        }
-
-        private List<IDataTableColumn> Columns { get { return _columns; } }
 
         public DataColumn ExportDataColumn(string name)
         {
@@ -332,23 +455,23 @@ namespace EvolverCore.Models
         {
             lock (_lock)
             {
-                _columns.Clear();
+                Columns.Clear();
 
                 foreach (DataField field in _pSchema.DataFields)
                 {
                     if (field.ClrType == typeof(DateTime))
-                        _columns.Add(new DataTableColumn<DateTime>(field.Name, DataType.DateTime, columnSize));
+                        Columns.Add(new DataTableColumn<DateTime>(field.Name, DataType.DateTime, columnSize));
                     else if (field.ClrType == typeof(double))
-                        _columns.Add(new DataTableColumn<double>(field.Name, DataType.Double, columnSize));
+                        Columns.Add(new DataTableColumn<double>(field.Name, DataType.Double, columnSize));
                     else if (field.ClrType == typeof(long))
-                        _columns.Add(new DataTableColumn<long>(field.Name, DataType.Int64, columnSize));
+                        Columns.Add(new DataTableColumn<long>(field.Name, DataType.Int64, columnSize));
                     else if (field.ClrType == typeof(int))
-                        _columns.Add(new DataTableColumn<int>(field.Name, DataType.Int32, columnSize));
+                        Columns.Add(new DataTableColumn<int>(field.Name, DataType.Int32, columnSize));
                     else if (field.ClrType == typeof(byte))
-                        _columns.Add(new DataTableColumn<byte>(field.Name, DataType.UInt8, columnSize));
+                        Columns.Add(new DataTableColumn<byte>(field.Name, DataType.UInt8, columnSize));
                     else
                     {
-                        _columns.Clear();
+                        Columns.Clear();
                         throw new Exception($"Unhandled parquet column type {field.ClrType.ToString()}");
                     }
                 }
@@ -359,12 +482,12 @@ namespace EvolverCore.Models
         {
             lock (_lock)
             {
-                if (table._columns.Count != _columns.Count) return false;
-                for (int i = 0; i < table._columns.Count; i++)
+                if (table.Columns.Count != Columns.Count) return false;
+                for (int i = 0; i < table.Columns.Count; i++)
                 {
-                    IDataTableColumn c = table._columns[i];
-                    if (c.Name != _columns[i].Name) return false;
-                    if (c.DataType != _columns[i].DataType) return false;
+                    IDataTableColumn c = table.Columns[i];
+                    if (c.Name != Columns[i].Name) return false;
+                    if (c.DataType != Columns[i].DataType) return false;
                 }
 
                 return true;
@@ -375,12 +498,12 @@ namespace EvolverCore.Models
         {
             lock (_lock)
             {
-                if (columns.Length != _columns.Count) return false;
+                if (columns.Length != Columns.Count) return false;
                 for (int i = 0; i < columns.Length; i++)
                 {
                     DataColumn c = columns[i];
-                    if (c.Field.Name != _columns[i].Name) return false;
-                    switch (_columns[i].DataType)
+                    if (c.Field.Name != Columns[i].Name) return false;
+                    switch (Columns[i].DataType)
                     {
                         case DataType.DateTime: if (c.Field.ClrType != typeof(DateTime)) return false; break;
                         case DataType.Int64: if (c.Field.ClrType != typeof(long)) return false; break;
@@ -407,7 +530,7 @@ namespace EvolverCore.Models
 
                 for (int i = 0; i < columns.Length; i++)
                 {
-                    _columns[i].AddDataColumn(columns[i]);
+                    Columns[i].AddDataColumn(columns[i]);
                 }
             }
         }
@@ -421,9 +544,9 @@ namespace EvolverCore.Models
                 //TODO:verify alignment
 
 
-                for (int i = 0; i < _columns.Count; i++)
+                for (int i = 0; i < Columns.Count; i++)
                 {
-                    _columns[i].AddDataColumn(table._columns[i]);
+                    Columns[i].AddDataColumn(table.Columns[i]);
                 }
             }
         }
@@ -436,14 +559,14 @@ namespace EvolverCore.Models
 
                 DataTable sliceTable = new DataTable(Schema, 0,TableType, Instrument, Interval);
 
-                for (int i = 0; i < _columns.Count; i++)
+                for (int i = 0; i < Columns.Count; i++)
                 {
-                    IDataTableColumn srcColumn = _columns[i];
+                    IDataTableColumn srcColumn = Columns[i];
                     IDataTableColumn newCol = srcColumn.ExportDynamics();
                     newColumns.Add(newCol);
                 }
 
-                sliceTable._columns = newColumns;
+                sliceTable.Columns = newColumns;
                 return sliceTable;
             }
         }
@@ -455,14 +578,14 @@ namespace EvolverCore.Models
                 List<IDataTableColumn> newColumns = new List<IDataTableColumn>();
                 DataTable sliceTable = new DataTable(Schema, 0, TableType, Instrument, Interval);
 
-                for (int i = 0; i < _columns.Count; i++)
+                for (int i = 0; i < Columns.Count; i++)
                 {
-                    IDataTableColumn srcColumn = _columns[i];
+                    IDataTableColumn srcColumn = Columns[i];
                     IDataTableColumn newCol = srcColumn.ExportRange(index, length);
                     newColumns.Add(newCol);
                 }
 
-                sliceTable._columns = newColumns;
+                sliceTable.Columns = newColumns;
                 return sliceTable;
             }
         }

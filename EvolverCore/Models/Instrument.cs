@@ -58,39 +58,39 @@ namespace EvolverCore.Models
     }
 
 
-    public class InstrumentDataLoadedEventArgs
-    {
-        public InstrumentDataLoadedEventArgs(InstrumentDataSlice slice) { Exception = null; Slice = slice; }
-        public InstrumentDataLoadedEventArgs(Exception? e = null) { Exception = e; Slice = null; }
-        public Exception? Exception { private set; get; }
-        public InstrumentDataSlice? Slice { private set; get; }
-    }
+    //public class InstrumentDataLoadedEventArgs
+    //{
+    //    public InstrumentDataLoadedEventArgs(InstrumentDataSlice slice) { Exception = null; Slice = slice; }
+    //    public InstrumentDataLoadedEventArgs(Exception? e = null) { Exception = e; Slice = null; }
+    //    public Exception? Exception { private set; get; }
+    //    public InstrumentDataSlice? Slice { private set; get; }
+    //}
 
-    public class InstrumentDataRecord
-    {
-        public string InstrumentName { get; internal set; } = string.Empty;
+    //public class InstrumentDataRecord
+    //{
+    //    public string InstrumentName { get; internal set; } = string.Empty;
 
-        public DataInterval Interval { get; internal set; } = new DataInterval(IntervalSpan.Minute, 1);
-        public DateTime StartTime { get; internal set; }
-        public DateTime EndTime { get; internal set; }
+    //    public DataInterval Interval { get; internal set; } = new DataInterval(IntervalSpan.Minute, 1);
+    //    public DateTime StartTime { get; internal set; }
+    //    public DateTime EndTime { get; internal set; }
 
-        public DataLoadState LoadState { get; internal set; } = DataLoadState.NotLoaded;
+    //    public DataLoadState LoadState { get; internal set; } = DataLoadState.NotLoaded;
 
-        public event EventHandler<InstrumentDataLoadedEventArgs>? DataLoaded;
+    //    public event EventHandler<InstrumentDataLoadedEventArgs>? DataLoaded;
 
-        internal void FireDataLoadFailed(Exception e)
-        {
-            LoadState = DataLoadState.Error;
-            DataLoaded?.Invoke(this, new InstrumentDataLoadedEventArgs(e));
-        }
-        internal void FireDataLoadCompleted(InstrumentDataSlice slice)
-        {
-            LoadState = DataLoadState.Loaded;
-            DataLoaded?.Invoke(this, new InstrumentDataLoadedEventArgs(slice));
-        }
+    //    internal void FireDataLoadFailed(Exception e)
+    //    {
+    //        LoadState = DataLoadState.Error;
+    //        DataLoaded?.Invoke(this, new InstrumentDataLoadedEventArgs(e));
+    //    }
+    //    internal void FireDataLoadCompleted(InstrumentDataSlice slice)
+    //    {
+    //        LoadState = DataLoadState.Loaded;
+    //        DataLoaded?.Invoke(this, new InstrumentDataLoadedEventArgs(slice));
+    //    }
 
-        public string FileName { get; internal set; } = string.Empty;
+    //    public string FileName { get; internal set; } = string.Empty;
 
-        public InstrumentDataSeries? Data { get; internal set; } = null;
-    }
+    //    public InstrumentDataSeries? Data { get; internal set; } = null;
+    //}
 }

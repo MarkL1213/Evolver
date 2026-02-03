@@ -43,7 +43,7 @@ namespace EvolverCore
 
             try
             {
-                Globals.Instance.DataManager.Shutdown();
+                Globals.Instance.DataTableManager.Shutdown();
             }
             catch (Exception ex)
             {

@@ -1,5 +1,4 @@
-﻿using EvolverCore.Models.DataV2;
-using Parquet.Data;
+﻿using Parquet.Data;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
@@ -43,6 +42,40 @@ namespace EvolverCore.Models
             return dataColumn.FindIndex(item);
         }
 
+        public int FindIndex(T item)
+        {
+            DataTableColumn<T>? dataColumn = _column as DataTableColumn<T>;
+            if (dataColumn == null) return -1;
+
+            return dataColumn.FindIndex(item, _parentTable.StartOffset, _parentTable.EndOffset);
+        }
+
+        public int GetNearestIndex(T item)
+        {
+            //FIXME: find the first nearest (up or down) item
+            return -1;
+        }
+
+        public int Count
+        {
+            get
+            {
+                return _parentTable.RowCount;
+            }
+        }
+
+        public T Min()
+        {
+            //FIXME: find the smallest item
+            return default(T);
+        }
+
+        public T Max()
+        {
+            //FIXME: find the largest item
+            return default(T);
+        }
+
         public T this[int barsAgo]
         {
             get
@@ -72,12 +105,12 @@ namespace EvolverCore.Models
         public void AddDataColumn(DataColumn column);
         public void AddDataColumn(IDataTableColumn column);
 
-        public void SetValues(List<object> values);
+        //public void SetValues(List<object> values);
     }
 
     public static class DataTableColumnFactory
     {
-        public static DataTableColumn<T> CopyBlankTableColumn<T>(IDataTableColumn sourceColumn)
+        public static DataTableColumn<T> CopyBlankTableColumn<T>(IDataTableColumn sourceColumn) where T : struct
         {
             DataTableColumn<T> c = new DataTableColumn<T>(sourceColumn.Name, sourceColumn.DataType, sourceColumn.Count);
             return c;
@@ -86,7 +119,7 @@ namespace EvolverCore.Models
 
 
 
-    public class DataTableColumn<T> : IDataTableColumn
+    public class DataTableColumn<T> : IDataTableColumn where T : struct
     {
         public DataTableColumn(string name, DataType dataType, int columnSize)
         {
@@ -143,7 +176,7 @@ namespace EvolverCore.Models
             RecalcOffsets();
         }
 
-        public void InitValues(List<object> values)
+        public void InitValues(List<T> values)
         {
             Array a = values.ToArray();
             _dataArrays.Add(a);
@@ -153,9 +186,9 @@ namespace EvolverCore.Models
 
         public IDataTableColumn ExportRange(int index, int length)
         {
-            IDataTableColumn newCol = DataTableColumnFactory.CopyBlankTableColumn<T>(this);
+            DataTableColumn<T> newCol = DataTableColumnFactory.CopyBlankTableColumn<T>(this);
 
-            List<object> values = new List<object>();
+            List<T> values = new List<T>();
             for (int i = index; i < index + length; i++)
                 values.Add(GetValueAt(i));
 
@@ -174,7 +207,7 @@ namespace EvolverCore.Models
             return newCol;
         }
 
-        public void SetValues(List<object> values)
+        public void SetValues(List<T> values)
         {
             _series.Clear();
             _dataArrays.Clear();
@@ -240,13 +273,31 @@ namespace EvolverCore.Models
             return allData.ToArray();
         }
 
+        public ColumnPointer<T> Slice(T min, T max)
+        {
+            throw new NotImplementedException();
+        }
+
+        public int FindIndex(T item, int start, int end) { return FindIndexRecursive(item, start, end); }
+
         public int FindIndex(T item) { return FindIndexRecursive(item, 0, RowCount()); }
 
         private int FindIndexRecursive(T item, int start, int end)
         {
             int mid = (end - start) / 2 + start;
-            T value = (T)GetValueAt(mid);
-            if (value.Equals(item)) return mid;
+            T value = GetValueAt(mid);
+            switch (DataType)
+            {
+                case DataType.Double:
+                    if ((double)(object)value! == (double)(object)item!) return mid;
+                    break;
+                case DataType.DateTime:
+                    if ((DateTime)(object)value! == (DateTime)(object)item!) return mid;
+                    break;
+                default:
+                    throw new EvolverException("Unknown data type in FindIndex.");
+            }
+            
             
             IComparable? itemComparable = item as IComparable;
             if(itemComparable == null) return -1;
@@ -255,10 +306,10 @@ namespace EvolverCore.Models
             else return FindIndexRecursive(item, mid + 1, end);
         }
 
-        public T this[int index]
+        public T this[int barsAgo]
         {
-            get { return (T)GetValueAt(index); }
-            internal set { SetValueAt(value, index); }
+            get { return (T)GetValueAt(Count - 1 - barsAgo); }
+            internal set { SetValueAt(value, Count - 1 - barsAgo); }
         }
     }
 }

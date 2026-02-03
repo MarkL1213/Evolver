@@ -9,7 +9,7 @@ namespace EvolverCore.Models.Indicators
         public void ConfigurePlots()
         {
             PlotProperties plotProperties = new PlotProperties();
-            Outputs.Add(new OutputPlot("MACD", plotProperties, PlotStyle.Line));
+            AddOutput(new OutputPlot("MACD", plotProperties, PlotStyle.Line));
         }
 
         //public override void Calculate()

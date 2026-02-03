@@ -21,10 +21,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.9" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.9" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.9" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.9" />
+    <PackageReference Include="Avalonia" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.11" />
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.1.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -32,7 +32,7 @@
     <PackageReference Include="NP.Ava.UniDock" Version="1.0.19" />
     <PackageReference Include="NP.Ava.Visuals" Version="1.0.48" />
     <PackageReference Include="NP.IoCy" Version="1.0.34" />
-    <PackageReference Include="Parquet.Net" Version="5.4.0" />
+    <PackageReference Include="Parquet.Net" Version="5.5.0" />
   </ItemGroup>
 
   <ItemGroup>

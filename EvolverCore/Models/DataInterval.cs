@@ -230,7 +230,26 @@ namespace EvolverCore.Models
 
         public static DataInterval? TryParseString(string s)
         {
-            return null;//FIXME: implement DataInterval? TryParseString(string s)
+            if (string.IsNullOrWhiteSpace(s))
+                return null;
+
+            string input = s.Trim();
+            int digitEnd = 0;
+            while (digitEnd < input.Length && char.IsDigit(input[digitEnd]))
+                digitEnd++;
+
+            int value = 1; // default when no number
+            if (digitEnd > 0)
+            {
+                if (!int.TryParse(input.Substring(0, digitEnd), out value) || value <= 0)
+                    return null;
+            }
+
+            string typePart = input.Substring(digitEnd);
+            if (!Enum.TryParse<IntervalSpan>(typePart, ignoreCase: true, out IntervalSpan interval))
+                return null;
+
+            return new DataInterval(interval, value);
         }
     }
 }

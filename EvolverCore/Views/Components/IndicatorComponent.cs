@@ -16,9 +16,9 @@ namespace EvolverCore.Views
         {
             if (vivm.Indicator == null) return;
 
-            for (int i = 0; i < vivm.Indicator.Outputs.Count; i++)
+            for (int i = 0; i < vivm.Indicator.Plots.Count; i++)
             {
-                OutputPlot oPlot = vivm.Indicator.Outputs[i];
+                OutputPlot oPlot = vivm.Indicator.Plots[i];
                 ChartPlotViewModel plotVM = new ChartPlotViewModel();
                 plotVM.PlotIndex = i;
                 plotVM.Indicator = vivm;
