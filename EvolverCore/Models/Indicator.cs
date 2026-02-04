@@ -453,9 +453,12 @@ namespace EvolverCore.Models
 
         internal BarTablePointer SliceSourcePointsInRange(DateTime min, DateTime max)
         {
-            if (_sourceRecord != null)
+            if (_sourceRecord != null )
             {
-                return Bars[0].Slice(min, max);
+                if (Bars[0].State == TableLoadState.Loaded)
+                    return Bars[0].Slice(min, max);
+                else
+                    return new BarTablePointer(null, Bars[0].Instrument, Bars[0].Interval);
             }
 
             throw new EvolverException("No source defined.");
@@ -463,11 +466,14 @@ namespace EvolverCore.Models
 
         internal (int min, int max) IndexOfSourcePointsInRange(DateTime min, DateTime max)
         {
-            int minIndex = Bars[0].Time.FindIndex(min);
-            int maxIndex = Bars[0].Time.FindIndex(max);
+            int minIndex = -1;
+            int maxIndex = -1;
 
-            if (minIndex == -1 || maxIndex == -1)
-                throw new IndexOutOfRangeException("Unable to slice min/max out of range.");
+            if (_sourceRecord != null && Bars[0].State == TableLoadState.Loaded)
+            {
+                minIndex = Bars[0].Time.FindIndex(min);
+                maxIndex = Bars[0].Time.FindIndex(max);
+            }
 
             return (minIndex, maxIndex);
         }

@@ -1,9 +1,14 @@
-﻿using Parquet;
+﻿using NP.Utilities;
+using Parquet;
 using Parquet.Data;
+using Parquet.File.Values.Primitives;
 using Parquet.Schema;
 using System;
+using System.Linq;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
@@ -109,13 +114,12 @@ namespace EvolverCore.Models
         private DataTableRecordCollection _recordCollection = new DataTableRecordCollection();
 
         private object _tablesLock = new object();
-        private Dictionary<string, Dictionary<DataInterval, BarTable>> _barTables = new Dictionary<string, Dictionary<DataInterval, BarTable>>();
+        private Dictionary<string, Dictionary<DataInterval, List<BarTable>>> _barTables = new Dictionary<string, Dictionary<DataInterval, List<BarTable>>>();
 
         private bool _disposedValue = false;
         private bool _isShutdown = false;
         private Thread _dataStoreWorker;
-        private object _jobQueueLock = new object();
-        private BlockingCollection<Func<CancellationToken, Task>> _dataJobQueue = new BlockingCollection<Func<CancellationToken,Task>>();
+        private BlockingCollection<Func<CancellationToken, Task>> _dataJobQueue = new BlockingCollection<Func<CancellationToken, Task>>();
         private CancellationTokenSource _cts = new CancellationTokenSource();
 
         internal event EventHandler? DataWarehouseWorkerError = null;
@@ -124,6 +128,7 @@ namespace EvolverCore.Models
         {
             _dataStoreWorker = new Thread(dataStoreWorker);
             _dataStoreWorker.Name = "DataWarehouse Worker";
+            _dataStoreWorker.Start();
             _tableManager = tableManager;
         }
 
@@ -134,36 +139,35 @@ namespace EvolverCore.Models
 
         internal void DataUpdate(ConnectionDataUpdateEventArgs args)
         {//Runs in the context of the connection data update worker
-            lock(_tablesLock)
+            lock (_tablesLock)
             {
                 if (!_barTables.ContainsKey(args.Instrument.Name)) return;
 
                 foreach (DataInterval interval in _barTables[args.Instrument.Name].Keys)
                 {
-                    BarTable table = _barTables[args.Instrument.Name][interval];
-                    if (!table.IsLive) continue;
+                    List<BarTable> tables = _barTables[args.Instrument.Name][interval];
+                    foreach (BarTable table in tables)
+                    {
+                        if (!table.IsLive) continue;
 
-                    table.AddTick(args.Time, args.Bid, args.Ask, args.Volume);
+                        table.AddTick(args.Time, args.Bid, args.Ask, args.Volume);
+                    }
                 }
             }
         }
 
         internal void EnqueueDataSaveJob(DataSaveJob job)
         {
-            lock (_jobQueueLock)
-            {
-                if (_isShutdown) return;
-                _dataJobQueue.Add((token) => ExecuteDataSaveJob(token, job));
-            }
+
+            if (_isShutdown) return;
+            _dataJobQueue.Add((token) => ExecuteDataSaveJob(token, job));
         }
 
         internal void EnqueueDataLoadJob(DataLoadJob job)
         {
-            lock (_jobQueueLock)
-            {
-                if (_isShutdown) return;
-                _dataJobQueue.Add((token) => ExecuteDataLoadJob(token, job));
-            }
+
+            if (_isShutdown) return;
+            _dataJobQueue.Add((token) => ExecuteDataLoadJob(token, job));
         }
 
         private async Task ExecuteDataSaveJob(CancellationToken token, DataSaveJob job)
@@ -177,13 +181,145 @@ namespace EvolverCore.Models
             {
                 Globals.Instance.Log.LogMessage($"Failed to save {job.Table.Interval} data for '{job.Table.Instrument!.Name}'", LogLevel.Error);
                 Globals.Instance.Log.LogException(ex);
-                
+
                 job.FireJobDone(ex.Message);
                 return;
             }
 
             job.FireJobDone();
         }
+
+
+
+        private async Task<BarTable> DownloadDataChunk(Instrument instrument, DataInterval interval, DateTime start, DateTime end, CancellationToken token)
+        {
+            try
+            {
+                //FIXME : implement download
+                throw new NotImplementedException("DownloadDataChunk");
+            }
+            catch (Exception ex)
+            {
+                Globals.Instance.Log.LogMessage($"Failed to download {interval.ToString()} data for '{instrument.Name}': From={start} To={end}", LogLevel.Error);
+                Globals.Instance.Log.LogException(ex);
+
+                throw new EvolverException("Data load failure.", ex);
+            }
+        }
+
+        private (bool eventFired, List<(DateTime start, DateTime end, BarTable table)> cacheCoverages) determineCacheCovereage(DataLoadJob job)
+        {
+            List<(DateTime start, DateTime end, BarTable table)> cacheCoverages = new List<(DateTime start, DateTime end, BarTable table)>();
+
+            lock (_tablesLock)
+            {
+                if (_barTables.ContainsKey(job.Instrument.Name) && _barTables[job.Instrument.Name].ContainsKey(job.Interval))
+                {
+                    foreach (BarTable table in _barTables[job.Instrument.Name][job.Interval])
+                    {
+                        if (job.StartTime >= table.MinTime && job.EndTime <= table.MaxTime)
+                        {
+                            job.FireJobDone(table);
+                            return (true, cacheCoverages.OrderBy(c=>c.start).ToList());
+                        }
+
+                        bool overlapStart = job.StartTime > table.MinTime;
+                        bool overlapEnd = job.EndTime < table.MaxTime;
+
+                        if (overlapStart || overlapEnd)
+                        {
+                            cacheCoverages.Add((table.MinTime, table.MaxTime, table));
+                        }
+                    }
+                }
+            }
+
+            return (false, cacheCoverages.OrderBy(c => c.start).ToList());
+        }
+
+        private List<(DateTime start, DateTime end)> determineMissingPeriods(DataLoadJob job, List<(DateTime start, DateTime end, BarTable table)> cacheCoverages)
+        {
+            List<(DateTime start, DateTime end)> missingPeriods = new List<(DateTime start, DateTime end)>();
+            if (cacheCoverages.Count == 0) missingPeriods.Add((job.StartTime, job.EndTime));
+            else
+            {
+                // Initial gap (before first cached piece)
+                (DateTime start, DateTime end, BarTable table) first = cacheCoverages[0];
+                DateTime initialGapEnd = job.Interval.Add(first.start, -1);
+                if (job.StartTime > first.start)
+                    missingPeriods.Add((job.StartTime, initialGapEnd));
+
+                DateTime currentEnd = first.end;
+                for (int i = 1; i < cacheCoverages.Count; i++)
+                {
+                    var cov = cacheCoverages[i];
+                    DateTime gapStart = job.Interval.Add(currentEnd, 1);
+                    DateTime gapEnd = job.Interval.Add(cov.start, -1);
+
+                    if (gapEnd < job.EndTime)
+                        missingPeriods.Add((gapStart, gapEnd));
+
+                    currentEnd = cov.end;
+                }
+
+                // Final gap (after last cached piece)
+                DateTime finalGapStart = job.Interval.Add(currentEnd, 1);
+                if (finalGapStart < job.EndTime)
+                    missingPeriods.Add((finalGapStart, job.EndTime));
+            }
+            return missingPeriods.OrderBy(t=>t.start).ToList();
+        }
+
+
+        private async Task<List<(DateTime start, DateTime end, BarTable dt)>> buildLoadJobChunks(DataLoadJob job,
+            List<(DateTime start, DateTime end)> missingPeriods,
+            List<(DateTime start, DateTime end)> availableDatesOnDisk,
+            CancellationToken token
+            )
+        {
+            List<(DateTime start, DateTime end, BarTable dt)> chunks = new List<(DateTime start, DateTime end, BarTable dt)> ();
+
+            int mpIdx=0;
+            int adodIdx = 0;
+
+            while (true)
+            {
+                if (mpIdx < missingPeriods.Count && missingPeriods[mpIdx].start < (adodIdx < availableDatesOnDisk.Count ? availableDatesOnDisk[adodIdx].start : DateTime.MaxValue))
+                {
+                    BarTable dt = await DownloadDataChunk(job.Instrument, job.Interval, missingPeriods[mpIdx].start, missingPeriods[mpIdx].end, token);
+                    chunks.Add((missingPeriods[mpIdx].start, missingPeriods[mpIdx].end, dt));
+                    mpIdx++;
+                }
+                else if (adodIdx < availableDatesOnDisk.Count)
+                {
+                    BarTable dt;
+                    bool loadFailed = false;
+                    try
+                    {
+                        dt = await DataWarehouse.ReadToDataTableAsync(token, job.Instrument, job.Interval, availableDatesOnDisk[adodIdx].start, availableDatesOnDisk[adodIdx].end);
+                        chunks.Add((availableDatesOnDisk[adodIdx].start, availableDatesOnDisk[adodIdx].end, dt));
+                    }
+                    catch
+                    {
+                        loadFailed = true;
+                    }
+
+                    if (loadFailed)
+                    {
+                        dt = await DownloadDataChunk(job.Instrument, job.Interval, availableDatesOnDisk[adodIdx].start, availableDatesOnDisk[adodIdx].end, token);
+                        chunks.Add((availableDatesOnDisk[adodIdx].start, availableDatesOnDisk[adodIdx].end, dt));
+                    }
+                    
+                    adodIdx++;
+                }
+
+                if (mpIdx >= missingPeriods.Count && adodIdx >= availableDatesOnDisk.Count)
+                    break;
+            }
+
+            return chunks.OrderBy(t => t.start).ToList();
+        }
+
 
         private async Task ExecuteDataLoadJob(CancellationToken token, DataLoadJob job)
         {
@@ -193,52 +329,67 @@ namespace EvolverCore.Models
             }
             else
             {
-                BarTable? loadedTable = null;
+                (bool eventFired, List<(DateTime start, DateTime end, BarTable table)> cacheCoverages) =
+                    determineCacheCovereage(job);
+                if (eventFired) return;
+
+                DataAvailability availability = _recordCollection.IsDataAvailable(job.Instrument, job.Interval, job.StartTime, job.EndTime);
+                List<(DateTime start, DateTime end)> missingPeriods = determineMissingPeriods(job, cacheCoverages);
+
+                List<(DateTime start, DateTime end, BarTable table)> chunks = await buildLoadJobChunks(job, missingPeriods, availability.AvailableDates, token);
+
+
+                DataTable mergeTable = new DataTable(Bar.GetSchema(), 0, TableType.Bar, job.Instrument, job.Interval);
+
+                int ccIdx = 0;
+                int chunkIdx = 0;
+
+                while (true)
+                {
+                    if (ccIdx < cacheCoverages.Count && cacheCoverages[ccIdx].start < (chunkIdx < chunks.Count ? chunks[chunkIdx].start : DateTime.MaxValue))
+                    {
+                        mergeTable.AppendTable(cacheCoverages[ccIdx].table.Table);
+                        ccIdx++;
+                    }
+                    else if (chunkIdx < chunks.Count)
+                    {
+                        mergeTable.AppendTable(chunks[chunkIdx].table.Table);
+                        chunkIdx++;
+                    }
+
+                    if (ccIdx >= cacheCoverages.Count && chunkIdx >= chunks.Count)
+                        break;
+                }
+
+                BarTable resultTable = new BarTable(mergeTable);
+
                 lock (_tablesLock)
                 {
-                    if (_barTables.ContainsKey(job.Instrument.Name))
+                    if (!_barTables.ContainsKey(job.Instrument.Name))
+                        _barTables.Add(job.Instrument.Name, new Dictionary<DataInterval, List<BarTable>>());
+
+                    if (!_barTables[job.Instrument.Name].ContainsKey(job.Interval))
+                        _barTables[job.Instrument.Name].Add(job.Interval, new List<BarTable>());
+
+                    _barTables[job.Instrument.Name][job.Interval].Add(resultTable);
+
+                    if (_barTables.ContainsKey(job.Instrument.Name) && _barTables[job.Instrument.Name].ContainsKey(job.Interval))
                     {
-                        if (_barTables[job.Instrument.Name].ContainsKey(job.Interval))
+                        List<BarTable> cacheList = _barTables[job.Instrument.Name][job.Interval];
+                        foreach ((DateTime start, DateTime end, BarTable table) cacheEntry in cacheCoverages)
                         {
-                            loadedTable = _barTables[job.Instrument.Name][job.Interval];
+                            List<BarTablePointer> pointers = cacheEntry.table.RegisteredPointers.ToList();
+
+                            foreach (BarTablePointer pointer in pointers)
+                                pointer.SetTable(resultTable, pointer.Time.GetValueAt(0), pointer.Time.GetValueAt(pointer.Time.Count - 1));
+
+                            cacheList.Remove(cacheEntry.table);
                         }
                     }
                 }
 
-                if (loadedTable == null)
-                {
-                    try
-                    {
-                        loadedTable = await DataWarehouse.ReadToDataTableAsync(token, job.Instrument, job.Interval, job.StartTime, job.EndTime);
-
-                        lock (_tablesLock)
-                        {
-                            if (_barTables.ContainsKey(job.Instrument.Name))
-                            {
-                                if (_barTables[job.Instrument.Name].ContainsKey(job.Interval))
-                                    _barTables[job.Instrument.Name][job.Interval] = loadedTable;
-                                else
-                                    _barTables[job.Instrument.Name].Add(job.Interval, loadedTable);
-                            }
-                            else
-                            {
-                                _barTables.Add(job.Instrument.Name, new Dictionary<DataInterval, BarTable>());
-                                _barTables[job.Instrument.Name].Add(job.Interval, loadedTable);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Globals.Instance.Log.LogMessage($"Failed to read {job.Interval.ToString()} data for '{job.Instrument.Name}': From={job.StartTime} To={job.EndTime}", LogLevel.Error);
-                        Globals.Instance.Log.LogException(ex);
-                        job.FireJobDone(ex.Message);
-                        return;
-                    }
-                }
-
-                job.FireJobDone(loadedTable);
+                job.FireJobDone(resultTable);
             }
-           
         }
 
         private void dataStoreWorker()
@@ -252,10 +403,7 @@ namespace EvolverCore.Models
                     Func<CancellationToken, Task> action;
                     try
                     {
-                        lock (_jobQueueLock)
-                        {
-                            action = _dataJobQueue.Take(token);
-                        }
+                        action = _dataJobQueue.Take(token);
                     }
                     catch (OperationCanceledException) { break; }
                     catch (InvalidOperationException) { break; }
@@ -303,12 +451,31 @@ namespace EvolverCore.Models
 
         internal BarTablePointer CreateTablePointer(Instrument instrument, DataInterval interval, DateTime start, DateTime end, bool isLive = false)
         {
-            //FIXME: create a new BarTablePointer 
+            BarTablePointer btp = new BarTablePointer(null, instrument, interval);
+            DataLoadJob job = new DataLoadJob(instrument, interval, start, end);
+            BarTable? bt = null;
 
-            //try to create from cache if possible.
+            lock (_tablesLock)
+            {
+                if (_barTables.ContainsKey(instrument.Name) && _barTables[instrument.Name].ContainsKey(interval))
+                {
+                    foreach (BarTable table in _barTables[instrument.Name][interval])
+                    {
+                        if (table.MinTime >= start && table.MaxTime <= end)
+                            bt = table;
+                    }
+                }
+            }
 
-            //if not create pointer in loading state and enqueue load job, wired to the pointer.
-            throw new NotImplementedException();
+            if (bt != null)
+            {
+                btp.OnDataTableLoaded(this, new DataLoadJobDoneArgs(job, bt));
+                return btp;
+            }
+
+            job.JobDone += btp.OnDataTableLoaded;
+            EnqueueDataLoadJob(job);
+            return btp;
         }
 
 
@@ -379,7 +546,7 @@ namespace EvolverCore.Models
                 throw new Exception($"No data files found for intrument={instrument.Name} interval={interval.ToString()} start={start.ToString()} end={end.ToString()}");
 
             DataTable? table = null;
-            
+
             for (int i = 0; i < filesToLoad.Count; i++)
             {
                 string filePath = filesToLoad[i];
@@ -462,7 +629,7 @@ namespace EvolverCore.Models
             }
         }
 
-        internal static async Task WritePartitionedBars(DataTable table, CancellationToken cancelToken=default)
+        internal static async Task WritePartitionedBars(DataTable table, CancellationToken cancelToken = default)
         {
             if (table.RowCount == 0) return; // nothing to write
 
@@ -511,7 +678,7 @@ namespace EvolverCore.Models
             }
         }
 
-        private static async Task WriteDataTableAsync(string filePath, TableType tableType, DataTable table, CancellationToken cancelToken=default)
+        private static async Task WriteDataTableAsync(string filePath, TableType tableType, DataTable table, CancellationToken cancelToken = default)
         {
             ParquetSchema schema;
             switch (tableType)

@@ -46,6 +46,9 @@ namespace EvolverCore.Models
 
     public class BarTable
     {
+        private List<BarTablePointer> _registeredPointers = new List<BarTablePointer>();
+        internal List<BarTablePointer> RegisteredPointers { get {  return _registeredPointers; } }
+
         public BarTable(DataTable table)
         {
             Table = table;
@@ -122,6 +125,16 @@ namespace EvolverCore.Models
 
         }
 
+        internal void RegisterPointer(BarTablePointer pointer)
+        {
+            if(_registeredPointers.Contains(pointer)) return;
+            _registeredPointers.Add(pointer);
+        }
+
+        internal void UnRegisterPointer(BarTablePointer pointer)
+        {
+            if (_registeredPointers.Contains(pointer)) _registeredPointers.Remove(pointer);
+        }
 
         internal static BarTable GenerateRandomData(Instrument randomInstrument, DataInterval interval, DateTime startTime, int size, int seed)
         {
@@ -193,7 +206,7 @@ namespace EvolverCore.Models
     //    }
     //}
 
-    public class BarTablePointer
+    public class BarTablePointer : IDisposable
     {
         public BarTablePointer(BarTable table, Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
@@ -201,6 +214,9 @@ namespace EvolverCore.Models
                 throw new ArgumentException($"Start  must be less than or equal to end: start={start} end={end}");
 
             _table = table;
+
+            _table.RegisterPointer(this);
+
             CurrentBar = -1;
             State = TableLoadState.Loaded;
             Instrument = instrument;
@@ -226,7 +242,11 @@ namespace EvolverCore.Models
             Instrument = instrument;
             Interval = interval;
 
-            if (_table != null) State = TableLoadState.Loaded;
+            if (_table != null)
+            {
+                State = TableLoadState.Loaded;
+                _table.RegisterPointer(this);
+            }
 
             Time = new ColumnPointer<DateTime>(this, table?.Time);
             Open = new ColumnPointer<double>(this, table?.Open);
@@ -250,13 +270,31 @@ namespace EvolverCore.Models
 
         private string _errorMessage = string.Empty;
 
+        internal double LowestLow()
+        {
+            if (RowCount == 0) return 0;
+            double v = double.MaxValue;
+            for (int i = 0; i < RowCount; i++)
+            { if (Low.GetValueAt(i) < v) v = Low.GetValueAt(i); }
+            return v;
+        }
+
+        internal double HighestHigh()
+        {
+            if (RowCount == 0) return 0;
+            double v = double.MinValue;
+            for (int i = 0; i < RowCount; i++)
+            { if (High.GetValueAt(i) > v) v = High.GetValueAt(i); }
+            return v;
+        }
+
         internal void OnDataTableLoaded(object? sender, DataLoadJobDoneArgs args)
         {
             TableLoadState oldState = State;
 
             if (!args.HasError)
             {
-                setTable(args.ResultTable, args.SourceJob.StartTime, args.SourceJob.EndTime);
+                SetTable(args.ResultTable, args.SourceJob.StartTime, args.SourceJob.EndTime);
                 State = TableLoadState.Loaded;
             }
             else
@@ -268,9 +306,16 @@ namespace EvolverCore.Models
             if (State != oldState) LoadStateChange?.Invoke(this, new BarTablePointerLoadStateChangeArgs(State, this));
         }
 
-        private void setTable(BarTable? table, DateTime start, DateTime end)
+        internal void SetTable(BarTable? table, DateTime start, DateTime end)
         {
+            if (_table != null)
+                _table.UnRegisterPointer(this);
+
             _table = table;
+
+            if (_table != null)
+                _table.RegisterPointer(this);
+
             CurrentBar = -1;
 
             Time = new ColumnPointer<DateTime>(this, table?.Time);
@@ -361,6 +406,7 @@ namespace EvolverCore.Models
         internal int EndOffset { get; private set; }
 
         BarTable? _table;
+        private bool disposedValue;
 
         public int CurrentBar { get; private set; }
 
@@ -374,6 +420,35 @@ namespace EvolverCore.Models
         public ColumnPointer<double> Bid { get; private set; }
         public ColumnPointer<double> Ask { get; private set; }
         public ColumnPointer<long> Volume { get; private set; }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    if (_table != null) _table.UnRegisterPointer(this);
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+                // TODO: set large fields to null
+                disposedValue = true;
+            }
+        }
+
+        // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+        // ~BarTablePointer()
+        // {
+        //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        //     Dispose(disposing: false);
+        // }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 
     public class DataTableBase

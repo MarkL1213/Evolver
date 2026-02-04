@@ -136,18 +136,32 @@ namespace EvolverCore.Views
             IndicatorViewModel? vm = Properties.Indicator;
             if (vm == null || vm.Indicator == null) return 0;
 
-            ColumnPointer<double> vBars = vm.Indicator.SliceOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
-
-            return vBars.Count > 0 ? vBars.Min() : 0;
+            if (vm.Indicator.IsDataOnly)
+            {
+                BarTablePointer vBars = vm.Indicator.SliceSourcePointsInRange(rangeMin, rangeMax);
+                return vBars.RowCount > 0 ? vBars.LowestLow() : 0;
+            }
+            else
+            {
+                ColumnPointer<double> vBars = vm.Indicator.SliceOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
+                return vBars.Count > 0 ? vBars.Min() : 0;
+            }
         }
         public double MaxY(DateTime rangeMin, DateTime rangeMax)
         {
             IndicatorViewModel? vm = Properties.Indicator;
             if (vm == null || vm.Indicator == null) return 100;
 
-            ColumnPointer<double> vBars = vm.Indicator.SliceOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
-
-            return vBars.Count > 0 ? vBars.Max() : 100;
+            if (vm.Indicator.IsDataOnly)
+            {
+                BarTablePointer vBars = vm.Indicator.SliceSourcePointsInRange(rangeMin, rangeMax);
+                return vBars.RowCount > 0 ? vBars.HighestHigh() : 0;
+            }
+            else
+            {
+                ColumnPointer<double> vBars = vm.Indicator.SliceOutputPointsInRange(rangeMin, rangeMax, Properties.PlotIndex);
+                return vBars.Count > 0 ? vBars.Max() : 100;
+            }
         }
 
         public void Render(DrawingContext context)
@@ -390,6 +404,7 @@ namespace EvolverCore.Views
             double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * indicator.Interval.Ticks / 2)); // auto-scale width
 
             (int minVisibleIndex,int maxVisibleIndex) = indicator.IndexOfSourcePointsInRange(xAxis.Min, xAxis.Max);
+            if (minVisibleIndex == -1 || maxVisibleIndex == -1) return;
 
             BarTablePointer bars = indicator.Bars[0];
 

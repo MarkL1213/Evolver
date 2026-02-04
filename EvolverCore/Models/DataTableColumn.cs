@@ -26,7 +26,7 @@ namespace EvolverCore.Models
             _parentTable = parentTable;
         }
 
-        public T GetValueAt(int index) => (T) _column!.GetValueAt(index);
+        public T GetValueAt(int index) => (T)_column!.GetValueAt(_parentTable.StartOffset + index);
         //{
         //    if (index < 0 || index >= _column!.Count)
         //        throw new ArgumentOutOfRangeException(nameof(index));

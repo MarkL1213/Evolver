@@ -13,9 +13,9 @@ using System.Threading.Tasks;
 
 namespace EvolverCore.Models
 {
-    public class InstrumentDataRecord_v2
+    public class InstrumentDataRecord
     {
-        public InstrumentDataRecord_v2(Instrument instrument, DataInterval interval)
+        public InstrumentDataRecord(Instrument instrument, DataInterval interval)
         {
             Instrument = instrument;
             Interval = interval;
@@ -23,7 +23,7 @@ namespace EvolverCore.Models
             MaxTime = DateTime.MinValue;
         }
         
-        public InstrumentDataRecord_v2(Instrument instrument, DataInterval interval, DateTime min, DateTime max)
+        public InstrumentDataRecord(Instrument instrument, DataInterval interval, DateTime min, DateTime max)
         {
             Instrument = instrument;
             Interval = interval;
@@ -36,15 +36,24 @@ namespace EvolverCore.Models
         public DateTime MinTime { get; internal set; }
         public DateTime MaxTime { get; internal set; }
 
-        internal bool IsContiguous(InstrumentDataRecord_v2 b)
+        internal bool IsContiguous(InstrumentDataRecord b)
         {
             return Interval.Add(MaxTime, 1) == b.MinTime;
         }
 
-        internal void Append(InstrumentDataRecord_v2 b)
+        internal void Append(InstrumentDataRecord b)
         {
             MaxTime = b.MaxTime;
         }
+    }
+
+    public enum DataAvailable { None, Partial, Full};
+    public class DataAvailability
+    {
+        public DataAvailability(DataAvailable available) { DataAvailable = available; }
+
+        public List<(DateTime StartTime, DateTime EndTime)> AvailableDates { get; } = new List<(DateTime StartTime, DateTime EndTime)>();
+        public DataAvailable DataAvailable { get; private set; }
     }
 
     public class DataTableRecordCollection
@@ -54,12 +63,18 @@ namespace EvolverCore.Models
         }
 
         object _lock = new object();
-        Dictionary<string, Dictionary<string, List<InstrumentDataRecord_v2>>> _records = new Dictionary<string, Dictionary<string, List<InstrumentDataRecord_v2>>>();
+        Dictionary<string, Dictionary<string, List<InstrumentDataRecord>>> _records = new Dictionary<string, Dictionary<string, List<InstrumentDataRecord>>>();
 
+        public DataAvailability IsDataAvailable(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        {
+            //FIXME : implement IsDataAvailable()
+            //.OrderBy(t => t.StartTime).ToList()
+            return new DataAvailability(DataAvailable.None);
+        }
 
         internal async Task LoadAvailableInstrumentData()
         {
-            Dictionary<string, Dictionary<string, List<InstrumentDataRecord_v2>>> newRecords = new Dictionary<string, Dictionary<string, List<InstrumentDataRecord_v2>>>();
+            Dictionary<string, Dictionary<string, List<InstrumentDataRecord>>> newRecords = new Dictionary<string, Dictionary<string, List<InstrumentDataRecord>>>();
 
             DirectoryInfo barDataDir = new DirectoryInfo(Path.Combine(Globals.Instance.DataDirectory, "bars"));
 
@@ -75,12 +90,12 @@ namespace EvolverCore.Models
                 if (instrument == null)
                     throw new EvolverException($"Unable to lookup instrument from folder name {instrumentKey}.");
 
-                Dictionary<string, List<InstrumentDataRecord_v2>> intervalDict;
+                Dictionary<string, List<InstrumentDataRecord>> intervalDict;
                 if (newRecords.ContainsKey(instrumentKey))
                     intervalDict = newRecords[instrumentKey];
                 else
                 {
-                    intervalDict = new Dictionary<string, List<InstrumentDataRecord_v2>>();
+                    intervalDict = new Dictionary<string, List<InstrumentDataRecord>>();
                     newRecords.Add(instrumentKey, intervalDict);
                 }
 
@@ -93,22 +108,22 @@ namespace EvolverCore.Models
                     if (!interval.HasValue)
                         throw new EvolverException($"Unable to parse interval folder name {intervalKey} in the instrument {instrumentKey} folder.");
 
-                    List<InstrumentDataRecord_v2> dataRecords;
+                    List<InstrumentDataRecord> dataRecords;
                     if (intervalDict.ContainsKey(intervalKey))
                         dataRecords = intervalDict[intervalKey];
                     else
                     {
-                        dataRecords = new List<InstrumentDataRecord_v2>();
+                        dataRecords = new List<InstrumentDataRecord>();
                         intervalDict.Add(intervalKey, dataRecords);
                     }
 
                     foreach (FileInfo file in files)
                     {
                         (DateTime min, DateTime max) = await loadTimestampRange(file.FullName);
-                        InstrumentDataRecord_v2 newRecord = new InstrumentDataRecord_v2(instrument, interval.Value, min, max);
+                        InstrumentDataRecord newRecord = new InstrumentDataRecord(instrument, interval.Value, min, max);
 
                         bool found = false;
-                        foreach (InstrumentDataRecord_v2 existingRecord in dataRecords)
+                        foreach (InstrumentDataRecord existingRecord in dataRecords)
                         {
                             if (existingRecord.IsContiguous(newRecord))
                             {
