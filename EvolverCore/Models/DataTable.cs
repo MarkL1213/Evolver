@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Intrinsics.X86;
 
 namespace EvolverCore.Models
 {
@@ -376,24 +377,61 @@ namespace EvolverCore.Models
 
         public double CalculatePriceField(int barsAgo, BarPriceValue priceField)
         {
-            //FIXME : CalculatePriceField(int barsAgo, BarPriceValue priceField)
-            return 0;
+            switch (priceField)
+            {
+                case BarPriceValue.Open: return Open[barsAgo];
+                case BarPriceValue.High: return High[barsAgo];
+                case BarPriceValue.Low: return Low[barsAgo];
+                case BarPriceValue.Close: return Close[barsAgo];
+                case BarPriceValue.Volume: return Volume[barsAgo];
+                case BarPriceValue.Bid: return Bid[barsAgo];
+                case BarPriceValue.Ask: return Ask[barsAgo];
+
+                case BarPriceValue.HL: return (High[barsAgo] + Low[barsAgo]) / 2.0;
+                case BarPriceValue.OC: return (Open[barsAgo] + Close[barsAgo]) / 2.0;
+                case BarPriceValue.HLC: return (High[barsAgo] + Low[barsAgo] + Close[barsAgo]) / 3.0;
+                case BarPriceValue.OHLC: return (Open[barsAgo] + High[barsAgo] + Low[barsAgo] + Close[barsAgo]) / 4.0;
+
+                default:
+                    throw new ArgumentException("Unknown priceField type.");
+            }
         }
 
         public BarTablePointer Slice(DateTime min, DateTime max)
         {
-            if (_table == null) throw new NullReferenceException("Unable to slice non-existing table.");
+            if(_table == null ||RowCount == 0)
+                return new BarTablePointer(null, Instrument, Interval);
 
-            if (min < Time[0] || max > Time[(int)_table.RowCount - 1])
-                throw new ArgumentOutOfRangeException("Slice dates out of range.");
+            DateTime sliceMin = min;
+            DateTime sliceMax = max;
 
-            return new BarTablePointer(_table, _table.Instrument!, (DataInterval)_table.Interval!, min, max);
+            DateTime tableMin = Time.GetValueAt(0);
+            DateTime tableMax = Time.GetValueAt((int)RowCount - 1);
+
+            if (sliceMin < tableMin) sliceMin = tableMin;
+            if (sliceMax > tableMax) sliceMax = tableMax;
+
+            if (sliceMin > tableMax) sliceMin = tableMax;
+            if (sliceMax < tableMin) sliceMax = tableMin;
+
+            return new BarTablePointer(_table, Instrument, Interval, sliceMin, sliceMax);
         }
 
         internal void CalculateOffsets(DateTime start, DateTime end)
         {
-            int startIndex = Time.RawFindIndex(start);
-            int endIndex = Time.RawFindIndex(end);
+            if (_table == null || _table.RowCount == 0)
+            {
+                StartOffset = EndOffset = 0;
+                return;
+            }
+            DateTime roundedStart = Interval.RoundUp(start);
+            DateTime roundedEnd = Interval.RoundDown(end);
+
+            //if (roundedStart < _table.Time.GetValueAt(0)) roundedStart = Time.GetValueAt(0);
+            //if (roundedEnd > Time.GetValueAt(Time.Count - 1)) roundedEnd = Time.GetValueAt(Time.Count - 1);
+
+            int startIndex = Time.RawFindIndex(roundedStart);
+            int endIndex = Time.RawFindIndex(roundedEnd);
 
             if (startIndex == -1 || endIndex == -1)
                 throw new EvolverException("Unable to locate start/end time index values.");

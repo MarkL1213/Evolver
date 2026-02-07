@@ -403,7 +403,9 @@ namespace EvolverCore.Views
 
             double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * indicator.Interval.Ticks / 2)); // auto-scale width
 
-            (int minVisibleIndex,int maxVisibleIndex) = indicator.IndexOfSourcePointsInRange(xAxis.Min, xAxis.Max);
+            (int minVisibleIndex,int maxVisibleIndex) = indicator.IndexOfSourcePointsInRange(
+                                            indicator.Interval.RoundUp(xAxis.Min),
+                                            indicator.Interval.RoundDown(xAxis.Max));
             if (minVisibleIndex == -1 || maxVisibleIndex == -1) return;
 
             BarTablePointer bars = indicator.Bars[0];

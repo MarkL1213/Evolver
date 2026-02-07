@@ -440,6 +440,8 @@ namespace EvolverCore.Models
 
             if (!WaitingForDataLoad)
             {
+                if (DataChanged != null) DataChanged(this, EventArgs.Empty);
+
                 //Globals.Instance.DataManager.IndicatorReadyToRun(this);
             }
         }
@@ -456,9 +458,18 @@ namespace EvolverCore.Models
             if (_sourceRecord != null )
             {
                 if (Bars[0].State == TableLoadState.Loaded)
-                    return Bars[0].Slice(min, max);
-                else
-                    return new BarTablePointer(null, Bars[0].Instrument, Bars[0].Interval);
+                {
+
+                    (int minIdx, int maxIdx) = IndexOfSourcePointsInRange(Bars[0].Interval.RoundUp(min), Bars[0].Interval.RoundDown(max));
+                    if (minIdx != -1 && maxIdx != -1)
+                    {
+                        DateTime sliceMin = Bars[0].Time.GetValueAt(minIdx);
+                        DateTime sliceMax = Bars[0].Time.GetValueAt(maxIdx);
+                        return Bars[0].Slice(sliceMin, sliceMax);
+                    }
+                }
+
+                return new BarTablePointer(null, Bars[0].Instrument, Bars[0].Interval);
             }
 
             throw new EvolverException("No source defined.");
@@ -471,8 +482,22 @@ namespace EvolverCore.Models
 
             if (_sourceRecord != null && Bars[0].State == TableLoadState.Loaded)
             {
-                minIndex = Bars[0].Time.FindIndex(min);
-                maxIndex = Bars[0].Time.FindIndex(max);
+                if (Bars[0].RowCount == 0) return (minIndex, maxIndex);
+                
+                DateTime sliceMin = min;
+                DateTime sliceMax = max;
+
+                DateTime tableMin = Bars[0].Time.GetValueAt(0);
+                DateTime tableMax = Bars[0].Time.GetValueAt((int)Bars[0].RowCount - 1);
+
+                if (sliceMin < tableMin) sliceMin = tableMin;
+                if (sliceMax > tableMax) sliceMax = tableMax;
+
+                if (sliceMin > tableMax) sliceMin = tableMax;
+                if (sliceMax < tableMin) sliceMax = tableMin;
+
+                minIndex = Bars[0].Time.FindIndex(sliceMin);
+                maxIndex = Bars[0].Time.FindIndex(sliceMax);
             }
 
             return (minIndex, maxIndex);

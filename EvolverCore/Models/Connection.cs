@@ -1,14 +1,53 @@
-﻿using System;
+﻿using Parquet.Utils;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace EvolverCore.Models
 {
     public enum ConnectionState { Disconnected, Connecting, Connected, Disconnecting, Error};
 
     public enum DataEvent { Bid, Ask, Last, Settlement };
+
+    internal class DataDownloadJobDoneArgs : EventArgs
+    {
+        public DataDownloadJobDoneArgs(DataDownloadJob sourceJob) { SourceJob = sourceJob; }
+        
+        public DataDownloadJob SourceJob { get; init; }
+    }
+
+    internal class DataDownloadSaveJob : DataSaveJob
+    {
+        public DataDownloadSaveJob(BarTable table, DataDownloadJob sourceJob ): base(table) { SourceJob = sourceJob; }
+
+        public DataDownloadJob SourceJob { get; init; }
+    }
+
+    internal class DataDownloadJob
+    {
+        public DataDownloadJob(DataLoadJob loadJob, DateTime start, DateTime end) { LoadJob = loadJob; StartTime = start; EndTime = end; }
+
+        public event EventHandler<DataDownloadJobDoneArgs>? JobDone;
+
+        public DataLoadJob LoadJob { get; init; }
+        public DateTime StartTime { get; init; }
+        public DateTime EndTime { get; init; }
+
+        public string ErrorMessage { get; set; } = string.Empty;
+        public bool HasError { get { return !string.IsNullOrEmpty(ErrorMessage); } }
+
+
+
+        public void FireJobDone()
+        {
+            JobDone?.Invoke(this,new DataDownloadJobDoneArgs(this));
+        }
+    }
 
     public class ConnectionDataUpdateEventArgs : EventArgs
     {
@@ -55,6 +94,8 @@ namespace EvolverCore.Models
         public ConnectionSettings(ConnectionSettings src) { Name = src.Name; }
 
         public string Name { get; set; }
+
+        public bool IsPrimaryDataSource { get; set; }
     }
 
 
@@ -72,6 +113,7 @@ namespace EvolverCore.Models
         private Thread _connectionWorker;
         private bool _wantExit = false;
         private bool _isSleeping = false;
+        private bool _isShutdown = false;
         private int _connectRetryCounter = 0;
 
         public int MaxConnectionRetryCount { get; set; } = 3;
@@ -83,6 +125,9 @@ namespace EvolverCore.Models
         public event EventHandler<ConnectionStateChangeEventArgs>? StateChange;
 
         public event EventHandler<ConnectionDataUpdateEventArgs>? DataUpdate;
+
+        private BlockingCollection<Func<CancellationToken, Task>> _dataJobQueue = new BlockingCollection<Func<CancellationToken, Task>>();
+        private CancellationTokenSource _cts = new CancellationTokenSource();
 
         public void Connect()
         {
@@ -106,9 +151,63 @@ namespace EvolverCore.Models
             wakeup();
         }
 
+        internal void EnqueueDataDownloadJob(DataDownloadJob job)
+        {
+
+            if (_isShutdown) return;
+            _dataJobQueue.Add((token) => ExecuteDataDownloadJob(token, job));
+        }
+
+
+        internal static string DownloadKey(Instrument i, DataInterval iv, DateTime s, DateTime e) => $"{i.Name}|{iv}|{s:O}|{e:O}";
+
+        private readonly ConcurrentDictionary<string, List<(DataDownloadJob,DataSaveJob)>> _waitingDownloadJobs = new();
+        private int _randomSeed = 420;
+        private async Task ExecuteDataDownloadJob(CancellationToken token, DataDownloadJob job)
+        {
+            Globals.Instance.Log.LogMessage($"Connection.ExecuteDataDownloadJob: start={job.StartTime} end={job.EndTime}", LogLevel.Info);
+
+            //////////////////
+            //TEMPORARY FAKE DATA AND DELAY
+            DataInterval interval = job.LoadJob.Interval;
+            TimeSpan span = job.EndTime - job.StartTime;
+
+            int size = (int)(span.Ticks / interval.Ticks)+1;
+
+            BarTable bt = BarTable.GenerateRandomData(job.LoadJob.Instrument, interval, job.StartTime, size, _randomSeed++);
+            
+            Random r = new Random(_randomSeed++);
+            await Task.Delay(r.Next(1000, 10000));
+            //////////////////
+
+            DataDownloadSaveJob savejob = new DataDownloadSaveJob(bt, job);
+            savejob.JobDone += OnDataSaveComplete;
+
+            string key = Connection.DownloadKey(job.LoadJob.Instrument, job.LoadJob.Interval, job.StartTime, job.EndTime);
+            _waitingDownloadJobs.GetOrAdd(key, _ => new()).Add((job,savejob));
+
+            Globals.Instance.DataTableManager.DataWarehouse.EnqueueDataSaveJob(savejob);
+        }
+
+        private void OnDataSaveComplete(object? sender, DataSaveJobDoneArgs args)
+        {
+            DataDownloadSaveJob? savejob = args.SourceJob as DataDownloadSaveJob;
+            if (savejob == null) return;
+
+            string key = Connection.DownloadKey(savejob.SourceJob.LoadJob.Instrument, savejob.SourceJob.LoadJob.Interval, savejob.SourceJob.StartTime, savejob.SourceJob.EndTime);
+
+            _waitingDownloadJobs.TryRemove(key, out _);
+
+            if (args.HasError) { savejob.SourceJob.ErrorMessage = args.ErrorMessage; }
+            
+            savejob.SourceJob.FireJobDone();
+        }
+
 
         private void connectionWorker()
         {
+            CancellationToken token = _cts.Token;
+
             try
             {
                 while (true)
@@ -144,11 +243,32 @@ namespace EvolverCore.Models
                         }
                         else if (State == ConnectionState.Connected)
                         {
+                            Func<CancellationToken, Task> action;
+
+                            if (_dataJobQueue.Count > 0)
+                            {
+                                action = _dataJobQueue.Take(token);
+
+                                try
+                                {
+                                    Task task = action(token);
+                                    task.Wait(token);
+                                }
+                                catch (Exception e)
+                                {
+                                    Globals.Instance.Log.LogMessage("ConnectionWorker task exception:", LogLevel.Error);
+                                    Globals.Instance.Log.LogException(e);
+                                }
+                            }
+
                             //TODO: do connection stuff...
 
                             ///////////
                             /// Fake connection for testing
+                            _isSleeping = true;
                             Thread.Sleep(5000);
+                            _isSleeping = false;
+
                             Random r = new Random(DateTime.Now.Second);
                             double p = r.Next(20, 100);
                             long v = r.Next(100, 1000);
@@ -194,7 +314,11 @@ namespace EvolverCore.Models
 
         internal void Shutdown()
         {
+            _isShutdown = true;
             _wantExit = true;
+
+            _dataJobQueue.CompleteAdding();
+
             wakeup();
 
             if (_connectionWorker.IsAlive)
@@ -246,6 +370,25 @@ namespace EvolverCore.Models
         }
 
         public List<string> GetKnownConnections() { return _knownConnections.Keys.ToList(); }
+
+        public Connection? GetDataConnection()
+        {
+            if (_activeConnections.Count == 1)
+                return _activeConnections[_activeConnections.Keys.ToList()[0]];
+            else if (_knownConnections.Count > 1)
+            {
+                //return connection marked as primary
+                foreach (Connection connection in _activeConnections.Values)
+                {
+                    if(connection.Properties.IsPrimaryDataSource) return connection;
+                }
+                
+                //if no primary return first connection
+                return _activeConnections[_activeConnections.Keys.ToList()[0]];
+            }
+
+            return null;
+        }
 
         public ConnectionState GetConnectionState(string cName)
         {

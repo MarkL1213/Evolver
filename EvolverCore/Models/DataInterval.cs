@@ -105,11 +105,23 @@ namespace EvolverCore.Models
             }
         }
 
+        public bool IsTimeBased
+        {
+            get
+            {
+                switch (Type)
+                {
+                    case IntervalSpan.Tick: return false;
+                    default: return true;
+                }
+            }
+        }
+
+
         public DateTime GetBarTime(DateTime time)
         {
-            //FIXME: determine what bar time this tick belongs to...
-
-            return new DateTime();
+            if (!IsTimeBased) return time;
+            return RoundUp(time);
         }
 
 

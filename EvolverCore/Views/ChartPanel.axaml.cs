@@ -744,12 +744,12 @@ public partial class ChartPanel : Decorator
 
 
 
-        double preferredWidth = plot.PreferredCandleWidth;
+        double preferredWidth = plot!.PreferredCandleWidth;
 
         int maxVisible = (int)(Bounds.Width / preferredWidth);
         maxVisible = Math.Max(maxVisible, 50);  // Minimum to avoid too-narrow views
 
-        var minTime = ivm.Indicator.MinTime(maxVisible);
+        var minTime = ivm!.Indicator!.MinTime(maxVisible);
         var maxTime = ivm.Indicator.MaxTime(maxVisible);
         var timeRange = maxTime - minTime;
         var timePadding = timeRange * 0.05;  // 5% padding

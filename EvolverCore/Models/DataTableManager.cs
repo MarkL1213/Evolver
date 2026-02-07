@@ -47,13 +47,13 @@ namespace EvolverCore.Models
         }
     }
 
-    public enum DataAvailable { None, Partial, Full};
+    public enum DataAvailable { None, Partial, Full };
     public class DataAvailability
     {
-        public DataAvailability(DataAvailable available) { DataAvailable = available; }
+        public DataAvailability(DataAvailable available, List<(DateTime StartTime, DateTime EndTime)> availableDates) { DataAvailable = available; AvailableDates = availableDates; }
 
-        public List<(DateTime StartTime, DateTime EndTime)> AvailableDates { get; } = new List<(DateTime StartTime, DateTime EndTime)>();
-        public DataAvailable DataAvailable { get; private set; }
+        public List<(DateTime StartTime, DateTime EndTime)> AvailableDates { get; init; }
+        public DataAvailable DataAvailable { get; init; }
     }
 
     public class DataTableRecordCollection
@@ -67,9 +67,37 @@ namespace EvolverCore.Models
 
         public DataAvailability IsDataAvailable(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
         {
-            //FIXME : implement IsDataAvailable()
-            //.OrderBy(t => t.StartTime).ToList()
-            return new DataAvailability(DataAvailable.None);
+            List<(DateTime StartTime, DateTime EndTime)> availableDates = new List<(DateTime StartTime, DateTime EndTime)>();
+            DataAvailable availability = DataAvailable.None;
+            
+            lock (_lock)
+            {
+                if (_records.ContainsKey(instrument.Name) && _records[instrument.Name].ContainsKey(interval.ToString()))
+                {
+                    foreach (InstrumentDataRecord record in _records[instrument.Name][interval.ToString()])
+                    {
+                        if (start >= record.MinTime && end <= record.MaxTime)
+                        {
+                            availability = DataAvailable.Full;
+                            availableDates.Add((start, end));
+                            break;
+                        }
+
+                        bool overlapStart = start > record.MinTime;
+                        bool overlapEnd = end < record.MaxTime;
+
+                        if (overlapStart || overlapEnd)
+                        {
+                            availability = DataAvailable.Partial;
+                            availableDates.Add((record.MinTime, record.MaxTime));
+                        }
+                    }
+                }
+            }
+
+            availableDates = availableDates.OrderBy(t => t.StartTime).ToList();
+            DataAvailability dataAvailability = new DataAvailability(availability, availableDates);
+            return dataAvailability;
         }
 
         internal async Task LoadAvailableInstrumentData()
@@ -305,6 +333,8 @@ namespace EvolverCore.Models
             {
                 Globals.Instance.Log.LogMessage("DataTableManager Update Worker was already terminated.", LogLevel.Warn);
             }
+
+            _dataWarehouse.Shutdown();
         }
 
         protected virtual void Dispose(bool disposing)

@@ -52,8 +52,10 @@ namespace EvolverCore.Models
 
         public int GetNearestIndex(T item)
         {
-            //FIXME: find the first nearest (up or down) item
-            return -1;
+            DataTableColumn<T>? dataColumn = _column as DataTableColumn<T>;
+            if (dataColumn == null) return -1;
+
+            return dataColumn.GetNearestIndex(item, _parentTable.StartOffset, _parentTable.EndOffset) - _parentTable.StartOffset;
         }
 
         public int Count
@@ -66,14 +68,17 @@ namespace EvolverCore.Models
 
         public T Min()
         {
-            //FIXME: find the smallest item
-            return default(T);
+            DataTableColumn<T>? col = _column as DataTableColumn<T>;
+            if (col == null) throw new EvolverException("DataTableColumn is invalid type.");
+            return col.Min(_parentTable.StartOffset, _parentTable.EndOffset);
         }
 
         public T Max()
         {
-            //FIXME: find the largest item
-            return default(T);
+            DataTableColumn<T>? col = _column as DataTableColumn<T>;
+            if (col == null) throw new EvolverException("DataTableColumn is invalid type.");
+            return col.Max(_parentTable.StartOffset, _parentTable.EndOffset);
+
         }
 
         public T this[int barsAgo]
@@ -196,14 +201,88 @@ namespace EvolverCore.Models
             return newCol;
         }
 
+        public T Min(int startIndex, int endIndex)
+        {
+            T min = default(T);
+            bool first = false;
+            for (int i = startIndex; i <= endIndex; i++)
+            {
+                T v = (T)GetValueAt(i);
+                IComparable? c = v as IComparable;
+                if (c == null) throw new EvolverException("Value type is not comparable.");
+
+                if (c.CompareTo(min) < 0 || !first)
+                { min = v; first = true; }
+            }
+            return min;
+        }
+        public T Max(int startIndex, int endIndex)
+        {
+            T max = default(T);
+            bool first = false;
+            for (int i = startIndex; i <= endIndex; i++)
+            {
+                T v = (T)GetValueAt(i);
+                IComparable? c = v as IComparable;
+                if (c == null) throw new EvolverException("Value type is not comparable.");
+
+                if (c.CompareTo(max) > 0 || !first)
+                { max = v; first = true; }
+            }
+            return max;
+        }
+
+        public int GetNearestIndex(T item, int startIndex, int endIndex)
+        {
+            double distance = double.MaxValue;
+            int index = -1;
+
+            for (int i = startIndex; i <= endIndex; i++)
+            {
+                double valueDistance;
+                switch (DataType)
+                {
+                    case DataType.Double:
+                        double dv = (double)(object)GetValueAt(i);
+                        double dn = (double)(object)item;
+                        valueDistance = Math.Abs(dv - dn);
+                        break;
+                    case DataType.UInt8:
+                    case DataType.Int32:
+                    case DataType.Int64:
+                        long lv = (long)(object)GetValueAt(i);
+                        long ln = (long)(object)item;
+                        valueDistance = Math.Abs(lv - ln);
+                        break;
+                    case DataType.DateTime:
+                        long tv = ((DateTime)(object)GetValueAt(i)).Ticks;
+                        long tn = ((DateTime)(object)item).Ticks;
+                        valueDistance = Math.Abs(tv - tn);
+                        break;
+                    default:
+                        throw new EvolverException("Invalid data type.");
+                }
+
+                if (valueDistance < distance)
+                {
+                    distance = valueDistance;
+                    index = i;
+                }
+                
+            }
+
+            return index;
+        }
+
         public IDataTableColumn ExportDynamics()
         {
-            IDataTableColumn newCol = DataTableColumnFactory.CopyBlankTableColumn<T>(this);
+            DataTableColumn<T> newCol = DataTableColumnFactory.CopyBlankTableColumn<T>(this);
 
-            List<object> values = new List<object>();
-            foreach (object? t in _series)
-                values.Add(t!);
+            List<T> values = new List<T>();
+            foreach (T t in _series)
+                values.Add(t);
 
+            newCol.SetValues(values);
             return newCol;
         }
 
@@ -284,6 +363,8 @@ namespace EvolverCore.Models
 
         private int FindIndexRecursive(T item, int start, int end)
         {
+            if (start > end) return -1;
+
             int mid = (end - start) / 2 + start;
             T value = GetValueAt(mid);
             switch (DataType)

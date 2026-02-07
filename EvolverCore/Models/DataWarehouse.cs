@@ -15,6 +15,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Security.Cryptography.X509Certificates;
 
 namespace EvolverCore.Models
 {
@@ -44,12 +45,13 @@ namespace EvolverCore.Models
     {
         public event EventHandler<DataLoadJobDoneArgs>? JobDone = null;
 
-        public DataLoadJob(Instrument instrument, DataInterval interval, DateTime start, DateTime end)
+        public DataLoadJob(Instrument instrument, DataInterval interval, DateTime start, DateTime end, bool forceRefresh = false)
         {
             Interval = interval;
             Instrument = instrument;
             StartTime = start;
             EndTime = end;
+            ForceRefresh = forceRefresh;
         }
 
         public Instrument Instrument { get; init; }
@@ -57,15 +59,21 @@ namespace EvolverCore.Models
         public DateTime StartTime { get; init; }
         public DateTime EndTime { get; init; }
 
+        public bool ForceRefresh { get; init; }
+
+        public bool DownloadsCompleted { get; set; } = false;
 
         internal void FireJobDone(string errorMessage)
         {
+            Globals.Instance.Log.LogMessage($"DataLoadJob error: {errorMessage}", LogLevel.Info);
             DataLoadJobDoneArgs args = new DataLoadJobDoneArgs(this, errorMessage);
             JobDone?.Invoke(this, args);
         }
 
         internal void FireJobDone(BarTable table)
         {
+            Globals.Instance.Log.LogMessage($"DataLoadJob complete: start={table.Time.GetValueAt(0)} end={table.Time.GetValueAt((int)table.RowCount - 1)}", LogLevel.Info);
+
             DataLoadJobDoneArgs args = new DataLoadJobDoneArgs(this, table);
             JobDone?.Invoke(this, args);
         }
@@ -174,8 +182,15 @@ namespace EvolverCore.Models
         {
             try
             {
+                Globals.Instance.Log.LogMessage($"DataWarehouse.ExecuteDataSaveJob: start={job.Table.Time.GetValueAt(0)} end={job.Table.Time.GetValueAt((int)job.Table.RowCount - 1)}", LogLevel.Info);
+
+                //FIXME : do we really want to slice here? 
+                //FIXME : also don't write a partial table over a partial table, if contiguos merge instead
                 DataTable subData = job.Table.Table!.DynamicSlice();
+
+
                 await DataWarehouse.WritePartitionedBars(subData);
+                await _recordCollection.LoadAvailableInstrumentData();
             }
             catch (Exception ex)
             {
@@ -189,25 +204,138 @@ namespace EvolverCore.Models
             job.FireJobDone();
         }
 
-
-
-        private async Task<BarTable> DownloadDataChunk(Instrument instrument, DataInterval interval, DateTime start, DateTime end, CancellationToken token)
+        private void OnDownloadCompleted(object? sender, DataDownloadJobDoneArgs e)
         {
-            try
-            {
-                //FIXME : implement download
-                throw new NotImplementedException("DownloadDataChunk");
-            }
-            catch (Exception ex)
-            {
-                Globals.Instance.Log.LogMessage($"Failed to download {interval.ToString()} data for '{instrument.Name}': From={start} To={end}", LogLevel.Error);
-                Globals.Instance.Log.LogException(ex);
+            DataDownloadJob dlJob = e.SourceJob;
 
-                throw new EvolverException("Data load failure.", ex);
+            lock (_downloadLock)
+            {
+                if (!_downloadJobs.ContainsKey(dlJob)) return;
+
+                foreach (DataLoadJob loadJob in _downloadJobs[dlJob])
+                {
+                    (Dictionary<string, DataDownloadJob> pendingDownloads, List<string> errors) loadRecord = _loadJobsWaiting[loadJob];
+
+                    string key = Connection.DownloadKey(loadJob.Instrument, loadJob.Interval, dlJob.StartTime, dlJob.EndTime);
+
+                    if (!loadRecord.pendingDownloads.ContainsKey(key))
+                        throw new EvolverException("load chain out of sync.");
+
+                    loadRecord.pendingDownloads.Remove(key);
+                    if (dlJob.HasError) loadRecord.errors.Add(dlJob.ErrorMessage);
+
+                    if (loadRecord.pendingDownloads.Count == 0)
+                    {
+                        _loadJobsWaiting.TryRemove(loadJob, out _);
+
+                        if (loadRecord.errors.Count == 0)
+                        {
+                            loadJob.DownloadsCompleted = true;
+                            EnqueueDataLoadJob(loadJob);
+                            return;
+                        }
+                        else
+                        {
+                            string loadErrors = loadRecord.errors.CollectionToStr();
+                            loadJob.FireJobDone(loadErrors);
+                            return;
+                        }
+                    }
+                }
+
+                _downloadJobs.TryRemove(dlJob, out _);
             }
         }
 
-        private (bool eventFired, List<(DateTime start, DateTime end, BarTable table)> cacheCoverages) determineCacheCovereage(DataLoadJob job)
+
+        private object _downloadLock = new object();
+        ConcurrentDictionary<DataLoadJob, (Dictionary<string, DataDownloadJob> pendingDownloads,List<string> errors)> _loadJobsWaiting = new ConcurrentDictionary<DataLoadJob, (Dictionary<string, DataDownloadJob>,List<string>)>();
+        ConcurrentDictionary<DataDownloadJob, List<DataLoadJob>> _downloadJobs = new ConcurrentDictionary<DataDownloadJob, List<DataLoadJob>>();
+
+        private void DownloadDataChunk(DataLoadJob loadJob, DateTime start, DateTime end)
+        {
+            Connection? c = Globals.Instance.Connections.GetDataConnection();
+            if (c == null) throw new EvolverException("No data connection available");
+
+            List<DataDownloadJob> downloadJobs = new List<DataDownloadJob>();
+
+            List<(DateTime dlStart, DateTime dlEnd)> datesNeeded = new List<(DateTime, DateTime)>();
+            datesNeeded.Add((start, end));
+
+            lock (_downloadLock)
+            {
+                foreach (DataDownloadJob existingJob in _downloadJobs.Keys)
+                {
+                    for (int i=0;i<datesNeeded.Count;i++)
+                    {
+                        (DateTime dlStart, DateTime dlEnd)  = datesNeeded[i];
+
+                        if (existingJob.StartTime <= dlStart && existingJob.EndTime > dlStart)
+                        {
+                            downloadJobs.Add(existingJob);
+                            _downloadJobs[existingJob].Add(loadJob);
+
+                            if (existingJob.EndTime >= dlEnd)
+                            {//total overlap
+                                datesNeeded.RemoveAt(i);
+                                break;
+                            }
+                            else
+                            {//overlap begining
+                                dlStart = loadJob.Interval.Add(existingJob.EndTime, 1);
+                                datesNeeded[i] = (dlStart, dlEnd);
+                            }
+                        }
+
+                        if (existingJob.StartTime < dlEnd && existingJob.EndTime >= dlEnd)
+                        {//overlap end
+                            downloadJobs.Add(existingJob);
+                            _downloadJobs[existingJob].Add(loadJob);
+
+                            dlEnd = loadJob.Interval.Add(existingJob.StartTime, -1);
+                            datesNeeded[i] = (dlStart, dlEnd);
+                        }
+
+                        if (existingJob.StartTime > dlStart && existingJob.EndTime < dlEnd)
+                        {//internal overlap
+                            downloadJobs.Add(existingJob);
+                            _downloadJobs[existingJob].Add(loadJob);
+
+                            datesNeeded.RemoveAt(i);
+                            datesNeeded.Add((dlStart, loadJob.Interval.Add(existingJob.StartTime, -1)));
+                            datesNeeded.Add((loadJob.Interval.Add(existingJob.EndTime, 1), dlEnd));
+                        }
+
+                        if (dlStart == dlEnd) datesNeeded.RemoveAt(i);
+                    }
+
+                    if (datesNeeded.Count == 0) break;
+                }
+
+                for (int i = 0; i < datesNeeded.Count; i++)
+                {//more data required, add additional new dlJob
+                    (DateTime dlStart, DateTime dlEnd) = datesNeeded[i];
+
+                    DataDownloadJob dlJob = new DataDownloadJob(loadJob, dlStart, dlEnd);
+                    dlJob.JobDone += OnDownloadCompleted;
+                    downloadJobs.Add(dlJob);
+
+                    _downloadJobs.TryAdd(dlJob, new() { loadJob });
+                    c.EnqueueDataDownloadJob(dlJob);
+                }
+
+                if (!_loadJobsWaiting.ContainsKey(loadJob))
+                    _loadJobsWaiting.TryAdd(loadJob, (new Dictionary<string, DataDownloadJob>(), new List<string>()));
+
+                foreach (DataDownloadJob dlJob in downloadJobs)
+                {
+                    string downloadKey = Connection.DownloadKey(loadJob.Instrument, loadJob.Interval, dlJob.StartTime, dlJob.EndTime);
+                    _loadJobsWaiting[loadJob].pendingDownloads.Add(downloadKey, dlJob);
+                }
+            }
+        }
+
+        private (bool eventFired, List<(DateTime start, DateTime end, BarTable table)> cacheCoverages) determineCacheCoverage(DataLoadJob job)
         {
             List<(DateTime start, DateTime end, BarTable table)> cacheCoverages = new List<(DateTime start, DateTime end, BarTable table)>();
 
@@ -237,12 +365,95 @@ namespace EvolverCore.Models
             return (false, cacheCoverages.OrderBy(c => c.start).ToList());
         }
 
-        private List<(DateTime start, DateTime end)> determineMissingPeriods(DataLoadJob job, List<(DateTime start, DateTime end, BarTable table)> cacheCoverages)
+        private List<(DateTime start, DateTime end)> DetermineMissingPieces(
+                DateTime rangeStart,
+                DateTime rangeEnd,
+                List<(DateTime start, DateTime end)> sourceA,
+                List<(DateTime start, DateTime end)> sourceB)
+        {
+            if (rangeStart > rangeEnd)
+                return new List<(DateTime, DateTime)>(); // invalid range → nothing missing
+
+            // Combine both sources
+            var all = new List<(DateTime start, DateTime end)>(sourceA.Count + sourceB.Count);
+            all.AddRange(sourceA);
+            all.AddRange(sourceB);
+
+            // Clip to the target range and keep only intervals that actually overlap it
+            var relevant = new List<(DateTime start, DateTime end)>(all.Count);
+            foreach (var r in all)
+            {
+                if (r.start > r.end) continue; // ignore obviously invalid input
+
+                DateTime s = r.start > rangeStart ? r.start : rangeStart;
+                DateTime e = r.end < rangeEnd ? r.end : rangeEnd;
+
+                if (s <= e)
+                    relevant.Add((s, e));
+            }
+
+            // Special case: nothing covers the target range at all
+            if (relevant.Count == 0)
+            {
+                return rangeStart <= rangeEnd
+                    ? new List<(DateTime, DateTime)> { (rangeStart, rangeEnd) }
+                    : new List<(DateTime, DateTime)>();
+            }
+
+            // Sort by start time
+            relevant.Sort((a, b) => a.start.CompareTo(b.start));
+
+            // Merge overlapping / adjacent intervals
+            var merged = new List<(DateTime start, DateTime end)>();
+            var current = relevant[0];
+
+            for (int i = 1; i < relevant.Count; i++)
+            {
+                if (current.end >= relevant[i].start) // overlap or touching
+                {
+                    current = (current.start, current.end > relevant[i].end ? current.end : relevant[i].end);
+                }
+                else
+                {
+                    merged.Add(current);
+                    current = relevant[i];
+                }
+            }
+            merged.Add(current);
+
+            // Build the missing pieces
+            var missing = new List<(DateTime start, DateTime end)>();
+            DateTime pos = rangeStart;
+
+            foreach (var cov in merged)
+            {
+                if (pos < cov.start)
+                    missing.Add((pos, cov.start));
+
+                pos = pos > cov.end ? pos : cov.end; // advance to the end of coverage
+            }
+
+            if (pos < rangeEnd)
+                missing.Add((pos, rangeEnd));
+
+            return missing;
+        }
+
+        private List<(DateTime start, DateTime end)> determineMissingPeriods(DataLoadJob job,
+            List<(DateTime start, DateTime end, BarTable table)> cacheCoverages,
+            DataAvailability availability)
         {
             List<(DateTime start, DateTime end)> missingPeriods = new List<(DateTime start, DateTime end)>();
-            if (cacheCoverages.Count == 0) missingPeriods.Add((job.StartTime, job.EndTime));
+
+            if(availability.DataAvailable == DataAvailable.Full)
+                return missingPeriods;
+
+            if (cacheCoverages.Count == 0 && availability.DataAvailable == DataAvailable.None) missingPeriods.Add((job.StartTime, job.EndTime));
             else
             {
+                //FIXME : missingPeriods is not accounting for on disk availability, only cached tables
+
+
                 // Initial gap (before first cached piece)
                 (DateTime start, DateTime end, BarTable table) first = cacheCoverages[0];
                 DateTime initialGapEnd = job.Interval.Add(first.start, -1);
@@ -271,53 +482,37 @@ namespace EvolverCore.Models
         }
 
 
-        private async Task<List<(DateTime start, DateTime end, BarTable dt)>> buildLoadJobChunks(DataLoadJob job,
-            List<(DateTime start, DateTime end)> missingPeriods,
+        private async Task<(bool pendingDownload, List<(DateTime start, DateTime end, BarTable dt)>)> buildLoadJobChunks(DataLoadJob job,
             List<(DateTime start, DateTime end)> availableDatesOnDisk,
             CancellationToken token
             )
         {
-            List<(DateTime start, DateTime end, BarTable dt)> chunks = new List<(DateTime start, DateTime end, BarTable dt)> ();
+            List<(DateTime start, DateTime end, BarTable dt)> chunks = new List<(DateTime start, DateTime end, BarTable dt)>();
 
-            int mpIdx=0;
-            int adodIdx = 0;
+            bool pendingDownload = false;
 
-            while (true)
+            for (int i = 0; i < availableDatesOnDisk.Count; i++)
             {
-                if (mpIdx < missingPeriods.Count && missingPeriods[mpIdx].start < (adodIdx < availableDatesOnDisk.Count ? availableDatesOnDisk[adodIdx].start : DateTime.MaxValue))
+                bool loadFailed = false;
+                try
                 {
-                    BarTable dt = await DownloadDataChunk(job.Instrument, job.Interval, missingPeriods[mpIdx].start, missingPeriods[mpIdx].end, token);
-                    chunks.Add((missingPeriods[mpIdx].start, missingPeriods[mpIdx].end, dt));
-                    mpIdx++;
+                    BarTable dt = await DataWarehouse.ReadToDataTableAsync(token, job.Instrument, job.Interval, availableDatesOnDisk[i].start, availableDatesOnDisk[i].end);
+                    chunks.Add((availableDatesOnDisk[i].start, availableDatesOnDisk[i].end, dt));
                 }
-                else if (adodIdx < availableDatesOnDisk.Count)
+                catch
                 {
-                    BarTable dt;
-                    bool loadFailed = false;
-                    try
-                    {
-                        dt = await DataWarehouse.ReadToDataTableAsync(token, job.Instrument, job.Interval, availableDatesOnDisk[adodIdx].start, availableDatesOnDisk[adodIdx].end);
-                        chunks.Add((availableDatesOnDisk[adodIdx].start, availableDatesOnDisk[adodIdx].end, dt));
-                    }
-                    catch
-                    {
-                        loadFailed = true;
-                    }
-
-                    if (loadFailed)
-                    {
-                        dt = await DownloadDataChunk(job.Instrument, job.Interval, availableDatesOnDisk[adodIdx].start, availableDatesOnDisk[adodIdx].end, token);
-                        chunks.Add((availableDatesOnDisk[adodIdx].start, availableDatesOnDisk[adodIdx].end, dt));
-                    }
-                    
-                    adodIdx++;
+                    loadFailed = true;
                 }
 
-                if (mpIdx >= missingPeriods.Count && adodIdx >= availableDatesOnDisk.Count)
+                if (loadFailed)
+                {
+                    pendingDownload = true;
+                    DownloadDataChunk(job, availableDatesOnDisk[i].start, availableDatesOnDisk[i].end);
                     break;
+                }
             }
 
-            return chunks.OrderBy(t => t.start).ToList();
+            return (pendingDownload, chunks.OrderBy(t => t.start).ToList());
         }
 
 
@@ -329,15 +524,42 @@ namespace EvolverCore.Models
             }
             else
             {
-                (bool eventFired, List<(DateTime start, DateTime end, BarTable table)> cacheCoverages) =
-                    determineCacheCovereage(job);
-                if (eventFired) return;
+                (bool eventFired, List<(DateTime start, DateTime end, BarTable table)> coverages) cache;
+                DataAvailability availability;
+                List<(DateTime start, DateTime end)> missingPeriods;
 
-                DataAvailability availability = _recordCollection.IsDataAvailable(job.Instrument, job.Interval, job.StartTime, job.EndTime);
-                List<(DateTime start, DateTime end)> missingPeriods = determineMissingPeriods(job, cacheCoverages);
+                if (!job.ForceRefresh)
+                {
+                    cache = determineCacheCoverage(job);
+                    if (cache.eventFired) return;
 
-                List<(DateTime start, DateTime end, BarTable table)> chunks = await buildLoadJobChunks(job, missingPeriods, availability.AvailableDates, token);
+                    availability = _recordCollection.IsDataAvailable(job.Instrument, job.Interval, job.StartTime, job.EndTime);
+                    
+                    List<(DateTime start, DateTime end)> cacheCoverages = cache.coverages.Select(c => (c.start,c.end)).ToList();
+                    missingPeriods = DetermineMissingPieces(job.StartTime, job.EndTime, cacheCoverages, availability.AvailableDates);
 
+                    //missingPeriods = determineMissingPeriods(job, cache.coverages, availability);
+                }
+                else
+                {
+                    cache = (false, new List<(DateTime start, DateTime end, BarTable table)>());
+                    availability = new DataAvailability(DataAvailable.None, new List<(DateTime StartTime, DateTime EndTime)>());
+                    missingPeriods = new List<(DateTime start, DateTime end)>();
+                    missingPeriods.Add((job.StartTime, job.EndTime));
+                }
+
+                if (missingPeriods.Count > 0)
+                {
+                    if (job.DownloadsCompleted)
+                        job.FireJobDone("Unfillable data gap detected.");
+
+                    foreach (var missingPeriod in missingPeriods)
+                        DownloadDataChunk(job, missingPeriod.start, missingPeriod.end);
+                    return;
+                }
+
+                (bool pendingDownloads, List<(DateTime start, DateTime end, BarTable table)> chunks) buildResults = await buildLoadJobChunks(job, availability.AvailableDates, token);
+                if (buildResults.pendingDownloads) return;
 
                 DataTable mergeTable = new DataTable(Bar.GetSchema(), 0, TableType.Bar, job.Instrument, job.Interval);
 
@@ -346,18 +568,18 @@ namespace EvolverCore.Models
 
                 while (true)
                 {
-                    if (ccIdx < cacheCoverages.Count && cacheCoverages[ccIdx].start < (chunkIdx < chunks.Count ? chunks[chunkIdx].start : DateTime.MaxValue))
+                    if (ccIdx < cache.coverages.Count && cache.coverages[ccIdx].start < (chunkIdx < buildResults.chunks.Count ? buildResults.chunks[chunkIdx].start : DateTime.MaxValue))
                     {
-                        mergeTable.AppendTable(cacheCoverages[ccIdx].table.Table);
+                        mergeTable.AppendTable(cache.coverages[ccIdx].table.Table);
                         ccIdx++;
                     }
-                    else if (chunkIdx < chunks.Count)
+                    else if (chunkIdx < buildResults.chunks.Count)
                     {
-                        mergeTable.AppendTable(chunks[chunkIdx].table.Table);
+                        mergeTable.AppendTable(buildResults.chunks[chunkIdx].table.Table);
                         chunkIdx++;
                     }
 
-                    if (ccIdx >= cacheCoverages.Count && chunkIdx >= chunks.Count)
+                    if (ccIdx >= cache.coverages.Count && chunkIdx >= buildResults.chunks.Count)
                         break;
                 }
 
@@ -376,7 +598,7 @@ namespace EvolverCore.Models
                     if (_barTables.ContainsKey(job.Instrument.Name) && _barTables[job.Instrument.Name].ContainsKey(job.Interval))
                     {
                         List<BarTable> cacheList = _barTables[job.Instrument.Name][job.Interval];
-                        foreach ((DateTime start, DateTime end, BarTable table) cacheEntry in cacheCoverages)
+                        foreach ((DateTime start, DateTime end, BarTable table) cacheEntry in cache.coverages)
                         {
                             List<BarTablePointer> pointers = cacheEntry.table.RegisteredPointers.ToList();
 
@@ -431,11 +653,8 @@ namespace EvolverCore.Models
 
         internal void Shutdown()
         {
-            lock (_dataJobQueue)
-            {
-                _isShutdown = true;
-                _dataJobQueue.CompleteAdding();
-            }
+            _isShutdown = true;
+            _dataJobQueue.CompleteAdding();
 
             if (_dataStoreWorker.IsAlive)
             {
