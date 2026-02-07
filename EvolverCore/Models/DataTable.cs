@@ -448,7 +448,7 @@ namespace EvolverCore.Models
 
         public int CurrentBar { get; private set; }
 
-        public int RowCount { get { return EndOffset - StartOffset; } }
+        public int RowCount { get { return _table != null ? EndOffset - StartOffset + 1 : 0; } }
 
         public ColumnPointer<DateTime> Time { get; private set; }
         public ColumnPointer<double> Open { get; private set; }
