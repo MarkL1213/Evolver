@@ -672,7 +672,7 @@ namespace EvolverCore.Models
                 throw new EvolverException("Attempting to run a sourceless indicator.");
 
             //next input:
-            int inputIndex = -1;
+            //int inputIndex = -1;
             int barsIndex = -1;
             DateTime nextDataTime = DateTime.MaxValue;
             for (int i = 0; i < Bars.Count; i++)
@@ -684,32 +684,33 @@ namespace EvolverCore.Models
                     nextDataTime = x;
                 }
             }
-            for (int i = 0; i < Inputs.Count; i++)
-            {
-                DateTime x = Inputs[i].Indicator.Outputs[Inputs[i].PlotIndex].GetValueAt(Inputs[i].CurrentBarIndex + 1).Time;
-                if (x < nextDataTime)
-                {
-                    inputIndex = i;
-                    barsIndex = -1;
-                    nextDataTime = x;
-                }
-            }
+            //for (int i = 0; i < Inputs.Count; i++)
+            //{
+            //    DateTime x = Inputs[i].Indicator.Outputs[Inputs[i].PlotIndex].GetValueAt(Inputs[i].CurrentBarIndex + 1).Time;
+            //    if (x < nextDataTime)
+            //    {
+            //        inputIndex = i;
+            //        barsIndex = -1;
+            //        nextDataTime = x;
+            //    }
+            //}
 
-            if (inputIndex >= 0)
-            {
-                Inputs[inputIndex].CurrentBarIndex++;
-                CurrentBarIndex = -1;
-                CurrentBarsIndex = -1;
-                CurrentInputsIndex = inputIndex;
-                CurrentInputIndex = Inputs[inputIndex].CurrentBarIndex;
-                if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && inputIndex == 0)
-                {
-                    Outputs.AddNewRow();
-                    foreach (OutputPlot output in Plots)
-                        output.Properties.Add(new PlotProperties(output.DefaultProperties));
-                }
-            }
-            else if (barsIndex >= 0)
+            //if (inputIndex >= 0)
+            //{
+            //    Inputs[inputIndex].CurrentBarIndex++;
+            //    CurrentBarIndex = -1;
+            //    CurrentBarsIndex = -1;
+            //    CurrentInputsIndex = inputIndex;
+            //    CurrentInputIndex = Inputs[inputIndex].CurrentBarIndex;
+            //    if (_sourceRecord.SourceType == CalculationSource.IndicatorPlot && inputIndex == 0)
+            //    {
+            //        Outputs.AddNewRow();
+            //        foreach (OutputPlot output in Plots)
+            //            output.Properties.Add(new PlotProperties(output.DefaultProperties));
+            //    }
+            //}
+            //else
+            if (barsIndex >= 0)
             {
                 Bars[barsIndex].IncrementCurrentBar();
                 CurrentBarsIndex = barsIndex;
