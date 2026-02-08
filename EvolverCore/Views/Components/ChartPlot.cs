@@ -184,7 +184,7 @@ namespace EvolverCore.Views
             Indicator indicator = ivm.Indicator;
             int plotIndex = Properties.PlotIndex;
 
-            (int minVisibleIndex, int  maxVisibleIndex) = indicator.IndexOfOutputPointsInRange(vm.XAxis.Min, vm.XAxis.Max, plotIndex);
+            (int minVisibleIndex, int  maxVisibleIndex) = indicator.IndexOfPointsInRange(vm.XAxis.Min, vm.XAxis.Max);
 
             List<Point> visibleScreenPoints = new List<Point>();
             List<int> visibleScreenIndexes = new List<int>();
@@ -291,7 +291,7 @@ namespace EvolverCore.Views
 
             double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * indicator.Interval.Ticks / 2)); // auto-scale width
 
-            (int minVisibleIndex, int maxVisibleIndex) = indicator.IndexOfOutputPointsInRange(panelVM.XAxis.Min, panelVM.XAxis.Max, plotIndex);
+            (int minVisibleIndex, int maxVisibleIndex) = indicator.IndexOfPointsInRange(indicator.Interval.RoundUp(panelVM.XAxis.Min), indicator.Interval.RoundDown(panelVM.XAxis.Max));
             List<PlotProperties> propertiesList = indicator.Plots[plotIndex].Properties.GetRange(minVisibleIndex,maxVisibleIndex);
 
 
@@ -403,7 +403,7 @@ namespace EvolverCore.Views
 
             double halfBarWidth = Math.Max(2, Math.Min(12, pixelsPerTick * indicator.Interval.Ticks / 2)); // auto-scale width
 
-            (int minVisibleIndex,int maxVisibleIndex) = indicator.IndexOfSourcePointsInRange(
+            (int minVisibleIndex,int maxVisibleIndex) = indicator.IndexOfPointsInRange(
                                             indicator.Interval.RoundUp(xAxis.Min),
                                             indicator.Interval.RoundDown(xAxis.Max));
             if (minVisibleIndex == -1 || maxVisibleIndex == -1) return;

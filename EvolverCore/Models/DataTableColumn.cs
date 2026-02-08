@@ -15,24 +15,26 @@ namespace EvolverCore.Models
     public class ColumnPointer<T> where T : struct
     {
         private DataTableColumn<T>? _column;
-        private BarTablePointer _parentTable;
+        private BarTablePointer? _parentTable;
+
+        int _startOffset = -1;
+        int _endOffset = -1;
 
 
-        internal ColumnPointer(BarTablePointer parentTable, DataTableColumn<T>? column=null)
+        internal int StartOffset { get { return _parentTable != null ? _parentTable.StartOffset : _startOffset; } }
+        internal int EndOffset { get { return _parentTable != null ? _parentTable.EndOffset : _endOffset; } }
+
+        internal ColumnPointer(DataTableColumn<T>? column, int startOffset, int endOffset)
         {
-            //match T vs column.DataType
+        }
 
+        internal ColumnPointer(BarTablePointer? parentTable, DataTableColumn<T>? column=null)
+        {
             _column = column;
             _parentTable = parentTable;
         }
 
-        public T GetValueAt(int index) => (T)_column!.GetValueAt(_parentTable.StartOffset + index);
-        //{
-        //    if (index < 0 || index >= _column!.Count)
-        //        throw new ArgumentOutOfRangeException(nameof(index));
-
-        //    return 
-        //}
+        public T GetValueAt(int index)=> (T)_column!.GetValueAt(StartOffset + index);
 
         public int RawFindIndex(T item)
         {
@@ -47,7 +49,7 @@ namespace EvolverCore.Models
             DataTableColumn<T>? dataColumn = _column as DataTableColumn<T>;
             if (dataColumn == null) return -1;
 
-            return dataColumn.FindIndex(item, _parentTable.StartOffset, _parentTable.EndOffset);
+            return dataColumn.FindIndex(item, StartOffset, EndOffset);
         }
 
         public int GetNearestIndex(T item)
@@ -55,14 +57,14 @@ namespace EvolverCore.Models
             DataTableColumn<T>? dataColumn = _column as DataTableColumn<T>;
             if (dataColumn == null) return -1;
 
-            return dataColumn.GetNearestIndex(item, _parentTable.StartOffset, _parentTable.EndOffset) - _parentTable.StartOffset;
+            return dataColumn.GetNearestIndex(item, StartOffset, EndOffset) - StartOffset;
         }
 
         public int Count
         {
             get
             {
-                return _parentTable.RowCount;
+                return _parentTable != null ? _parentTable.RowCount : (_startOffset == _endOffset ? 0 : _endOffset - _startOffset + 1);
             }
         }
 
@@ -70,14 +72,16 @@ namespace EvolverCore.Models
         {
             DataTableColumn<T>? col = _column as DataTableColumn<T>;
             if (col == null) throw new EvolverException("DataTableColumn is invalid type.");
-            return col.Min(_parentTable.StartOffset, _parentTable.EndOffset);
+            
+            return col.Min(StartOffset, EndOffset);
         }
 
         public T Max()
         {
             DataTableColumn<T>? col = _column as DataTableColumn<T>;
             if (col == null) throw new EvolverException("DataTableColumn is invalid type.");
-            return col.Max(_parentTable.StartOffset, _parentTable.EndOffset);
+
+            return col.Max(StartOffset, EndOffset);
 
         }
 
@@ -85,7 +89,8 @@ namespace EvolverCore.Models
         {
             get
             {
-                return GetValueAt(_parentTable.CurrentBar - barsAgo);
+                //FIXME : this is going to become a problem for output tables. need a way to keep current that doesn't link to a parent bar table
+                return GetValueAt(_parentTable!.CurrentBar - barsAgo);
             }
         }
     }
@@ -343,6 +348,11 @@ namespace EvolverCore.Models
             }
         }
 
+        public void AddValue(T value)
+        {
+            _series.Add(value);
+        }
+
         public Array ToArray()
         {
             List<T> allData = new List<T>();
@@ -350,11 +360,6 @@ namespace EvolverCore.Models
             for (int i = 0; i < Count; i++) { allData.Add((T)GetValueAt(i)); }
 
             return allData.ToArray();
-        }
-
-        public ColumnPointer<T> Slice(T min, T max)
-        {
-            throw new NotImplementedException();
         }
 
         public int FindIndex(T item, int start, int end) { return FindIndexRecursive(item, start, end); }

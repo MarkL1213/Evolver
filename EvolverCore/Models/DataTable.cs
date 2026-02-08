@@ -510,6 +510,22 @@ namespace EvolverCore.Models
             Columns.Add(new DataTableColumn<double>(name, DataType.Double, size));
         }
 
+        public void AddNewRow()
+        {
+            foreach (IDataTableColumn col in Columns)
+            {
+                switch (col.DataType)
+                {
+                    case DataType.Double:
+                        DataTableColumn<double>? c = col as DataTableColumn<double>;
+                        if (c != null) c.AddValue(double.NaN);
+                        break;
+                    default:
+                        throw new NotImplementedException($"AddNewRow does not implement type {col.DataType}");
+                }
+            }
+        }
+
         public DataTableColumn<double> this[int colIndex]
         {
             get

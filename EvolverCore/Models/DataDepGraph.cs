@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -11,7 +12,7 @@ namespace EvolverCore.Models
     {
         internal DataDepGraph() { }
 
-        private Dictionary<string, Dictionary<DataInterval, List<DepGraphRootNode>>> _rootNodes = new Dictionary<string, Dictionary<DataInterval, List<DepGraphRootNode>>>();
+        private Dictionary<string, Dictionary<DataInterval, List<DepGraphNode>>> _rootNodes = new Dictionary<string, Dictionary<DataInterval, List<DepGraphNode>>>();
 
         public Indicator? CreateIndicator(Type indicatorType, IndicatorProperties properties, Indicator source, CalculationSource sourceType, int sourcePlotIndex = -1)
         {
@@ -51,12 +52,13 @@ namespace EvolverCore.Models
 
             newIndicator.SetSourceData(newSourceRecord);
             newIndicator.Startup();
-            //_indicatorCache.Add(newIndicator);
+            
+            AddIndicatorNode(newIndicator);
 
             if (newIndicator.WaitingForDataLoad)
                 source.DataChanged += newIndicator.OnSourceDataLoaded;
             else
-            { }//IndicatorReadyToRun(newIndicator);
+            { _indicatorsReadyToRun.Add(newIndicator); }
 
             return newIndicator;
         }
@@ -77,8 +79,6 @@ namespace EvolverCore.Models
             //};
 
             BarTablePointer tablePointer = Globals.Instance.DataTableManager.DataWarehouse.CreateTablePointer(instrument, interval, start, end, isLive);
-            DepGraphRootNode rootNode = new DepGraphRootNode(tablePointer);
-            AddRootNode(rootNode);
 
             IndicatorDataSourceRecord iSliceRecord = new IndicatorDataSourceRecord()
             {
@@ -95,34 +95,76 @@ namespace EvolverCore.Models
             if (indicator.WaitingForDataLoad)
                 tablePointer.LoadStateChange += indicator.OnSourceDataLoaded;
 
+            DepGraphNode rootNode = new DepGraphNode();
+            rootNode.Indicators.Add(indicator);
+            AddRootNode(rootNode);
+
+
             indicator.Startup();
 
             if (!indicator.WaitingForDataLoad)
-            { }//Globals.Instance.DataManager.IndicatorReadyToRun(indicator);
+            { _indicatorsReadyToRun.Add(indicator); }
 
             return indicator;
         }
 
-        private void AddRootNode(DepGraphRootNode node)
+        private void AddRootNode(DepGraphNode node)
         {
-            string instrumentName = node.TablePointer.Instrument.Name;
+            BarTablePointer btp = node.Indicators[0].Bars[0];
+
+            string instrumentName = btp.Instrument.Name;
             if (!_rootNodes.ContainsKey(instrumentName))
-                _rootNodes.Add(instrumentName, new Dictionary<DataInterval, List<DepGraphRootNode>>());
+                _rootNodes.Add(instrumentName, new Dictionary<DataInterval, List<DepGraphNode>>());
 
-            if (!_rootNodes[instrumentName].ContainsKey(node.TablePointer.Interval))
-                _rootNodes[instrumentName].Add(node.TablePointer.Interval, new List<DepGraphRootNode>());
+            if (!_rootNodes[instrumentName].ContainsKey(btp.Interval))
+                _rootNodes[instrumentName].Add(btp.Interval, new List<DepGraphNode>());
 
-            _rootNodes[instrumentName][node.TablePointer.Interval].Add(node);
+            _rootNodes[instrumentName][btp.Interval].Add(node);
+        }
+
+        private void AddIndicatorNode(Indicator indicator)
+        {
+            DepGraphNode? indicatorNode = FindNodeByDependency(indicator);
+            if (indicatorNode != null)
+            {
+                indicatorNode.Indicators.Add(indicator);
+                return;
+            }
+
+
+            indicatorNode = new DepGraphNode();
+            indicatorNode.Indicators.Add(indicator);
+
+
+            //FIXME : link node into dep graph, adding any parent deps not already preset
+        }
+
+        DepGraphNode? FindNodeByDependency(Indicator indicator)
+        {
+            //FIXME : find a dep graph node whose dependency tree matches the indicator
+            return null;
+        }
+
+        //FIXME : need thread/pool for 1) executing history tasks
+        ////      and 2) processing incoming data into live indicators
+        ////
+        ////      when incoming data arrives deliver in parallel as much as possible
+        ////      based on dependency inter-relations and reasonable max thread count
+
+
+        private BlockingCollection<Indicator> _indicatorsReadyToRun = new BlockingCollection<Indicator>();
+
+        internal void EnqueueIndicatorReadyToRun(Indicator indicator)
+        {
+            _indicatorsReadyToRun.Add(indicator);
+        }
+
+        private async Task ExecuteHistory(Indicator indicator)
+        {
+            await Task.Run(()=>indicator.RunHistory());
         }
     }
 
-
-    internal class DepGraphRootNode : DepGraphNode
-    {
-        internal DepGraphRootNode(BarTablePointer tablePointer) : base() { TablePointer = tablePointer; }
-        internal BarTablePointer TablePointer { get; init; }
-        
-    }
 
     internal class DepGraphNode
     {
